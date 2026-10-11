@@ -17,3 +17,5 @@ Las actualizaciones que subas a la rama `cs-resourcehub-android` volverán a com
 - La compilación es una APK de depuración para pruebas, no un paquete firmado para Google Play.
 - Las funciones que dependen de Supabase/Stripe requieren credenciales y configuración propias.
 - El código se organiza en una rama separada; la rama `main` no se modifica.
+
+> Estado: workflow de compilación configurado en `.github/workflows/build-cs-resourcehub.yml`.
