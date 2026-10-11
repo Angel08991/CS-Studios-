@@ -23,24 +23,6 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Set up JDK 17
-        uses: actions/setup-java@v4
-        with:
-          distribution: temurin
-          java-version: "17"
-          cache: gradle
-
-      - name: Set up Android SDK
-        uses: android-actions/setup-android@v3
-
-      - name: Install Android platform and build tools
-        run: sdkmanager "platforms;android-35" "build-tools;35.0.0"
-
-      - name: Set up Gradle 8.9
-        uses: gradle/actions/setup-gradle@v4
-        with:
-          gradle-version: "8.9"
-
       - name: Restore project source
         shell: bash
         run: |
@@ -55,7 +37,7 @@ jobs:
           pos = 0
           count = 0
           with zipfile.ZipFile(rebuilt, "w", compression=zipfile.ZIP_DEFLATED) as out:
-              while pos + 30 <= len(raw) and raw[pos:pos+4] == b"PK\\x03\\x04":
+              while pos + 30 <= len(raw) and raw[pos:pos+4] == b"PK\x03\x04":
                   values = struct.unpack_from("<IHHHHHIIIHH", raw, pos)
                   flags, method, crc, csize, usize, nlen, xlen = values[2], values[3], values[6], values[7], values[8], values[9], values[10]
                   if flags & 0x08:
@@ -93,6 +75,24 @@ jobs:
           test -f CS-ResourceHub/app/build.gradle.kts
           test -f CS-ResourceHub/app/src/main/AndroidManifest.xml
           test -f CS-ResourceHub/app/src/main/java/com/csstudios/resourcehub/MainActivity.kt
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: "17"
+          cache: gradle
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Install Android platform and build tools
+        run: sdkmanager "platforms;android-35" "build-tools;35.0.0"
+
+      - name: Set up Gradle 8.9
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: "8.9"
 
       - name: Compile APK
         shell: bash
