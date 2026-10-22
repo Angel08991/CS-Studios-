@@ -238,13 +238,117 @@ public final class IxKitsPlugin extends JavaPlugin implements Listener, CommandE
         return true;
     }
 
+    private void openCatalog(Player p, String query) {
+        if (!catalogClient.isEnabled()) {
+            p.sendMessage(PREFIX + tr("El catálogo todavía no está configurado. Activa catalog.enabled y define catalog.base-url en config.yml.", "The catalog is not configured yet. Enable catalog.enabled and set catalog.base-url in config.yml."));
+            return;
+        }
+        p.sendMessage(PREFIX + tr("Conectando con IxKits Community...", "Connecting to IxKits Community..."));
+        catalogClient.search(query, 1, EDIT_SLOTS.length).whenComplete((items, error) ->
+            Bukkit.getScheduler().runTask(this, () -> {
+                if (error != null) {
+                    p.sendMessage(PREFIX + tr("No se pudo cargar el catálogo: ", "Could not load catalog: ") + rootMessage(error));
+                    return;
+                }
+                Inventory inv = menu("catalog", null, 0, tr("§3✦ §bIxKits §8• §0Community", "§3✦ §bIxKits §8• §0Community"));
+                ((MenuHolder) inv.getHolder()).query = query;
+                border(inv);
+                MenuHolder holder = (MenuHolder) inv.getHolder();
+                if (items.isEmpty()) inv.setItem(22, item(Material.PAPER, tr("§7No hay plantillas disponibles.", "§7No templates are available."), tr("§7Prueba otra búsqueda.", "§7Try another search.")));
+                int i = 0;
+                for (CatalogClient.TemplateSummary template : items) {
+                    if (i >= EDIT_SLOTS.length) break;
+                    int slot = EDIT_SLOTS[i++];
+                    String rating = template.ratingCount() == 0 ? tr("Sin valoraciones", "Not rated")
+                        : String.format(Locale.US, "%.1f/5 (%d)", template.averageRating(), template.ratingCount());
+                    inv.setItem(slot, item(Material.ENDER_CHEST, "§d" + template.title(),
+                        "§7" + tr("Autor: ", "Author: ") + template.author(),
+                        "§7" + tr("Categoría: ", "Category: ") + template.category(),
+                        "§7" + tr("Versión: ", "Version: ") + template.mcVersion(),
+                        "§7" + tr("Descargas: ", "Downloads: ") + template.downloads(),
+                        "§7" + tr("Valoración: ", "Rating: ") + rating,
+                        tr("§eClic: descargar", "§eClick: download"),
+                        tr("§eClic derecho: favorito", "§eRight-click: favorite")));
+                    holder.entryBySlot.put(slot, template.id());
+                }
+                inv.setItem(45, item(Material.ARROW, tr("§7Volver", "§7Back"), tr("§8Menú principal", "§8Main menu")));
+                inv.setItem(47, item(Material.COMPASS, tr("§bNueva búsqueda", "§bNew search"), tr("§7Usa /ixkits buscar <texto>", "§7Use /ixkits buscar <text>")));
+                inv.setItem(49, item(Material.BOOK, tr("§fCómo descargar", "§fHow to download"), tr("§7Clic izquierdo en una plantilla.", "§7Left-click a template.")));
+                inv.setItem(51, item(Material.REFRESH, tr("§bActualizar", "§bRefresh"), tr("§7Volver a cargar el catálogo.", "§7Reload the catalog.")));
+                p.openInventory(inv);
+            }));
+    }
+
+    private void downloadCatalogTemplate(Player p, String id) {
+        if (!catalogClient.isEnabled()) {
+            p.sendMessage(PREFIX + tr("El catálogo no está configurado.", "The catalog is not configured."));
+            return;
+        }
+        catalogClient.download(id).whenComplete((download, error) ->
+            Bukkit.getScheduler().runTask(this, () -> {
+                if (error != null) {
+                    p.sendMessage(PREFIX + tr("Descarga fallida: ", "Download failed: ") + rootMessage(error));
+                    return;
+                }
+                try {
+                    File file = new File(projectService.importsDirectory(), projectService.slug(download.id()) + ".ixkit.yml");
+                    Files.writeString(file.toPath(), download.projectYaml(), java.nio.charset.StandardCharsets.UTF_8);
+                    String name = download.title();
+                    if (!projectService.importNative(file, name)) {
+                        name = download.title() + " " + Long.toString(System.currentTimeMillis() % 100000);
+                        if (!projectService.importNative(file, name)) {
+                            p.sendMessage(PREFIX + tr("El archivo no pasó la validación o el nombre ya existe.", "The file failed validation or the project name already exists."));
+                            return;
+                        }
+                    }
+                    p.sendMessage(PREFIX + tr("Plantilla importada como proyecto: §b", "Template imported as project: §b") + name);
+                    openProjects(p);
+                } catch (IOException ex) {
+                    p.sendMessage(PREFIX + "§c" + ex.getMessage());
+                }
+            }));
+    }
+
+    private void publishProject(Player p, String project, String category, String description) {
+        if (!catalogClient.isEnabled()) {
+            p.sendMessage(PREFIX + tr("Configura primero el catálogo online en config.yml.", "Configure the online catalog in config.yml first."));
+            return;
+        }
+        File file = projectFile(project);
+        if (!file.isFile()) {
+            p.sendMessage(PREFIX + tr("No existe ese proyecto.", "Project not found."));
+            return;
+        }
+        try {
+            String yaml = Files.readString(file.toPath(), java.nio.charset.StandardCharsets.UTF_8);
+            YamlConfiguration projectYaml = YamlConfiguration.loadConfiguration(file);
+            String title = projectYaml.getString("name", project);
+            String version = getConfig().getString("catalog.minecraft-version", "1.21.11");
+            String license = getConfig().getString("catalog.default-license", "all-rights-reserved");
+            catalogClient.publish(title, p.getName(), category, description, version, license, yaml)
+                .whenComplete((result, error) -> Bukkit.getScheduler().runTask(this, () -> {
+                    if (error != null) p.sendMessage(PREFIX + tr("No se pudo publicar: ", "Publish failed: ") + rootMessage(error));
+                    else p.sendMessage(PREFIX + tr("Plantilla publicada con ID §b", "Template published with ID §b") + result.id());
+                }));
+        } catch (IOException ex) {
+            p.sendMessage(PREFIX + "§c" + ex.getMessage());
+        }
+    }
+
+    private String rootMessage(Throwable error) {
+        Throwable current = error;
+        while (current.getCause() != null && current.getCause() != current) current = current.getCause();
+        String message = current.getMessage();
+        return message == null || message.isBlank() ? current.getClass().getSimpleName() : message;
+    }
+
     private void openMain(Player p) {
         Inventory inv = menu("main", null, 0, tr("§3✦ §bIxKits §3• §8Estudio", "§3✦ §bIxKits §3• §8Studio"));
         border(inv);
         inv.setItem(20, item(Material.CHEST, tr("§bMis proyectos", "§bMy projects"), tr("§7Crear, abrir y editar kits.", "§7Create, open and edit kits."), tr("§8Proyectos locales", "§8Local projects")));
         inv.setItem(22, item(Material.BOOKSHELF, tr("§bBiblioteca de plantillas", "§bTemplate library"), tr("§7Lore, paletas y encantamientos.", "§7Lore, palettes and enchantments."), tr("§8Plantillas incluidas", "§8Built-in templates")));
         inv.setItem(24, item(Material.WRITABLE_BOOK, tr("§bExportadores", "§bExport tools"), tr("§7Generar archivos editables.", "§7Generate editable files."), tr("§8Selecciona un proyecto", "§8Choose a project")));
-        inv.setItem(30, item(Material.ENDER_CHEST, "§dIxKits Community", tr("§7Catálogo comunitario online.", "§7Online community catalog."), tr("§cServicio web aún no conectado", "§cWeb service not connected yet")));
+        inv.setItem(30, item(Material.ENDER_CHEST, "§dIxKits Community", tr("§7Buscar y descargar plantillas.", "§7Search and download templates."), tr("§8Requiere catalog.enabled y base-url", "§8Requires catalog.enabled and base-url")));
         inv.setItem(32, item(Material.COMPASS, tr("§fAyuda y comandos", "§fHelp and commands"), tr("§7/ixkits crear <nombre>", "§7/ixkits crear <name>"), "§7/ixkits idioma"));
         inv.setItem(28, item(Material.IRON_CHESTPLATE, tr("§bHerramientas del proyecto", "§bProject tools"), tr("§7Copias, validación e importación.", "§7Backups, validation and import."), tr("§eAbre Mis proyectos", "§eOpen My projects")));
         inv.setItem(40, item(Material.WRITABLE_BOOK, tr("§eIdioma / Language", "§eLanguage / Idioma"), tr("§7Actual: " + (isEnglish() ? "English" : "Español"), "§7Current: " + (isEnglish() ? "English" : "Spanish")), tr("§eClic para cambiar", "§eClick to change")));
@@ -314,6 +418,7 @@ public final class IxKitsPlugin extends JavaPlugin implements Listener, CommandE
         inv.setItem(24, item(Material.TNT, tr("§cEliminar", "§cDelete"), tr("§7Mover a la papelera recuperable.", "§7Move it to recoverable trash."), tr("§eSolicita confirmación", "§eRequires confirmation")));
         inv.setItem(30, item(Material.WRITABLE_BOOK, tr("§bValidar proyecto", "§bValidate project"), tr("§7Comprobar objetos y formato.", "§7Check items and project format.")));
         inv.setItem(32, item(Material.PAPER, tr("§aExportar EssentialsX", "§aExport to EssentialsX"), tr("§7Crea un kits.yml compatible.", "§7Create a compatible kits.yml."), tr("§cPuede perder metadatos avanzados", "§cAdvanced metadata may be lost")));
+        inv.setItem(34, item(Material.ENDER_CHEST, tr("§dPublicar en Community", "§dPublish to Community"), tr("§7Publica una plantilla validada.", "§7Publish a validated template."), tr("§8Requiere token de publicación.", "§8Requires a publish token.")));
         inv.setItem(40, item(Material.CLOCK, tr("§eDeshacer último cambio", "§eUndo last change"), tr("§7Restaurar una copia anterior.", "§7Restore a previous backup.")));
         inv.setItem(49, item(Material.WRITABLE_BOOK, tr("§dExportar IxKits", "§dExport IxKits"), tr("§7Conserva los objetos serializados.", "§7Preserves serialized items.")));
         inv.setItem(45, item(Material.ARROW, tr("§7Volver", "§7Back"), tr("§8Biblioteca de proyectos", "§8Project library")));
@@ -672,7 +777,8 @@ public final class IxKitsPlugin extends JavaPlugin implements Listener, CommandE
             if (slot == 20) openProjects(p);
             else if (slot == 22) openTemplates(p);
             else if (slot == 24) { p.sendMessage(PREFIX + tr("Abre Mis proyectos y pulsa Exportar.", "Open My projects and choose Export.")); openProjects(p); }
-            else if (slot == 30) p.sendMessage(PREFIX + tr("El catálogo comunitario necesita el servicio web, aún no conectado.", "The community catalog needs its web service, which is not connected yet."));
+            else if (slot == 30) openCatalog(p, "");
+            else if (slot == 28) openProjects(p);
             else if (slot == 32) {
                 p.sendMessage(tr("§bIxKits §7— /ixkits crear <nombre> · /ixkits proyectos · /ixkits idioma", "§bIxKits §7— /ixkits crear <name> · /ixkits proyectos · /ixkits idioma"));
             } else if (slot == 40) openLanguages(p);
@@ -709,7 +815,21 @@ public final class IxKitsPlugin extends JavaPlugin implements Listener, CommandE
                     else p.sendMessage(PREFIX + tr("No hay copias para restaurar.", "No backups are available."));
                 } catch (IOException ex) { p.sendMessage(PREFIX + "§c" + ex.getMessage()); }
                 openProjectActions(p, h.project);
-            } else if (slot == 49) { exportProject(p, h.project); openProjectActions(p, h.project); }
+            } else if (slot == 34) publishProject(p, h.project, "misc", "Created with IxKits by CS Studios");
+            else if (slot == 49) { exportProject(p, h.project); openProjectActions(p, h.project); }
+        } else if (h.kind.equals("catalog")) {
+            if (slot == 45) openMain(p);
+            else if (slot == 47 || slot == 51) openCatalog(p, h.query);
+            else if (slot == 49) p.sendMessage(PREFIX + tr("Haz clic en una plantilla para descargarla.", "Click a template to download it."));
+            else if (h.entryBySlot.containsKey(slot)) {
+                String id = h.entryBySlot.get(slot);
+                if (e.isRightClick()) {
+                    catalogClient.toggleFavorite(id, p.getUniqueId().toString()).whenComplete((ignored, error) ->
+                        Bukkit.getScheduler().runTask(this, () -> p.sendMessage(PREFIX + (error == null
+                            ? tr("Favorito actualizado.", "Favorite updated.")
+                            : tr("No se pudo actualizar el favorito: ", "Could not update favorite: ") + rootMessage(error)))));
+                } else downloadCatalogTemplate(p, id);
+            }
         } else if (h.kind.equals("project-delete-confirm")) {
             if (slot == 23 || slot == 45) openProjectActions(p, h.project);
             else if (slot == 21) {
@@ -1192,6 +1312,7 @@ public final class IxKitsPlugin extends JavaPlugin implements Listener, CommandE
     private static final class MenuHolder implements InventoryHolder {
         final String kind, project;
         final int page, targetSlot, subPage;
+        String query = "";
         final Map<Integer, String> entryBySlot = new HashMap<>();
         Inventory inventory;
         MenuHolder(String kind, String project, int page, int targetSlot, int subPage) {
