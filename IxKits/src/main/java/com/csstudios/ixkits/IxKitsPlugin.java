@@ -289,20 +289,20 @@ public final class IxKitsPlugin extends JavaPlugin implements Listener, CommandE
         p.openInventory(inv);
     }
 
+    private ItemStack gearSlot(ItemStack stored, Material icon, String label) {
+        if (stored != null && !stored.getType().isAir()) return stored.clone();
+        return item(Material.GRAY_STAINED_GLASS_PANE, "§8IxKits empty slot", "§7" + label, tr("§8Coloca aquí un objeto", "§8Place an item here"));
+    }
+
     private void openEquipment(Player p, String project) {
         YamlConfiguration yaml = YamlConfiguration.loadConfiguration(projectFile(project));
         Inventory inv = menu("equipment", project, 0, tr("§3✦ §bIxKits §8• §0Equipamiento", "§3✦ §bIxKits §8• §0Equipment"));
         border(inv);
-        inv.setItem(19, yaml.getItemStack("equipment.helmet", null));
-        inv.setItem(21, yaml.getItemStack("equipment.chestplate", null));
-        inv.setItem(23, yaml.getItemStack("equipment.leggings", null));
-        inv.setItem(25, yaml.getItemStack("equipment.boots", null));
-        inv.setItem(31, yaml.getItemStack("equipment.offhand", null));
-        if (inv.getItem(19) == null) inv.setItem(19, item(Material.LEATHER_HELMET, tr("§bCasco", "§bHelmet"), tr("§7Coloca aquí el casco", "§7Place the helmet here")));
-        if (inv.getItem(21) == null) inv.setItem(21, item(Material.LEATHER_CHESTPLATE, tr("§bPeto", "§bChestplate"), tr("§7Coloca aquí el peto", "§7Place the chestplate here")));
-        if (inv.getItem(23) == null) inv.setItem(23, item(Material.LEATHER_LEGGINGS, tr("§bPantalones", "§bLeggings"), tr("§7Coloca aquí los pantalones", "§7Place leggings here")));
-        if (inv.getItem(25) == null) inv.setItem(25, item(Material.LEATHER_BOOTS, tr("§bBotas", "§bBoots"), tr("§7Coloca aquí las botas", "§7Place the boots here")));
-        if (inv.getItem(31) == null) inv.setItem(31, item(Material.SHIELD, tr("§bMano secundaria", "§bOffhand"), tr("§7Escudo, tótem u otro objeto", "§7Shield, totem or another item")));
+        inv.setItem(19, gearSlot(yaml.getItemStack("equipment.helmet"), Material.LEATHER_HELMET, tr("Casco", "Helmet")));
+        inv.setItem(21, gearSlot(yaml.getItemStack("equipment.chestplate"), Material.LEATHER_CHESTPLATE, tr("Peto", "Chestplate")));
+        inv.setItem(23, gearSlot(yaml.getItemStack("equipment.leggings"), Material.LEATHER_LEGGINGS, tr("Pantalones", "Leggings")));
+        inv.setItem(25, gearSlot(yaml.getItemStack("equipment.boots"), Material.LEATHER_BOOTS, tr("Botas", "Boots")));
+        inv.setItem(31, gearSlot(yaml.getItemStack("equipment.offhand"), Material.SHIELD, tr("Mano secundaria", "Offhand")));
         inv.setItem(40, item(Material.PAPER, tr("§fCómo usarlo", "§fHow to use"), tr("§7Mueve objetos del inventario", "§7Move items from your inventory"), tr("§7a las cinco ranuras disponibles.", "§7into the five available slots."), tr("§7Se guarda al cerrar.", "§7Saved when closed.")));
         inv.setItem(45, item(Material.ARROW, tr("§7Volver al proyecto", "§7Back to project")));
         p.openInventory(inv);
@@ -615,10 +615,19 @@ public final class IxKitsPlugin extends JavaPlugin implements Listener, CommandE
             else if (slot == 47) { savePage(e.getView().getTopInventory(), h); openEditor(p, h.project, Math.max(0, h.page-1)); }
             else if (slot == 51) { savePage(e.getView().getTopInventory(), h); openEditor(p, h.project, Math.min(1, h.page+1)); }
             else if (slot == 49) { savePage(e.getView().getTopInventory(), h); p.closeInventory(); p.sendMessage(PREFIX + tr("Proyecto guardado.", "Project saved.")); }
+            else if (slot == 44) { savePage(e.getView().getTopInventory(), h); openEquipment(p, h.project); }
             else if (slot == 53) { savePage(e.getView().getTopInventory(), h); exportProject(p, h.project); }
             return;
         }
 
+        if (h.kind.equals("equipment")) {
+            if (slot >= e.getView().getTopInventory().getSize()) {
+                if (e.isShiftClick()) e.setCancelled(true);
+                return;
+            }
+            if (!contains(EQUIP_SLOTS, slot)) e.setCancelled(true);
+            return;
+        }
         e.setCancelled(true);
         if (h.kind.equals("main")) {
             if (slot == 20) openProjects(p);
@@ -635,7 +644,42 @@ public final class IxKitsPlugin extends JavaPlugin implements Listener, CommandE
         } else if (h.kind.equals("projects")) {
             if (slot == 45) openMain(p);
             else if (slot == 49) p.sendMessage(PREFIX + tr("Crea un proyecto con §f/ixkits crear <nombre>§7.", "Create a project with §f/ixkits crear <name>§7."));
-            else if (h.entryBySlot.containsKey(slot)) openEditor(p, h.entryBySlot.get(slot), 0);
+            else if (h.entryBySlot.containsKey(slot)) {
+                String project = h.entryBySlot.get(slot);
+                if (e.isRightClick()) openProjectActions(p, project);
+                else openEditor(p, project, 0);
+            }
+        } else if (h.kind.equals("project-actions")) {
+            if (slot == 45) openProjects(p);
+            else if (slot == 20) promptInput(p, InputType.DUPLICATE_PROJECT, h.project, 0, -1, "Escribe el nombre para la copia:", "Type a name for the copy:");
+            else if (slot == 22) promptInput(p, InputType.RENAME_PROJECT, h.project, 0, -1, "Escribe el nuevo nombre:", "Type the new name:");
+            else if (slot == 24) openDeleteConfirm(p, h.project);
+            else if (slot == 30) {
+                for (String line : projectService.validate(h.project)) p.sendMessage(PREFIX + "§7" + line);
+                openProjectActions(p, h.project);
+            } else if (slot == 32) {
+                try {
+                    File output = projectService.exportEssentials(h.project);
+                    p.sendMessage(PREFIX + tr("Exportado: §b", "Exported: §b") + output.getPath());
+                    p.sendMessage(PREFIX + tr("Revisa los avisos de metadatos avanzados.", "Review the advanced metadata warning."));
+                } catch (IOException ex) { p.sendMessage(PREFIX + "§c" + ex.getMessage()); }
+                openProjectActions(p, h.project);
+            } else if (slot == 40) {
+                try {
+                    if (projectService.undo(h.project)) p.sendMessage(PREFIX + tr("Copia restaurada.", "Backup restored."));
+                    else p.sendMessage(PREFIX + tr("No hay copias para restaurar.", "No backups are available."));
+                } catch (IOException ex) { p.sendMessage(PREFIX + "§c" + ex.getMessage()); }
+                openProjectActions(p, h.project);
+            } else if (slot == 49) { exportProject(p, h.project); openProjectActions(p, h.project); }
+        } else if (h.kind.equals("project-delete-confirm")) {
+            if (slot == 23 || slot == 45) openProjectActions(p, h.project);
+            else if (slot == 21) {
+                try {
+                    if (projectService.moveToTrash(h.project)) p.sendMessage(PREFIX + tr("Proyecto movido a la papelera.", "Project moved to trash."));
+                    else p.sendMessage(PREFIX + tr("No existe ese proyecto.", "Project not found."));
+                    openProjects(p);
+                } catch (IOException ex) { p.sendMessage(PREFIX + "§c" + ex.getMessage()); }
+            }
         } else if (h.kind.equals("templates")) {
             if (slot == 45) openMain(p);
             else if (slot == 20) openLoreTemplates(p, 0);
@@ -657,7 +701,41 @@ public final class IxKitsPlugin extends JavaPlugin implements Listener, CommandE
             if (slot == 45) openEditor(p, h.project, h.page);
             else if (slot == 20) openEnchantments(p, h.project, h.page, h.targetSlot, 0);
             else if (slot == 22) openLoreTemplates(p, 0, h.project, h.page, h.targetSlot);
-            else if (slot == 24) {
+            else if (slot == 11) promptInput(p, InputType.ITEM_NAME, h.project, h.page, h.targetSlot, "Escribe el nombre MiniMessage del objeto:", "Type the item's MiniMessage name:");
+            else if (slot == 13) promptInput(p, InputType.ITEM_LORE, h.project, h.page, h.targetSlot, "Escribe el lore; separa cada línea con |. Usa - para borrar:", "Type the lore; separate each line with |. Use - to clear:");
+            else if (slot == 29) {
+                ItemStack target = getProjectItem(h.project, h.page, h.targetSlot);
+                if (target != null) { ItemMeta meta = target.getItemMeta(); meta.setUnbreakable(!meta.isUnbreakable()); target.setItemMeta(meta); saveProjectItem(h.project, h.page, h.targetSlot, target); }
+                openItemEditor(p, h.project, h.page, h.targetSlot);
+            } else if (slot == 33) {
+                ItemStack target = getProjectItem(h.project, h.page, h.targetSlot);
+                if (target != null && target.getItemMeta() instanceof Damageable damageable) {
+                    ItemMeta meta = target.getItemMeta();
+                    Damageable edit = (Damageable) meta;
+                    int maximum = Math.max(0, target.getType().getMaxDurability());
+                    int value = e.isShiftClick() ? 0 : edit.getDamage() + (e.isRightClick() ? -10 : 10);
+                    edit.setDamage(Math.max(0, Math.min(maximum, value)));
+                    target.setItemMeta(meta);
+                    saveProjectItem(h.project, h.page, h.targetSlot, target);
+                } else p.sendMessage(PREFIX + tr("Este objeto no tiene durabilidad.", "This item has no durability."));
+                openItemEditor(p, h.project, h.page, h.targetSlot);
+            } else if (slot == 35) promptInput(p, InputType.MODEL_DATA, h.project, h.page, h.targetSlot, "Escribe el custom model data numérico o - para borrarlo:", "Type the numeric custom model data or - to clear it:");
+            else if (slot == 37) openAttributes(p, h.project, h.page, h.targetSlot);
+            else if (slot == 39) {
+                ItemStack target = getProjectItem(h.project, h.page, h.targetSlot);
+                if (target != null) {
+                    ItemMeta meta = target.getItemMeta();
+                    if (meta.hasItemFlag(ItemFlag.HIDE_ATTRIBUTES)) meta.removeItemFlags(ItemFlag.HIDE_ATTRIBUTES, ItemFlag.HIDE_ENCHANTS);
+                    else meta.addItemFlags(ItemFlag.HIDE_ATTRIBUTES, ItemFlag.HIDE_ENCHANTS);
+                    target.setItemMeta(meta);
+                    saveProjectItem(h.project, h.page, h.targetSlot, target);
+                }
+                openItemEditor(p, h.project, h.page, h.targetSlot);
+            } else if (slot == 41) {
+                ItemStack target = getProjectItem(h.project, h.page, h.targetSlot);
+                if (target != null && target.getItemMeta() instanceof LeatherArmorMeta) promptInput(p, InputType.LEATHER_COLOR, h.project, h.page, h.targetSlot, "Escribe el color como #RRGGBB o R,G,B:", "Type a color as #RRGGBB or R,G,B:");
+                else p.sendMessage(PREFIX + tr("Solo disponible para armadura de cuero.", "Only available for leather armor."));
+            } else if (slot == 24) {
                 YamlConfiguration y = YamlConfiguration.loadConfiguration(projectFile(h.project));
                 ItemStack target = y.getItemStack("pages." + h.page + "." + h.targetSlot);
                 if (target != null) {
@@ -668,6 +746,9 @@ public final class IxKitsPlugin extends JavaPlugin implements Listener, CommandE
                 }
                 openItemEditor(p, h.project, h.page, h.targetSlot);
             }
+        } else if (h.kind.equals("attributes")) {
+            if (slot == 45) openItemEditor(p, h.project, h.page, h.targetSlot);
+            else if (h.entryBySlot.containsKey(slot)) adjustAttribute(p, h, h.entryBySlot.get(slot), e.isRightClick(), e.isShiftClick());
         } else if (h.kind.equals("enchantments")) {
             if (slot == 45) openItemEditor(p, h.project, h.page, h.targetSlot);
             else if (slot == 47) openEnchantments(p, h.project, h.page, h.targetSlot, Math.max(0, h.subPage - 1));
@@ -717,6 +798,12 @@ public final class IxKitsPlugin extends JavaPlugin implements Listener, CommandE
 
     @EventHandler public void onDrag(InventoryDragEvent e) {
         if (!(e.getView().getTopInventory().getHolder() instanceof MenuHolder h)) return;
+        if (h.kind.equals("equipment")) {
+            for (int slot : e.getRawSlots()) {
+                if (slot < e.getView().getTopInventory().getSize() && !contains(EQUIP_SLOTS, slot)) { e.setCancelled(true); return; }
+            }
+            return;
+        }
         if (!h.kind.equals("editor")) {
             e.setCancelled(true);
             return;
@@ -727,16 +814,64 @@ public final class IxKitsPlugin extends JavaPlugin implements Listener, CommandE
     }
 
     @EventHandler public void onClose(InventoryCloseEvent e) {
-        if (e.getInventory().getHolder() instanceof MenuHolder h && h.kind.equals("editor")) savePage(e.getInventory(), h);
+        if (!(e.getInventory().getHolder() instanceof MenuHolder h)) return;
+        if (h.kind.equals("editor")) savePage(e.getInventory(), h);
+        else if (h.kind.equals("equipment")) saveEquipment(e.getInventory(), h.project);
     }
 
     private void savePage(Inventory inv, MenuHolder h) {
         File f = projectFile(h.project);
         YamlConfiguration y = YamlConfiguration.loadConfiguration(f);
+        boolean changed = false;
+        for (int slot : EDIT_SLOTS) {
+            if (!Objects.equals(y.getItemStack("pages." + h.page + "." + slot), inv.getItem(slot))) { changed = true; break; }
+        }
+        if (changed) projectService.backupBeforeChange(f);
         y.set("version", 1);
+        y.set("format-version", 2);
+        if (!y.contains("created")) y.set("created", System.currentTimeMillis());
         y.set("updated", System.currentTimeMillis());
         for (int slot : EDIT_SLOTS) y.set("pages." + h.page + "." + slot, inv.getItem(slot));
         saveYaml(y, f);
+    }
+
+    private void saveEquipment(Inventory inv, String project) {
+        File file = projectFile(project);
+        YamlConfiguration yaml = YamlConfiguration.loadConfiguration(file);
+        String[] keys = {"helmet", "chestplate", "leggings", "boots", "offhand"};
+        boolean changed = false;
+        for (int i = 0; i < EQUIP_SLOTS.length; i++) {
+            ItemStack current = inv.getItem(EQUIP_SLOTS[i]);
+            if (isEquipmentPlaceholder(current)) current = null;
+            if (!Objects.equals(yaml.getItemStack("equipment." + keys[i]), current)) { changed = true; break; }
+        }
+        if (changed) projectService.backupBeforeChange(file);
+        for (int i = 0; i < EQUIP_SLOTS.length; i++) {
+            ItemStack current = inv.getItem(EQUIP_SLOTS[i]);
+            yaml.set("equipment." + keys[i], isEquipmentPlaceholder(current) ? null : current);
+        }
+        yaml.set("format-version", 2);
+        yaml.set("updated", System.currentTimeMillis());
+        saveYaml(yaml, file);
+    }
+
+    private boolean isEquipmentPlaceholder(ItemStack item) {
+        return item != null && item.getType() == Material.GRAY_STAINED_GLASS_PANE
+            && item.hasItemMeta() && Objects.equals(item.getItemMeta().getDisplayName(), "§8IxKits empty slot");
+    }
+
+    private ItemStack getProjectItem(String project, int page, int slot) {
+        return YamlConfiguration.loadConfiguration(projectFile(project)).getItemStack("pages." + page + "." + slot);
+    }
+
+    private void saveProjectItem(String project, int page, int slot, ItemStack item) {
+        File file = projectFile(project);
+        projectService.backupBeforeChange(file);
+        YamlConfiguration yaml = YamlConfiguration.loadConfiguration(file);
+        yaml.set("pages." + page + "." + slot, item);
+        yaml.set("format-version", 2);
+        yaml.set("updated", System.currentTimeMillis());
+        saveYaml(yaml, file);
     }
 
     private void exportProject(Player p, String project) {
@@ -744,11 +879,13 @@ public final class IxKitsPlugin extends JavaPlugin implements Listener, CommandE
         if (!f.exists()) { p.sendMessage(PREFIX + tr("Proyecto no encontrado.", "Project not found.")); return; }
         File out = new File(exportsDir, project + ".ixkit.yml");
         YamlConfiguration y = YamlConfiguration.loadConfiguration(f);
-        y.set("ixkits-export.version", 1);
+        y.set("format-version", 2);
+        y.set("ixkits-export.version", 2);
         y.set("ixkits-export.source", project);
+        y.set("ixkits-export.created", System.currentTimeMillis());
         saveYaml(y, out);
         p.sendMessage(PREFIX + tr("Exportado a §bplugins/IxKits/exports/", "Exported to §bplugins/IxKits/exports/") + out.getName());
-        p.sendMessage(PREFIX + tr("Formato nativo IxKits; los exportadores para plugins externos se ampliarán en futuras versiones.", "Native IxKits format; external plugin exporters will be added in future versions."));
+        p.sendMessage(PREFIX + tr("Formato nativo: conserva objetos y equipamiento serializados.", "Native format: preserves serialized items and equipment."));
     }
 
     private void handleLore(Player p, String action, String name) {
@@ -990,7 +1127,7 @@ public final class IxKitsPlugin extends JavaPlugin implements Listener, CommandE
     private boolean contains(int[] arr, int value) { for (int n : arr) if (n == value) return true; return false; }
     private List<String> color(List<String> lines) { return lines.stream().map(s -> ChatColor.translateAlternateColorCodes('&', s)).toList(); }
     private String slug(String in) { return in.toLowerCase(Locale.ROOT).replaceAll("[^a-z0-9_-]", "-").replaceAll("-+", "-"); }
-    private File projectFile(String name) { return new File(projectsDir, slug(name) + ".yml"); }
+    private File projectFile(String name) { return projectService == null ? new File(projectsDir, slug(name) + ".yml") : projectService.projectFile(name); }
     private void saveYaml(YamlConfiguration yaml, File file) {
         try { File parent=file.getParentFile(); if(parent!=null) parent.mkdirs(); yaml.save(file); }
         catch (IOException ex) { getLogger().severe("No se pudo guardar " + file.getName() + ": " + ex.getMessage()); }
