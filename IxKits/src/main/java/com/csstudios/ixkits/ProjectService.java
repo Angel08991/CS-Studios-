@@ -129,7 +129,7 @@ public final class ProjectService {
     public boolean undo(String id) throws IOException {
         File current = projectFile(id);
         File directory = new File(backupsDir, slug(id));
-        File[] backups = directory.listFiles((d, name) -> name.endsWith(".yml"));
+        File[] backups = directory.listFiles((d, name) -> name.endsWith(".yml") && !name.startsWith("before-undo-"));
         if (backups == null || backups.length == 0) return false;
         Arrays.sort(backups, Comparator.comparing(File::getName).reversed());
         File latest = backups[0];
