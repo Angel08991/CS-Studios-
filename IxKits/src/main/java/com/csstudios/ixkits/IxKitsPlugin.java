@@ -45,6 +45,7 @@ public final class IxKitsPlugin extends JavaPlugin implements Listener, CommandE
     private ProjectService projectService;
     private CatalogClient catalogClient;
     private final Map<UUID, PendingInput> pendingInputs = new ConcurrentHashMap<>();
+    private final Map<UUID, ItemStack> itemClipboard = new ConcurrentHashMap<>();
     private static final int[] EQUIP_SLOTS = {19, 21, 23, 25, 31};
     private static final List<String> EDITABLE_ATTRIBUTES = List.of("max_health", "attack_damage", "attack_speed", "armor", "armor_toughness", "knockback_resistance", "movement_speed", "luck");
     private static final String PREFIX = "§8[§bIxKits§8] §7";
@@ -739,6 +740,12 @@ public final class IxKitsPlugin extends JavaPlugin implements Listener, CommandE
         Inventory inv = menu("item-editor", project, page, targetSlot, 0, tr("§3✦ §bIxKits §8• §0Editor de objeto", "§3✦ §bIxKits §8• §0Item editor"));
         border(inv);
         inv.setItem(4, target.clone());
+        inv.setItem(15, item(Material.COPY, tr("§bCopiar objeto", "§bCopy item"),
+            tr("§7Guardar una copia exacta en IxKits.", "§7Keep an exact copy in IxKits."),
+            tr("§7Después haz clic en una ranura vacía.", "§7Then click an empty project slot.")));
+        inv.setItem(17, item(Material.CHEST, tr("§bPortapapeles", "§bClipboard"),
+            itemClipboard.containsKey(p.getUniqueId()) ? tr("§aHay un objeto copiado", "§aAn item is copied") : tr("§8Está vacío", "§8It is empty"),
+            tr("§7Clic para ver el estado", "§7Click to check status")));
         inv.setItem(20, item(Material.ENCHANTED_BOOK, tr("§bEncantamientos", "§bEnchantments"),
             tr("§7Añadir, subir o quitar niveles.", "§7Add, raise or lower levels."),
             tr("§eClic para abrir el editor", "§eClick to open the editor")));
@@ -817,6 +824,15 @@ public final class IxKitsPlugin extends JavaPlugin implements Listener, CommandE
                     e.setCancelled(true);
                     savePage(e.getView().getTopInventory(), h);
                     openItemEditor(p, h.project, h.page, slot);
+                } else if ((clicked == null || clicked.getType().isAir()) && !e.isRightClick()
+                    && (e.getCursor() == null || e.getCursor().getType().isAir()) && itemClipboard.containsKey(p.getUniqueId())) {
+                    e.setCancelled(true);
+                    ItemStack copy = itemClipboard.get(p.getUniqueId());
+                    if (copy != null) {
+                        e.getView().getTopInventory().setItem(slot, copy.clone());
+                        savePage(e.getView().getTopInventory(), h);
+                        p.sendMessage(PREFIX + tr("Objeto pegado desde el portapapeles de IxKits.", "Item pasted from the IxKits clipboard."));
+                    }
                 }
                 return;
             }
@@ -835,7 +851,16 @@ public final class IxKitsPlugin extends JavaPlugin implements Listener, CommandE
                 if (e.isShiftClick()) e.setCancelled(true);
                 return;
             }
-            if (!contains(EQUIP_SLOTS, slot)) e.setCancelled(true);
+            if (!contains(EQUIP_SLOTS, slot)) { e.setCancelled(true); return; }
+            ItemStack current = e.getCurrentItem();
+            ItemStack cursor = e.getCursor();
+            if (isEquipmentPlaceholder(current)) {
+                e.setCancelled(true);
+                if (cursor != null && !cursor.getType().isAir()) {
+                    e.getView().getTopInventory().setItem(slot, cursor.clone());
+                    e.getView().setCursor(null);
+                }
+            }
             return;
         }
         e.setCancelled(true);
@@ -928,7 +953,19 @@ public final class IxKitsPlugin extends JavaPlugin implements Listener, CommandE
             }
         } else if (h.kind.equals("item-editor")) {
             if (slot == 45) openEditor(p, h.project, h.page);
-            else if (slot == 20) openEnchantments(p, h.project, h.page, h.targetSlot, 0);
+            else if (slot == 15) {
+                ItemStack source = getProjectItem(h.project, h.page, h.targetSlot);
+                if (source != null && !source.getType().isAir()) {
+                    itemClipboard.put(p.getUniqueId(), source.clone());
+                    p.sendMessage(PREFIX + tr("Objeto copiado. Haz clic izquierdo en una ranura vacía del proyecto para pegarlo.", "Item copied. Left-click an empty project slot to paste it."));
+                }
+                openItemEditor(p, h.project, h.page, h.targetSlot);
+            } else if (slot == 17) {
+                p.sendMessage(PREFIX + (itemClipboard.containsKey(p.getUniqueId())
+                    ? tr("El portapapeles contiene: §b", "Clipboard contains: §b") + prettyKey(itemClipboard.get(p.getUniqueId()).getType().name())
+                    : tr("El portapapeles está vacío.", "The clipboard is empty.")));
+                openItemEditor(p, h.project, h.page, h.targetSlot);
+            } else if (slot == 20) openEnchantments(p, h.project, h.page, h.targetSlot, 0);
             else if (slot == 22) openLoreTemplates(p, 0, h.project, h.page, h.targetSlot);
             else if (slot == 11) promptInput(p, InputType.ITEM_NAME, h.project, h.page, h.targetSlot, "Escribe el nombre MiniMessage del objeto:", "Type the item's MiniMessage name:");
             else if (slot == 13) promptInput(p, InputType.ITEM_LORE, h.project, h.page, h.targetSlot, "Escribe el lore; separa cada línea con |. Usa - para borrar:", "Type the lore; separate each line with |. Use - to clear:");
