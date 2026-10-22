@@ -1122,7 +1122,8 @@ public final class IxKitsPlugin extends JavaPlugin implements Listener, CommandE
             else if (h.entryBySlot.containsKey(slot)) {
                 String id = h.entryBySlot.get(slot);
                 try {
-                    if (projectService.restoreFromTrash(id)) p.sendMessage(PREFIX + tr("Proyecto restaurado: §b", "Project restored: §b") + projectService.trashedProjectName(id));
+                    String displayName = projectService.trashedProjectName(id);
+                    if (projectService.restoreFromTrash(id)) p.sendMessage(PREFIX + tr("Proyecto restaurado: §b", "Project restored: §b") + displayName);
                     else p.sendMessage(PREFIX + tr("No se pudo restaurar porque el ID ya está ocupado o el proyecto no existe.", "Restore failed because the ID is occupied or the project is missing."));
                 } catch (IOException ex) { p.sendMessage(PREFIX + "§c" + ex.getMessage()); }
                 openTrash(p);
