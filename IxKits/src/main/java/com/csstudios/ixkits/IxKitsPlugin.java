@@ -484,6 +484,32 @@ public final class IxKitsPlugin extends JavaPlugin implements Listener, CommandE
         p.openInventory(inv);
     }
 
+    private void openFlags(Player p, String project, int page, int targetSlot) {
+        YamlConfiguration yaml = YamlConfiguration.loadConfiguration(projectFile(project));
+        ItemStack target = yaml.getItemStack("pages." + page + "." + targetSlot);
+        if (target == null || target.getType().isAir()) { openEditor(p, project, page); return; }
+        Inventory inv = menu("flags", project, page, targetSlot, 0, tr("§3✦ §bIxKits §8• §0Visibilidad", "§3✦ §bIxKits §8• §0Item flags"));
+        border(inv);
+        MenuHolder holder = (MenuHolder) inv.getHolder();
+        ItemFlag[] flags = ItemFlag.values();
+        for (int i = 0; i < flags.length && i < EDIT_SLOTS.length; i++) {
+            ItemFlag flag = flags[i];
+            int slot = EDIT_SLOTS[i];
+            boolean enabled = target.getItemMeta().hasItemFlag(flag);
+            inv.setItem(slot, item(enabled ? Material.LIME_DYE : Material.GRAY_DYE,
+                "§b" + prettyKey(flag.name()),
+                enabled ? tr("§aOculto en la descripción del objeto", "§aHidden from the item tooltip")
+                    : tr("§7Visible en la descripción del objeto", "§7Visible in the item tooltip"),
+                tr("§eClic para alternar", "§eClick to toggle")));
+            holder.entryBySlot.put(slot, flag.name());
+        }
+        inv.setItem(45, item(Material.ARROW, tr("§7Volver al objeto", "§7Back to item")));
+        inv.setItem(49, item(Material.PAPER, tr("§fQué hacen los flags", "§fAbout item flags"),
+            tr("§7Ocultan secciones de la descripción.", "§7Hide sections of the item's tooltip."),
+            tr("§7No quitan los datos del objeto.", "§7They do not remove item data.")));
+        p.openInventory(inv);
+    }
+
     private void openAttributes(Player p, String project, int page, int targetSlot) {
         YamlConfiguration yaml = YamlConfiguration.loadConfiguration(projectFile(project));
         ItemStack target = yaml.getItemStack("pages." + page + "." + targetSlot);
@@ -987,17 +1013,7 @@ public final class IxKitsPlugin extends JavaPlugin implements Listener, CommandE
                 openItemEditor(p, h.project, h.page, h.targetSlot);
             } else if (slot == 35) promptInput(p, InputType.MODEL_DATA, h.project, h.page, h.targetSlot, "Escribe el custom model data numérico o - para borrarlo:", "Type the numeric custom model data or - to clear it:");
             else if (slot == 37) openAttributes(p, h.project, h.page, h.targetSlot);
-            else if (slot == 39) {
-                ItemStack target = getProjectItem(h.project, h.page, h.targetSlot);
-                if (target != null) {
-                    ItemMeta meta = target.getItemMeta();
-                    if (meta.hasItemFlag(ItemFlag.HIDE_ATTRIBUTES)) meta.removeItemFlags(ItemFlag.HIDE_ATTRIBUTES, ItemFlag.HIDE_ENCHANTS);
-                    else meta.addItemFlags(ItemFlag.HIDE_ATTRIBUTES, ItemFlag.HIDE_ENCHANTS);
-                    target.setItemMeta(meta);
-                    saveProjectItem(h.project, h.page, h.targetSlot, target);
-                }
-                openItemEditor(p, h.project, h.page, h.targetSlot);
-            } else if (slot == 41) {
+            else if (slot == 39) openFlags(p, h.project, h.page, h.targetSlot); else if (slot == 41) {
                 ItemStack target = getProjectItem(h.project, h.page, h.targetSlot);
                 if (target != null && target.getItemMeta() instanceof LeatherArmorMeta) promptInput(p, InputType.LEATHER_COLOR, h.project, h.page, h.targetSlot, "Escribe el color como #RRGGBB o R,G,B:", "Type a color as #RRGGBB or R,G,B:");
                 else p.sendMessage(PREFIX + tr("Solo disponible para armadura de cuero.", "Only available for leather armor."));
@@ -1011,6 +1027,27 @@ public final class IxKitsPlugin extends JavaPlugin implements Listener, CommandE
                     p.sendMessage(PREFIX + tr("Se quitaron todos los encantamientos del objeto.", "All enchantments were removed from the item."));
                 }
                 openItemEditor(p, h.project, h.page, h.targetSlot);
+            }
+        } else if (h.kind.equals("flags")) {
+            if (slot == 45) openItemEditor(p, h.project, h.page, h.targetSlot);
+            else if (h.entryBySlot.containsKey(slot)) {
+                File file = projectFile(h.project);
+                YamlConfiguration yaml = YamlConfiguration.loadConfiguration(file);
+                String itemPath = "pages." + h.page + "." + h.targetSlot;
+                ItemStack target = yaml.getItemStack(itemPath);
+                if (target != null && !target.getType().isAir()) {
+                    ItemFlag flag = ItemFlag.valueOf(h.entryBySlot.get(slot));
+                    ItemMeta meta = target.getItemMeta();
+                    if (meta.hasItemFlag(flag)) meta.removeItemFlags(flag);
+                    else meta.addItemFlags(flag);
+                    target.setItemMeta(meta);
+                    projectService.backupBeforeChange(file);
+                    yaml.set(itemPath, target);
+                    yaml.set("format-version", 2);
+                    yaml.set("updated", System.currentTimeMillis());
+                    saveYaml(yaml, file);
+                }
+                openFlags(p, h.project, h.page, h.targetSlot);
             }
         } else if (h.kind.equals("attributes")) {
             if (slot == 45) openItemEditor(p, h.project, h.page, h.targetSlot);
