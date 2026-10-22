@@ -12,6 +12,7 @@ const DATA_DIR = process.env.IXKITS_DATA_DIR || path.join(__dirname, "data");
 const DB_FILE = path.join(DATA_DIR, "catalog.json");
 const PUBLISH_TOKEN = process.env.IXKITS_PUBLISH_TOKEN || "";
 const ADMIN_TOKEN = process.env.IXKITS_ADMIN_TOKEN || "";
+const INTERACTION_TOKEN = process.env.IXKITS_INTERACTION_TOKEN || "";
 const MAX_BODY_BYTES = 700 * 1024;
 const MAX_PROJECT_BYTES = 500 * 1024;
 const PAGE_SIZE_MAX = 50;
@@ -280,6 +281,7 @@ async function handler(req, res) {
   }
 
   if (req.method === "POST" && parts.length === 4 && parts[3] === "rate") {
+    if (!INTERACTION_TOKEN || !authRequired(req, res, INTERACTION_TOKEN, "Catalog interactions are not configured or the token is invalid.")) return;
     if (!template) return send(res, 404, { error: "Template not found." });
     const body = await readBody(req);
     const reviewerId = text(body.reviewerId, 80);
@@ -294,6 +296,7 @@ async function handler(req, res) {
   }
 
   if (req.method === "POST" && parts.length === 4 && parts[3] === "favorite") {
+    if (!INTERACTION_TOKEN || !authRequired(req, res, INTERACTION_TOKEN, "Catalog interactions are not configured or the token is invalid.")) return;
     if (!template) return send(res, 404, { error: "Template not found." });
     const body = await readBody(req);
     const userId = text(body.userId, 80);
