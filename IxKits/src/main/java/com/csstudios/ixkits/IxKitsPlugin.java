@@ -182,13 +182,20 @@ public final class IxKitsPlugin extends JavaPlugin implements Listener, CommandE
     }
 
     private void openLoreTemplates(Player p, int page) {
+        openLoreTemplates(p, page, null, 0, -1);
+    }
+
+    private void openLoreTemplates(Player p, int page, String project, int projectPage, int targetSlot) {
         YamlConfiguration lore = YamlConfiguration.loadConfiguration(new File(templatesDir, "lore.yml"));
         List<String> keys = new ArrayList<>();
         for (String key : lore.getKeys(false)) if (!lore.getStringList(key + ".lore").isEmpty()) keys.add(key);
         Collections.sort(keys);
         int pages = Math.max(1, (int) Math.ceil(keys.size() / (double) EDIT_SLOTS.length));
         int safePage = Math.max(0, Math.min(page, pages - 1));
-        Inventory inv = menu("lore-templates", null, safePage, tr("§3✦ §bIxKits §8• §0Plantillas de lore", "§3✦ §bIxKits §8• §0Lore templates") + " §7[" + (safePage + 1) + "/" + pages + "]");
+        String title = tr("§3✦ §bIxKits §8• §0Plantillas de lore", "§3✦ §bIxKits §8• §0Lore templates") + " §7[" + (safePage + 1) + "/" + pages + "]";
+        Inventory inv = project == null
+            ? menu("lore-templates", null, safePage, title)
+            : menu("lore-templates", project, projectPage, targetSlot, safePage, title);
         border(inv);
         MenuHolder holder = (MenuHolder) inv.getHolder();
         for (int i = safePage * EDIT_SLOTS.length; i < Math.min(keys.size(), (safePage + 1) * EDIT_SLOTS.length); i++) {
@@ -200,17 +207,21 @@ public final class IxKitsPlugin extends JavaPlugin implements Listener, CommandE
             if (configured.isEmpty()) configured = lore.getStringList(key + ".lore");
             for (String line : configured.stream().limit(4).toList()) preview.add(ChatColor.translateAlternateColorCodes('&', line));
             preview.add("");
-            preview.add(tr("§eClic para aplicar al objeto en mano", "§eClick to apply to item in hand"));
+            preview.add(project == null
+                ? tr("§eClic para aplicar al objeto en mano", "§eClick to apply to item in hand")
+                : tr("§eClic para aplicar al objeto del kit", "§eClick to apply to kit item"));
             inv.setItem(slot, itemWithLore(Material.WRITABLE_BOOK, ChatColor.translateAlternateColorCodes('&', display), preview));
             holder.entryBySlot.put(slot, key);
         }
-        inv.setItem(45, item(Material.ARROW, tr("§7Volver", "§7Back"), tr("§8Biblioteca de plantillas", "§8Template library")));
+        inv.setItem(45, item(Material.ARROW, tr("§7Volver", "§7Back"), project == null
+            ? tr("§8Biblioteca de plantillas", "§8Template library")
+            : tr("§8Volver al objeto", "§8Back to item")));
         inv.setItem(47, item(Material.SPECTRAL_ARROW, tr("§bAnterior", "§bPrevious"), tr("§7Página anterior", "§7Previous page")));
         inv.setItem(51, item(Material.SPECTRAL_ARROW, tr("§bSiguiente", "§bNext"), tr("§7Página siguiente", "§7Next page")));
         p.openInventory(inv);
     }
 
-    private void openItemEditor(Player p, String project, int page, int targetSlot) {
+    private void openItemEditor    private void openItemEditor(Player p, String project, int page, int targetSlot) {
         YamlConfiguration y = YamlConfiguration.loadConfiguration(projectFile(project));
         ItemStack target = y.getItemStack("pages." + page + "." + targetSlot);
         if (target == null || target.getType().isAir()) {
@@ -231,7 +242,10 @@ public final class IxKitsPlugin extends JavaPlugin implements Listener, CommandE
         if (target.getEnchantments().isEmpty()) enchantLore.add(tr("§8Sin encantamientos", "§8No enchantments"));
         else target.getEnchantments().entrySet().stream().sorted(Comparator.comparing(entry -> entry.getKey().getKey().toString())).forEach(entry ->
             enchantLore.add("§b• §f" + prettyKey(entry.getKey().getKey().getKey()) + " " + romanLevel(entry.getValue())));
-        inv.setItem(22, item(Material.PAPER, tr("§fDetalles del objeto", "§fItem details"), enchantLore.toArray(new String[0])));
+        inv.setItem(22, item(Material.WRITABLE_BOOK, tr("§bPlantillas de lore", "§bLore templates"),
+            tr("§7Aplicar un diseño predeterminado.", "§7Apply a built-in style."),
+            tr("§eClic para elegir", "§eClick to choose")));
+        inv.setItem(31, item(Material.PAPER, tr("§fDetalles del objeto", "§fItem details"), enchantLore.toArray(new String[0])));
         inv.setItem(24, item(Material.BARRIER, tr("§cQuitar todos los encantamientos", "§cRemove all enchantments"), tr("§7Solo afecta a este objeto del proyecto.", "§7Only affects this project item."), tr("§eClic para confirmar al instante", "§eClick to apply immediately")));
         inv.setItem(45, item(Material.ARROW, tr("§7Volver al proyecto", "§7Back to project")));
         p.openInventory(inv);
@@ -326,13 +340,20 @@ public final class IxKitsPlugin extends JavaPlugin implements Listener, CommandE
             else if (slot == 24) p.sendMessage(PREFIX + tr("Para editar encantamientos de un kit: abre un proyecto y haz clic derecho sobre un objeto.", "To edit a kit's enchantments: open a project and right-click an item."));
             else if (slot == 30) p.sendMessage(PREFIX + tr("El catálogo online todavía no está conectado.", "The online catalog is not connected yet."));
         } else if (h.kind.equals("lore-templates")) {
-            if (slot == 45) openTemplates(p);
-            else if (slot == 47) openLoreTemplates(p, Math.max(0, h.page - 1));
-            else if (slot == 51) openLoreTemplates(p, h.page + 1);
-            else if (h.entryBySlot.containsKey(slot)) applyLoreTemplateToHand(p, h.entryBySlot.get(slot));
+            int listPage = h.project == null ? h.page : h.subPage;
+            if (slot == 45) {
+                if (h.project == null) openTemplates(p);
+                else openItemEditor(p, h.project, h.page, h.targetSlot);
+            } else if (slot == 47) openLoreTemplates(p, Math.max(0, listPage - 1), h.project, h.page, h.targetSlot);
+            else if (slot == 51) openLoreTemplates(p, listPage + 1, h.project, h.page, h.targetSlot);
+            else if (h.entryBySlot.containsKey(slot)) {
+                if (h.project == null) applyLoreTemplateToHand(p, h.entryBySlot.get(slot));
+                else applyLoreTemplateToProject(p, h.entryBySlot.get(slot), h.project, h.page, h.targetSlot);
+            }
         } else if (h.kind.equals("item-editor")) {
             if (slot == 45) openEditor(p, h.project, h.page);
             else if (slot == 20) openEnchantments(p, h.project, h.page, h.targetSlot, 0);
+            else if (slot == 22) openLoreTemplates(p, 0, h.project, h.page, h.targetSlot);
             else if (slot == 24) {
                 YamlConfiguration y = YamlConfiguration.loadConfiguration(projectFile(h.project));
                 ItemStack target = y.getItemStack("pages." + h.page + "." + h.targetSlot);
@@ -531,6 +552,42 @@ public final class IxKitsPlugin extends JavaPlugin implements Listener, CommandE
         if (!yaml.contains(key + ".lore_en")) yaml.set(key + ".lore_en", loreEn);
         if (!yaml.contains(key + ".display")) yaml.set(key + ".display", displayEs);
         if (!yaml.contains(key + ".display_en")) yaml.set(key + ".display_en", displayEn);
+    }
+
+    private void applyLoreTemplateToProject(Player p, String key, String project, int projectPage, int targetSlot) {
+        File file = projectFile(project);
+        YamlConfiguration yaml = YamlConfiguration.loadConfiguration(file);
+        String itemPath = "pages." + projectPage + "." + targetSlot;
+        ItemStack target = yaml.getItemStack(itemPath);
+        if (target == null || target.getType().isAir()) {
+            p.sendMessage(PREFIX + tr("No se encontró el objeto del proyecto.", "Could not find the project item."));
+            openEditor(p, project, projectPage);
+            return;
+        }
+        List<String> lines = yamlListForLoreTemplate(key);
+        if (lines.isEmpty()) {
+            p.sendMessage(PREFIX + tr("La plantilla no contiene líneas de lore.", "That template contains no lore lines."));
+            return;
+        }
+        ItemMeta meta = target.getItemMeta();
+        if (meta == null) {
+            p.sendMessage(PREFIX + tr("No se pudo editar ese objeto.", "Could not edit that item."));
+            return;
+        }
+        meta.setLore(color(lines));
+        target.setItemMeta(meta);
+        yaml.set(itemPath, target);
+        saveYaml(yaml, file);
+        YamlConfiguration loreFile = YamlConfiguration.loadConfiguration(new File(templatesDir, "lore.yml"));
+        String label = loreFile.getString(key + (isEnglish() ? ".display_en" : ".display"), loreFile.getString(key + ".display", prettyKey(key)));
+        p.sendMessage(PREFIX + tr("Plantilla aplicada al objeto del kit: §b", "Template applied to kit item: §b") + label);
+        openItemEditor(p, project, projectPage, targetSlot);
+    }
+
+    private List<String> yamlListForLoreTemplate(String key) {
+        YamlConfiguration yaml = YamlConfiguration.loadConfiguration(new File(templatesDir, "lore.yml"));
+        List<String> lines = yaml.getStringList(key + (isEnglish() ? ".lore_en" : ".lore"));
+        return lines.isEmpty() ? yaml.getStringList(key + ".lore") : lines;
     }
 
     private void applyLoreTemplateToHand(Player p, String key) {
