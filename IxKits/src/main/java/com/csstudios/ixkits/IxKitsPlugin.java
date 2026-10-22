@@ -632,8 +632,12 @@ public final class IxKitsPlugin extends JavaPlugin implements Listener, CommandE
     }
 
     private void openEquipment(Player p, String project) {
+        openEquipment(p, project, 0);
+    }
+
+    private void openEquipment(Player p, String project, int returnPage) {
         YamlConfiguration yaml = YamlConfiguration.loadConfiguration(projectFile(project));
-        Inventory inv = menu("equipment", project, 0, tr("§3✦ §bIxKits §8• §0Equipamiento", "§3✦ §bIxKits §8• §0Equipment"));
+        Inventory inv = menu("equipment", project, Math.max(0, Math.min(1, returnPage)), tr("§3✦ §bIxKits §8• §0Equipamiento", "§3✦ §bIxKits §8• §0Equipment"));
         border(inv);
         inv.setItem(19, gearSlot(yaml.getItemStack("equipment.helmet"), Material.LEATHER_HELMET, tr("Casco", "Helmet")));
         inv.setItem(21, gearSlot(yaml.getItemStack("equipment.chestplate"), Material.LEATHER_CHESTPLATE, tr("Peto", "Chestplate")));
@@ -1334,7 +1338,7 @@ public final class IxKitsPlugin extends JavaPlugin implements Listener, CommandE
             else if (slot == 47) { savePage(e.getView().getTopInventory(), h); openEditor(p, h.project, Math.max(0, h.page-1)); }
             else if (slot == 51) { savePage(e.getView().getTopInventory(), h); openEditor(p, h.project, Math.min(1, h.page+1)); }
             else if (slot == 49) { savePage(e.getView().getTopInventory(), h); p.closeInventory(); p.sendMessage(PREFIX + tr("Proyecto guardado.", "Project saved.")); }
-            else if (slot == 44) { savePage(e.getView().getTopInventory(), h); openEquipment(p, h.project); }
+            else if (slot == 44) { savePage(e.getView().getTopInventory(), h); openEquipment(p, h.project, h.page); }
             else if (slot == 53) { savePage(e.getView().getTopInventory(), h); exportProject(p, h.project); }
             return;
         }
@@ -1342,6 +1346,17 @@ public final class IxKitsPlugin extends JavaPlugin implements Listener, CommandE
         if (h.kind.equals("equipment")) {
             if (slot >= e.getView().getTopInventory().getSize()) {
                 if (e.isShiftClick()) e.setCancelled(true);
+                return;
+            }
+            if (slot == 45) {
+                e.setCancelled(true);
+                saveEquipment(e.getView().getTopInventory(), h.project);
+                openEditor(p, h.project, h.page);
+                return;
+            }
+            if (slot == 40) {
+                e.setCancelled(true);
+                p.sendMessage(PREFIX + tr("Coloca objetos en las cinco ranuras centrales. Usa el botón Volver al proyecto para guardar y regresar.", "Place items in the five central slots. Use Back to project to save and return."));
                 return;
             }
             if (!contains(EQUIP_SLOTS, slot)) { e.setCancelled(true); return; }
