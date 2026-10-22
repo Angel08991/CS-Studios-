@@ -1,10 +1,14 @@
 package com.csstudios.ixkits;
 
 import org.bukkit.Bukkit;
+import org.bukkit.Color;
 import org.bukkit.ChatColor;
 import org.bukkit.Material;
 import org.bukkit.NamespacedKey;
 import org.bukkit.Registry;
+import org.bukkit.attribute.Attribute;
+import org.bukkit.attribute.AttributeModifier;
+import org.bukkit.inventory.EquipmentSlotGroup;
 import org.bukkit.command.Command;
 import org.bukkit.command.CommandExecutor;
 import org.bukkit.command.CommandSender;
@@ -17,19 +21,31 @@ import org.bukkit.event.Listener;
 import org.bukkit.event.inventory.InventoryClickEvent;
 import org.bukkit.event.inventory.InventoryCloseEvent;
 import org.bukkit.event.inventory.InventoryDragEvent;
+import org.bukkit.event.player.AsyncPlayerChatEvent;
 import org.bukkit.inventory.Inventory;
 import org.bukkit.inventory.InventoryHolder;
 import org.bukkit.inventory.ItemFlag;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.meta.ItemMeta;
+import org.bukkit.inventory.meta.Damageable;
+import org.bukkit.inventory.meta.LeatherArmorMeta;
 import org.bukkit.plugin.java.JavaPlugin;
+import net.kyori.adventure.text.Component;
+import net.kyori.adventure.text.minimessage.MiniMessage;
 
 import java.io.File;
 import java.io.IOException;
+import java.nio.file.Files;
 import java.util.*;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.UUID;
 
 public final class IxKitsPlugin extends JavaPlugin implements Listener, CommandExecutor {
     private File projectsDir, templatesDir, exportsDir;
+    private ProjectService projectService;
+    private final Map<UUID, PendingInput> pendingInputs = new ConcurrentHashMap<>();
+    private static final int[] EQUIP_SLOTS = {19, 21, 23, 25, 31};
+    private static final List<String> EDITABLE_ATTRIBUTES = List.of("max_health", "attack_damage", "attack_speed", "armor", "armor_toughness", "knockback_resistance", "movement_speed", "luck");
     private static final String PREFIX = "§8[§bIxKits§8] §7";
     private static final int[] EDIT_SLOTS = {
         10,11,12,13,14,15,16, 19,20,21,22,23,24,25,
@@ -44,6 +60,7 @@ public final class IxKitsPlugin extends JavaPlugin implements Listener, CommandE
         templatesDir = new File(getDataFolder(), "templates");
         exportsDir = new File(getDataFolder(), "exports");
         projectsDir.mkdirs(); templatesDir.mkdirs(); exportsDir.mkdirs();
+        projectService = new ProjectService(this, getDataFolder());
         initializeTemplates();
         Objects.requireNonNull(getCommand("ixkits")).setExecutor(this);
         Bukkit.getPluginManager().registerEvents(this, this);
@@ -91,6 +108,75 @@ public final class IxKitsPlugin extends JavaPlugin implements Listener, CommandE
         if (sub.equals("lore") && args.length >= 3) { handleLore(player, args[1], args[2]); return true; }
         if (sub.equals("paleta") && args.length >= 3 && args[1].equalsIgnoreCase("aplicar")) { applyPalette(player, args[2]); return true; }
         if (sub.equals("encantamientos") && args.length >= 3) { handleEnchantments(player, args[1], args[2]); return true; }
+        if (sub.equals("duplicar") && args.length >= 3) {
+            String source = slug(args[1]);
+            String targetName = String.join(" ", Arrays.copyOfRange(args, 2, args.length));
+            try {
+                if (projectService.duplicate(source, targetName)) player.sendMessage(PREFIX + tr("Proyecto duplicado: §b", "Project duplicated: §b") + targetName);
+                else player.sendMessage(PREFIX + tr("No se pudo duplicar. Comprueba el origen y que el nombre no exista.", "Could not duplicate. Check the source and make sure the name is unused."));
+            } catch (IOException ex) { player.sendMessage(PREFIX + "§c" + ex.getMessage()); }
+            return true;
+        }
+        if (sub.equals("renombrar") && args.length >= 3) {
+            String source = slug(args[1]);
+            String targetName = String.join(" ", Arrays.copyOfRange(args, 2, args.length));
+            try {
+                if (projectService.rename(source, targetName)) player.sendMessage(PREFIX + tr("Proyecto renombrado: §b", "Project renamed: §b") + targetName);
+                else player.sendMessage(PREFIX + tr("No se pudo renombrar el proyecto.", "Could not rename the project."));
+            } catch (IOException ex) { player.sendMessage(PREFIX + "§c" + ex.getMessage()); }
+            return true;
+        }
+        if (sub.equals("eliminar") && args.length >= 2) {
+            try {
+                if (projectService.moveToTrash(slug(args[1]))) player.sendMessage(PREFIX + tr("Proyecto movido a la papelera recuperable.", "Project moved to recoverable trash."));
+                else player.sendMessage(PREFIX + tr("No existe ese proyecto.", "That project does not exist."));
+            } catch (IOException ex) { player.sendMessage(PREFIX + "§c" + ex.getMessage()); }
+            return true;
+        }
+        if ((sub.equals("deshacer") || sub.equals("restaurar")) && args.length >= 2) {
+            try {
+                if (projectService.undo(slug(args[1]))) player.sendMessage(PREFIX + tr("Se restauró la última copia disponible.", "The latest available backup was restored."));
+                else player.sendMessage(PREFIX + tr("No hay copias disponibles para ese proyecto.", "No backups are available for that project."));
+            } catch (IOException ex) { player.sendMessage(PREFIX + "§c" + ex.getMessage()); }
+            return true;
+        }
+        if (sub.equals("validar") && args.length >= 2) {
+            for (String line : projectService.validate(slug(args[1]))) player.sendMessage(PREFIX + "§7" + line);
+            return true;
+        }
+        if (sub.equals("exportar-essentials") && args.length >= 2) {
+            try {
+                File output = projectService.exportEssentials(slug(args[1]));
+                player.sendMessage(PREFIX + tr("Exportación EssentialsX creada: §b", "EssentialsX export created: §b") + output.getPath());
+                player.sendMessage(PREFIX + tr("Aviso: el formato legible no conserva todas las propiedades avanzadas.", "Warning: the human-readable format cannot preserve all advanced metadata."));
+            } catch (IOException ex) { player.sendMessage(PREFIX + "§c" + ex.getMessage()); }
+            return true;
+        }
+        if (sub.equals("importar") && args.length >= 2) {
+            String safeName = new File(args[1]).getName();
+            File input = new File(projectService.importsDirectory(), safeName);
+            String requestedName = args.length >= 3 ? String.join(" ", Arrays.copyOfRange(args, 2, args.length)) : null;
+            try {
+                if (projectService.importNative(input, requestedName)) player.sendMessage(PREFIX + tr("Proyecto importado y validado desde la carpeta imports.", "Project imported and validated from the imports folder."));
+                else player.sendMessage(PREFIX + tr("No se pudo importar. Usa un archivo IxKits YAML válido y un nombre nuevo.", "Import failed. Use a valid IxKits YAML file and a new project name."));
+            } catch (IOException ex) { player.sendMessage(PREFIX + "§c" + ex.getMessage()); }
+            return true;
+        }
+        if (sub.equals("importar-essentials") && args.length >= 4) {
+            File input = new File(projectService.importsDirectory(), new File(args[1]).getName());
+            String kit = args[2];
+            String projectName = String.join(" ", Arrays.copyOfRange(args, 3, args.length));
+            try {
+                if (projectService.importEssentials(input, kit, projectName)) player.sendMessage(PREFIX + tr("Importación EssentialsX completada. Revisa el kit con /ixkits validar.", "EssentialsX import completed. Review the kit with /ixkits validar."));
+                else player.sendMessage(PREFIX + tr("No se pudo importar ese kit. Los kits NBT/base64 no se pueden convertir con este importador básico.", "Could not import that kit. NBT/base64 kits cannot be converted by this basic importer."));
+            } catch (IOException ex) { player.sendMessage(PREFIX + "§c" + ex.getMessage()); }
+            return true;
+        }
+        if (sub.equals("equipamiento") && args.length >= 2) {
+            if (projectFile(slug(args[1])).exists()) openEquipment(player, slug(args[1]));
+            else player.sendMessage(PREFIX + tr("No existe ese proyecto.", "That project does not exist."));
+            return true;
+        }
         if (sub.equals("recargar")) { reloadConfig(); initializeTemplates(); player.sendMessage(PREFIX + tr("Configuración y plantillas recargadas.", "Configuration and templates reloaded.")); return true; }
         player.sendMessage(tr("§bIxKits §7— comandos:", "§bIxKits §7— commands:"));
         player.sendMessage(tr("§f/ixkits §8| §7Abrir editor", "§f/ixkits §8| §7Open studio"));
@@ -100,6 +186,12 @@ public final class IxKitsPlugin extends JavaPlugin implements Listener, CommandE
         player.sendMessage(tr("§f/ixkits plantillas §8| §7Plantillas locales", "§f/ixkits plantillas §8| §7Local templates"));
         player.sendMessage(tr("§f/ixkits idioma §8| §7Cambiar idioma", "§f/ixkits idioma §8| §7Change language"));
         player.sendMessage(tr("§f/ixkits exportar <proyecto> §8| §7Exportar proyecto IxKits", "§f/ixkits exportar <project> §8| §7Export IxKits project"));
+        player.sendMessage("§f/ixkits exportar-essentials <proyecto>");
+        player.sendMessage("§f/ixkits importar <archivo.yml> [nombre]");
+        player.sendMessage("§f/ixkits importar-essentials <archivo.yml> <kit> <nombre>");
+        player.sendMessage("§f/ixkits duplicar|renombrar <proyecto> <nuevo nombre>");
+        player.sendMessage("§f/ixkits eliminar|deshacer|validar <proyecto>");
+        player.sendMessage("§f/ixkits equipamiento <proyecto>");
         player.sendMessage(tr("§f/ixkits lore guardar|aplicar <nombre>", "§f/ixkits lore guardar|aplicar <name>"));
         player.sendMessage(tr("§f/ixkits paleta aplicar <nombre>", "§f/ixkits paleta aplicar <name>"));
         player.sendMessage(tr("§f/ixkits encantamientos guardar|aplicar <nombre>", "§f/ixkits encantamientos guardar|aplicar <name>"));
@@ -114,7 +206,8 @@ public final class IxKitsPlugin extends JavaPlugin implements Listener, CommandE
         inv.setItem(24, item(Material.WRITABLE_BOOK, tr("§bExportadores", "§bExport tools"), tr("§7Generar archivos editables.", "§7Generate editable files."), tr("§8Selecciona un proyecto", "§8Choose a project")));
         inv.setItem(30, item(Material.ENDER_CHEST, "§dIxKits Community", tr("§7Catálogo comunitario online.", "§7Online community catalog."), tr("§cServicio web aún no conectado", "§cWeb service not connected yet")));
         inv.setItem(32, item(Material.COMPASS, tr("§fAyuda y comandos", "§fHelp and commands"), tr("§7/ixkits crear <nombre>", "§7/ixkits crear <name>"), "§7/ixkits idioma"));
-        inv.setItem(40, item(Material.WRITABLE_BOOK, tr("§eIdioma / Language", "§eLanguage / Idioma"), tr("§7Actual: Español", "§7Current: English"), tr("§eClic para cambiar", "§eClick to change")));
+        inv.setItem(28, item(Material.IRON_CHESTPLATE, tr("§bHerramientas del proyecto", "§bProject tools"), tr("§7Copias, validación e importación.", "§7Backups, validation and import."), tr("§eAbre Mis proyectos", "§eOpen My projects")));
+        inv.setItem(40, item(Material.WRITABLE_BOOK, tr("§eIdioma / Language", "§eLanguage / Idioma"), tr("§7Actual: " + (isEnglish() ? "English" : "Español"), "§7Current: " + (isEnglish() ? "English" : "Spanish")), tr("§eClic para cambiar", "§eClick to change")));
         p.openInventory(inv);
     }
 
@@ -167,6 +260,7 @@ public final class IxKitsPlugin extends JavaPlugin implements Listener, CommandE
         inv.setItem(49, item(Material.LIME_CONCRETE, tr("§aGuardar y salir", "§aSave and exit"), tr("§7Guardar los cambios del proyecto", "§7Save project changes")));
         inv.setItem(51, item(Material.SPECTRAL_ARROW, tr("§bPágina siguiente", "§bNext page"), tr("§7Página ", "§7Page ") + Math.min(2, page+2)));
         inv.setItem(46, item(Material.ENCHANTED_BOOK, tr("§bEditar objeto", "§bEdit item"), tr("§7Clic derecho sobre cualquier objeto", "§7Right-click any item"), tr("§7para abrir su editor.", "§7to open its editor.")));
+        inv.setItem(44, item(Material.IRON_CHESTPLATE, tr("§bEquipamiento", "§bEquipment"), tr("§7Casco, peto, pantalones, botas", "§7Helmet, chestplate, leggings, boots"), tr("§7y mano secundaria", "§7and offhand")));
         inv.setItem(53, item(Material.WRITABLE_BOOK, tr("§dExportar", "§dExport"), tr("§7Generar archivo .ixkit.yml", "§7Generate .ixkit.yml file")));
         p.openInventory(inv);
     }
@@ -246,7 +340,15 @@ public final class IxKitsPlugin extends JavaPlugin implements Listener, CommandE
             tr("§7Aplicar un diseño predeterminado.", "§7Apply a built-in style."),
             tr("§eClic para elegir", "§eClick to choose")));
         inv.setItem(31, item(Material.PAPER, tr("§fDetalles del objeto", "§fItem details"), enchantLore.toArray(new String[0])));
+        inv.setItem(11, item(Material.NAME_TAG, tr("§bEditar nombre", "§bEdit name"), tr("§7Admite MiniMessage y RGB.", "§7Supports MiniMessage and RGB."), tr("§eClic para escribir", "§eClick to type")));
+        inv.setItem(13, item(Material.WRITABLE_BOOK, tr("§bEditar lore", "§bEdit lore"), tr("§7Separa las líneas usando |.", "§7Separate lines using |."), tr("§7Admite MiniMessage y degradados.", "§7Supports MiniMessage and gradients."), tr("§eClic para escribir", "§eClick to type")));
         inv.setItem(24, item(Material.BARRIER, tr("§cQuitar todos los encantamientos", "§cRemove all enchantments"), tr("§7Solo afecta a este objeto del proyecto.", "§7Only affects this project item."), tr("§eClic para confirmar al instante", "§eClick to apply immediately")));
+        inv.setItem(29, item(Material.IRON_BLOCK, tr("§bIrrompible", "§bUnbreakable"), tr("§7Alternar la propiedad del objeto.", "§7Toggle the item's property."), tr("§eClic para cambiar", "§eClick to toggle")));
+        inv.setItem(33, item(Material.ANVIL, tr("§bDurabilidad", "§bDurability"), tr("§7Clic: +10 de daño", "§7Click: +10 damage"), tr("§7Derecho: -10; Mayús: reparar", "§7Right-click: -10; Shift: repair")));
+        inv.setItem(35, item(Material.CARVED_PUMPKIN, tr("§bModelo personalizado", "§bCustom model data"), tr("§7Define o borra el número de modelo.", "§7Set or clear the model number."), tr("§eClic para escribir", "§eClick to type")));
+        inv.setItem(37, item(Material.BRUSH, tr("§bAtributos", "§bAttributes"), tr("§7Salud, daño, armadura y más.", "§7Health, damage, armor and more."), tr("§eClic para abrir", "§eClick to open")));
+        inv.setItem(39, item(Material.GLASS, tr("§bFlags del objeto", "§bItem flags"), tr("§7Alternar ocultación de atributos.", "§7Toggle hidden attributes."), tr("§eClic para cambiar", "§eClick to toggle")));
+        inv.setItem(41, item(Material.LEATHER_CHESTPLATE, tr("§bColor de cuero", "§bLeather color"), tr("§7Para objetos de cuero.", "§7For leather items."), tr("§eEscribe #RRGGBB o R,G,B", "§eType #RRGGBB or R,G,B")));
         inv.setItem(45, item(Material.ARROW, tr("§7Volver al proyecto", "§7Back to project")));
         p.openInventory(inv);
     }
