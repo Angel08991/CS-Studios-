@@ -1,0 +1,6 @@
+# IxKits - configuración inicial
+# Las GUI usan bordes de cristal cian y azul.
+settings:
+  autosave-on-editor-close: true
+  project-format-version: 1
+  community-catalog-enabled: false
