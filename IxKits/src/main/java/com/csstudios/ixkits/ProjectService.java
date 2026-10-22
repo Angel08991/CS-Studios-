@@ -342,7 +342,7 @@ public final class ProjectService {
     }
 
     private Enchantment findEnchantment(String key) {
-        String normalized = key.replace("_", "").replace('-', '');
+        String normalized = key.replace("_", "").replace("-", "");
         for (Enchantment enchantment : Registry.ENCHANTMENT) {
             String id = enchantment.getKey().getKey();
             if (id.replace("_", "").equals(normalized)) return enchantment;
