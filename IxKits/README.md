@@ -99,7 +99,7 @@ La exportación a EssentialsX está en plugins/IxKits/exports/. Comprueba el res
 El servicio está en IxKits/catalog-service/, usa Node.js 20+ y no necesita dependencias npm externas.
 
 1. Para Render, importa el repositorio y selecciona el Blueprint raíz render.yaml. Este blueprint usa un plan Starter y un disco persistente; revisa el coste en Render antes de confirmar. Alternativamente, despliega la carpeta como servicio Node en otro host con almacenamiento persistente.
-2. Configura IXKITS_PUBLISH_TOKEN y IXKITS_ADMIN_TOKEN con secretos aleatorios diferentes.
+2. El blueprint genera IXKITS_PUBLISH_TOKEN, IXKITS_ADMIN_TOKEN e IXKITS_INTERACTION_TOKEN como secretos independientes. Si despliegas manualmente, crea los tres con valores aleatorios diferentes.
 3. El blueprint configura IXKITS_DATA_DIR en el disco persistente. Si usas otro host, define esa variable apuntando a almacenamiento persistente; con disco efímero el catálogo puede perder los datos al reiniciar.
 4. Verifica https://TU-DOMINIO/health.
 5. En plugins/IxKits/config.yml, configura la URL real:
@@ -114,7 +114,7 @@ El servicio está en IxKits/catalog-service/, usa Node.js 20+ y no necesita depe
 
 Después del despliegue, copia IXKITS_PUBLISH_TOKEN al campo catalog.publish-token e IXKITS_INTERACTION_TOKEN al campo catalog.interaction-token de plugins/IxKits/config.yml. No pongas el token de administración en el plugin ni publiques ninguno de los secretos en un repositorio o chat. Las valoraciones y favoritos requieren el token de interacción; la moderación usa el token administrativo solo en la API.
 
-El catálogo es una primera versión técnica: las valoraciones y favoritos no verifican identidad real; antes de abrirlo a una comunidad grande hay que añadir autenticación y moderación. La plantilla se guarda como texto y el servicio no ejecuta comandos ni código de los archivos subidos; aun así, el plugin valida antes de importar.
+El token de interacción evita que cualquier visitante anónimo escriba valoraciones o favoritos directamente. Aun así, los identificadores los proporciona el servidor que posee ese secreto; para una comunidad pública grande conviene añadir cuentas verificadas, moderación y controles adicionales. La plantilla se guarda como texto y el servicio no ejecuta comandos ni código de los archivos subidos; aun así, el plugin valida antes de importar.
 
 Consulta IxKits/catalog-service/README.md para los endpoints y las variables de entorno.
 
