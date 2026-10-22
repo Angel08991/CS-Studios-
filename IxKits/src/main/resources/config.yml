@@ -1,5 +1,8 @@
-# IxKits - configuración inicial
-# Las GUI usan bordes de cristal cian y azul.
+# IxKits - Server configuration
+# Supported interface languages: "es" (Spanish) and "en" (English).
+# You can also open /ixkits idioma in-game to change this setting.
+language: es
+
 settings:
   autosave-on-editor-close: true
   project-format-version: 1
