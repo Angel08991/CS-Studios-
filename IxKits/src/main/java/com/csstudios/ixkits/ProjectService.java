@@ -119,10 +119,51 @@ public final class ProjectService {
     public boolean moveToTrash(String id) throws IOException {
         File source = projectFile(id);
         if (!source.isFile()) return false;
+        backupBeforeChange(source);
         File directory = new File(trashDir, slug(id));
         directory.mkdirs();
         String stamp = new SimpleDateFormat("yyyyMMdd-HHmmss-SSS", Locale.ROOT).format(new Date());
         Files.move(source.toPath(), new File(directory, stamp + ".yml").toPath(), StandardCopyOption.REPLACE_EXISTING);
+        return true;
+    }
+
+    public List<String> listTrash() {
+        File[] directories = trashDir.listFiles(File::isDirectory);
+        if (directories == null) return new ArrayList<>();
+        List<String> ids = new ArrayList<>();
+        for (File directory : directories) {
+            File[] files = directory.listFiles((d, name) -> name.endsWith(".yml"));
+            if (files != null && files.length > 0) ids.add(directory.getName());
+        }
+        ids.sort(String.CASE_INSENSITIVE_ORDER);
+        return ids;
+    }
+
+    public String trashedProjectName(String id) {
+        File directory = new File(trashDir, slug(id));
+        File[] snapshots = directory.listFiles((d, name) -> name.endsWith(".yml"));
+        if (snapshots == null || snapshots.length == 0) return id;
+        Arrays.sort(snapshots, Comparator.comparing(File::getName).reversed());
+        return YamlConfiguration.loadConfiguration(snapshots[0]).getString("name", id);
+    }
+
+    public boolean restoreFromTrash(String id) throws IOException {
+        File directory = new File(trashDir, slug(id));
+        File target = projectFile(id);
+        if (target.exists()) return false;
+        File[] snapshots = directory.listFiles((d, name) -> name.endsWith(".yml"));
+        if (snapshots == null || snapshots.length == 0) return false;
+        Arrays.sort(snapshots, Comparator.comparing(File::getName).reversed());
+        File latest = snapshots[0];
+        Files.copy(latest.toPath(), target.toPath(), StandardCopyOption.REPLACE_EXISTING);
+        YamlConfiguration yaml = YamlConfiguration.loadConfiguration(target);
+        yaml.set("id", slug(id));
+        yaml.set("format-version", Math.max(2, yaml.getInt("format-version", 1)));
+        yaml.set("updated", System.currentTimeMillis());
+        yaml.save(target);
+        Files.deleteIfExists(latest.toPath());
+        File[] remaining = directory.listFiles();
+        if (remaining != null && remaining.length == 0) Files.deleteIfExists(directory.toPath());
         return true;
     }
 
@@ -140,6 +181,22 @@ public final class ProjectService {
         }
         Files.copy(latest.toPath(), current.toPath(), StandardCopyOption.REPLACE_EXISTING);
         Files.deleteIfExists(latest.toPath());
+        YamlConfiguration yaml = YamlConfiguration.loadConfiguration(current);
+        yaml.set("updated", System.currentTimeMillis());
+        yaml.save(current);
+        return true;
+    }
+
+    public boolean redo(String id) throws IOException {
+        File current = projectFile(id);
+        File directory = new File(backupsDir, slug(id));
+        File[] undoSnapshots = directory.listFiles((d, name) -> name.startsWith("before-undo-") && name.endsWith(".yml"));
+        if (undoSnapshots == null || undoSnapshots.length == 0 || !current.isFile()) return false;
+        Arrays.sort(undoSnapshots, Comparator.comparing(File::getName).reversed());
+        File snapshot = undoSnapshots[0];
+        backupBeforeChange(current);
+        Files.copy(snapshot.toPath(), current.toPath(), StandardCopyOption.REPLACE_EXISTING);
+        Files.deleteIfExists(snapshot.toPath());
         YamlConfiguration yaml = YamlConfiguration.loadConfiguration(current);
         yaml.set("updated", System.currentTimeMillis());
         yaml.save(current);
