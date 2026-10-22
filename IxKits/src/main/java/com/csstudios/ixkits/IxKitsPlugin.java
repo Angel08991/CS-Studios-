@@ -221,7 +221,7 @@ public final class IxKitsPlugin extends JavaPlugin implements Listener, CommandE
         p.openInventory(inv);
     }
 
-    private void openItemEditor    private void openItemEditor(Player p, String project, int page, int targetSlot) {
+    private void openItemEditor(Player p, String project, int page, int targetSlot) {
         YamlConfiguration y = YamlConfiguration.loadConfiguration(projectFile(project));
         ItemStack target = y.getItemStack("pages." + page + "." + targetSlot);
         if (target == null || target.getType().isAir()) {
