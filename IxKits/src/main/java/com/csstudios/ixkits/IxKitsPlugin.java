@@ -29,6 +29,8 @@ import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.meta.ItemMeta;
 import org.bukkit.inventory.meta.Damageable;
 import org.bukkit.inventory.meta.LeatherArmorMeta;
+import org.bukkit.inventory.meta.PotionMeta;
+import org.bukkit.potion.PotionType;
 import org.bukkit.plugin.java.JavaPlugin;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.minimessage.MiniMessage;
@@ -489,6 +491,42 @@ public final class IxKitsPlugin extends JavaPlugin implements Listener, CommandE
         p.openInventory(inv);
     }
 
+    private void openPotionTypes(Player p, String project, int projectPage, int targetSlot, int requestedSubPage) {
+        ItemStack target = getProjectItem(project, projectPage, targetSlot);
+        if (target == null || !(target.getItemMeta() instanceof PotionMeta potionMeta)) {
+            p.sendMessage(PREFIX + tr("Este objeto no admite tipos de poción.", "This item does not support potion types."));
+            openItemEditor(p, project, projectPage, targetSlot);
+            return;
+        }
+        List<PotionType> types = new ArrayList<>(Arrays.asList(PotionType.values()));
+        types.sort(Comparator.comparing(type -> type.getKey().toString()));
+        int pages = Math.max(1, (int) Math.ceil(types.size() / (double) EDIT_SLOTS.length));
+        int page = Math.max(0, Math.min(requestedSubPage, pages - 1));
+        Inventory inv = menu("potion-types", project, projectPage, targetSlot, page,
+            tr("§3✦ §bIxKits §8• §0Tipos de poción", "§3✦ §bIxKits §8• §0Potion types") + " §7[" + (page + 1) + "/" + pages + "]");
+        border(inv);
+        MenuHolder holder = (MenuHolder) inv.getHolder();
+        PotionType current = potionMeta.getBasePotionType();
+        for (int i = page * EDIT_SLOTS.length; i < Math.min(types.size(), (page + 1) * EDIT_SLOTS.length); i++) {
+            PotionType type = types.get(i);
+            int slot = EDIT_SLOTS[i - page * EDIT_SLOTS.length];
+            boolean selected = type == current;
+            inv.setItem(slot, item(selected ? Material.LIME_DYE : Material.POTION,
+                "§b" + prettyKey(type.name()),
+                selected ? tr("§aTipo seleccionado", "§aSelected type") : tr("§7Tipo disponible", "§7Available type"),
+                tr("§eClic para aplicar", "§eClick to apply")));
+            holder.entryBySlot.put(slot, type.name());
+        }
+        inv.setItem(4, target.clone());
+        inv.setItem(45, item(Material.ARROW, tr("§7Volver al objeto", "§7Back to item")));
+        inv.setItem(47, item(Material.SPECTRAL_ARROW, tr("§bAnterior", "§bPrevious"), tr("§7Página anterior", "§7Previous page")));
+        inv.setItem(51, item(Material.SPECTRAL_ARROW, tr("§bSiguiente", "§bNext"), tr("§7Página siguiente", "§7Next page")));
+        inv.setItem(49, item(Material.POTION, tr("§fEfectos personalizados", "§fCustom effects"),
+            potionMeta.hasCustomEffects() ? tr("§aTiene efectos personalizados", "§aHas custom effects") : tr("§7No tiene efectos personalizados", "§7No custom effects"),
+            tr("§8La gestión de efectos personalizados queda pendiente", "§8Custom effect management is still pending")));
+        p.openInventory(inv);
+    }
+
     private void openFlags(Player p, String project, int page, int targetSlot) {
         YamlConfiguration yaml = YamlConfiguration.loadConfiguration(projectFile(project));
         ItemStack target = yaml.getItemStack("pages." + page + "." + targetSlot);
@@ -798,6 +836,7 @@ public final class IxKitsPlugin extends JavaPlugin implements Listener, CommandE
         inv.setItem(37, item(Material.BRUSH, tr("§bAtributos", "§bAttributes"), tr("§7Salud, daño, armadura y más.", "§7Health, damage, armor and more."), tr("§eClic para abrir", "§eClick to open")));
         inv.setItem(39, item(Material.GLASS, tr("§bFlags del objeto", "§bItem flags"), tr("§7Alternar ocultación de atributos.", "§7Toggle hidden attributes."), tr("§eClic para cambiar", "§eClick to toggle")));
         inv.setItem(41, item(Material.LEATHER_CHESTPLATE, tr("§bColor de cuero", "§bLeather color"), tr("§7Para objetos de cuero.", "§7For leather items."), tr("§eEscribe #RRGGBB o R,G,B", "§eType #RRGGBB or R,G,B")));
+        inv.setItem(43, item(Material.POTION, tr("§bTipo de poción", "§bPotion type"), tr("§7Para pociones y flechas con efecto.", "§7For potions and tipped arrows."), tr("§eClic para editar", "§eClick to edit")));
         inv.setItem(45, item(Material.ARROW, tr("§7Volver al proyecto", "§7Back to project")));
         p.openInventory(inv);
     }
