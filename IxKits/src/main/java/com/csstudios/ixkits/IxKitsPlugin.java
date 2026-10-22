@@ -52,7 +52,7 @@ public final class IxKitsPlugin extends JavaPlugin implements Listener, CommandE
 
     @Override public boolean onCommand(CommandSender sender, Command command, String label, String[] args) {
         if (!(sender instanceof Player player)) {
-            sender.sendMessage("IxKits: este comando requiere un jugador.");
+            sender.sendMessage(tr("IxKits: este comando requiere un jugador.", "IxKits: this command requires a player."));
             return true;
         }
         if (!player.hasPermission("ixkits.admin")) {
@@ -113,7 +113,7 @@ public final class IxKitsPlugin extends JavaPlugin implements Listener, CommandE
         inv.setItem(22, item(Material.BOOKSHELF, tr("§bBiblioteca de plantillas", "§bTemplate library"), tr("§7Lore, paletas y encantamientos.", "§7Lore, palettes and enchantments."), tr("§8Plantillas incluidas", "§8Built-in templates")));
         inv.setItem(24, item(Material.WRITABLE_BOOK, tr("§bExportadores", "§bExport tools"), tr("§7Generar archivos editables.", "§7Generate editable files."), tr("§8Selecciona un proyecto", "§8Choose a project")));
         inv.setItem(30, item(Material.ENDER_CHEST, "§dIxKits Community", tr("§7Catálogo comunitario online.", "§7Online community catalog."), tr("§cServicio web aún no conectado", "§cWeb service not connected yet")));
-        inv.setItem(32, item(Material.COMPASS, tr("§fAyuda y comandos", "§fHelp and commands"), "§7/ixkits crear <nombre>", "§7/ixkits idioma"));
+        inv.setItem(32, item(Material.COMPASS, tr("§fAyuda y comandos", "§fHelp and commands"), tr("§7/ixkits crear <nombre>", "§7/ixkits crear <name>"), "§7/ixkits idioma"));
         inv.setItem(40, item(Material.WRITABLE_BOOK, tr("§eIdioma / Language", "§eLanguage / Idioma"), tr("§7Actual: Español", "§7Current: English"), tr("§eClic para cambiar", "§eClick to change")));
         p.openInventory(inv);
     }
@@ -417,14 +417,14 @@ public final class IxKitsPlugin extends JavaPlugin implements Listener, CommandE
 
     private void exportProject(Player p, String project) {
         File f = projectFile(project);
-        if (!f.exists()) { p.sendMessage(PREFIX + "Proyecto no encontrado."); return; }
+        if (!f.exists()) { p.sendMessage(PREFIX + tr("Proyecto no encontrado.", "Project not found.")); return; }
         File out = new File(exportsDir, project + ".ixkit.yml");
         YamlConfiguration y = YamlConfiguration.loadConfiguration(f);
         y.set("ixkits-export.version", 1);
         y.set("ixkits-export.source", project);
         saveYaml(y, out);
-        p.sendMessage(PREFIX + "Exportado a §bplugins/IxKits/exports/" + out.getName());
-        p.sendMessage(PREFIX + "Formato nativo IxKits; los exportadores para plugins externos se ampliarán en futuras versiones.");
+        p.sendMessage(PREFIX + tr("Exportado a §bplugins/IxKits/exports/", "Exported to §bplugins/IxKits/exports/") + out.getName());
+        p.sendMessage(PREFIX + tr("Formato nativo IxKits; los exportadores para plugins externos se ampliarán en futuras versiones.", "Native IxKits format; external plugin exporters will be added in future versions."));
     }
 
     private void handleLore(Player p, String action, String name) {
@@ -438,7 +438,8 @@ public final class IxKitsPlugin extends JavaPlugin implements Listener, CommandE
             y.set(name + ".lore", lore); saveYaml(y, file);
             p.sendMessage(PREFIX + tr("Lore guardado como §b", "Lore saved as §b") + name); return;
         }
-        List<String> lore = y.getStringList(name + ".lore");
+        List<String> lore = y.getStringList(name + (isEnglish() ? ".lore_en" : ".lore"));
+        if (lore.isEmpty()) lore = y.getStringList(name + ".lore");
         if (lore.isEmpty()) { p.sendMessage(PREFIX + tr("No existe esa plantilla de lore.", "That lore template does not exist.")); return; }
         ItemMeta meta = item.getItemMeta(); meta.setLore(color(lore)); item.setItemMeta(meta);
         p.sendMessage(PREFIX + tr("Plantilla aplicada: §b", "Template applied: §b") + name);
