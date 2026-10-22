@@ -756,9 +756,11 @@ public final class IxKitsPlugin extends JavaPlugin implements Listener, CommandE
         if ((materialKey == null || materialKey.isBlank()) && armorMeta.hasTrim()) {
             materialKey = armorMeta.getTrim().getMaterial().getKey().getKey();
         }
-        if (materialKey == null || materials.stream().noneMatch(m -> m.getKey().getKey().equals(materialKey))) {
-            materialKey = materials.get(0).getKey().getKey();
+        boolean materialFound = false;
+        if (materialKey != null) {
+            for (TrimMaterial candidate : materials) if (candidate.getKey().getKey().equals(materialKey)) { materialFound = true; break; }
         }
+        if (!materialFound) materialKey = materials.get(0).getKey().getKey();
         int pages = Math.max(1, (int) Math.ceil(patterns.size() / (double) EDIT_SLOTS.length));
         int page = Math.max(0, Math.min(requestedPage, pages - 1));
         Inventory inv = menu("trim-editor", project, projectPage, targetSlot, page,
@@ -1061,6 +1063,23 @@ public final class IxKitsPlugin extends JavaPlugin implements Listener, CommandE
                     }
                     leather.setColor(color);
                 }
+                case BOOK_TITLE -> {
+                    if (!(meta instanceof BookMeta book)) throw new IllegalArgumentException("This item is not a written book.");
+                    book.title(input.equals("-") ? null : MiniMessage.miniMessage().deserialize(input));
+                }
+                case BOOK_AUTHOR -> {
+                    if (!(meta instanceof BookMeta book)) throw new IllegalArgumentException("This item is not a written book.");
+                    book.author(input.equals("-") ? null : MiniMessage.miniMessage().deserialize(input));
+                }
+                case BOOK_PAGES -> {
+                    if (!(meta instanceof BookMeta book)) throw new IllegalArgumentException("This item is not a written book.");
+                    if (input.equals("-")) book.pages(List.of());
+                    else book.pages(Arrays.stream(input.split("\\|", -1)).limit(100).map(MiniMessage.miniMessage()::deserialize).toList());
+                }
+                case SKULL_OWNER -> {
+                    if (!(meta instanceof SkullMeta skull)) throw new IllegalArgumentException("This item is not a player head.");
+                    skull.setOwner(input.equals("-") ? null : input.trim());
+                }
                 default -> { }
             }
         } catch (IllegalArgumentException ex) {
@@ -1339,6 +1358,123 @@ public final class IxKitsPlugin extends JavaPlugin implements Listener, CommandE
                     else p.sendMessage(PREFIX + tr("No se pudo restaurar porque el ID ya está ocupado o el proyecto no existe.", "Restore failed because the ID is occupied or the project is missing."));
                 } catch (IOException ex) { p.sendMessage(PREFIX + "§c" + ex.getMessage()); }
                 openTrash(p);
+            }
+        } else if (h.kind.equals("special-properties")) {
+            if (slot == 45) openItemEditor(p, h.project, h.page, h.targetSlot);
+            else if (h.entryBySlot.containsKey(slot)) {
+                switch (h.entryBySlot.get(slot)) {
+                    case "book" -> openBookEditor(p, h.project, h.page, h.targetSlot);
+                    case "banner" -> openBannerEditor(p, h.project, h.page, h.targetSlot, 0, "WHITE");
+                    case "trim" -> openTrimEditor(p, h.project, h.page, h.targetSlot, 0, null);
+                    case "skull" -> promptInput(p, InputType.SKULL_OWNER, h.project, h.page, h.targetSlot,
+                        "Escribe el nombre del jugador propietario o - para borrar:", "Type the owning player's name or - to clear:");
+                    case "firework" -> openFireworkEditor(p, h.project, h.page, h.targetSlot, null);
+                    default -> { }
+                }
+            }
+        } else if (h.kind.equals("book-editor")) {
+            if (slot == 45) openSpecialProperties(p, h.project, h.page, h.targetSlot);
+            else if (slot == 20) promptInput(p, InputType.BOOK_TITLE, h.project, h.page, h.targetSlot, "Escribe el título del libro o - para borrar:", "Type the book title or - to clear:");
+            else if (slot == 22) promptInput(p, InputType.BOOK_AUTHOR, h.project, h.page, h.targetSlot, "Escribe el autor del libro o - para borrar:", "Type the book author or - to clear:");
+            else if (slot == 24) promptInput(p, InputType.BOOK_PAGES, h.project, h.page, h.targetSlot, "Escribe el contenido; separa páginas con |. Usa MiniMessage.", "Type the contents; separate pages with |. MiniMessage is supported.");
+        } else if (h.kind.equals("banner-editor")) {
+            if (slot == 45) openSpecialProperties(p, h.project, h.page, h.targetSlot);
+            else if (slot == 47) openBannerEditor(p, h.project, h.page, h.targetSlot, Math.max(0, h.subPage - 1), h.query);
+            else if (slot == 51) openBannerEditor(p, h.project, h.page, h.targetSlot, h.subPage + 1, h.query);
+            else if (slot == 49) {
+                DyeColor[] colors = DyeColor.values();
+                int index = 0;
+                for (int i = 0; i < colors.length; i++) if (colors[i].name().equals(h.query)) { index = i; break; }
+                openBannerEditor(p, h.project, h.page, h.targetSlot, h.subPage, colors[(index + 1) % colors.length].name());
+            } else if (h.entryBySlot.containsKey(slot)) {
+                File file = projectFile(h.project);
+                YamlConfiguration yaml = YamlConfiguration.loadConfiguration(file);
+                String itemPath = "pages." + h.page + "." + h.targetSlot;
+                ItemStack target = yaml.getItemStack(itemPath);
+                if (target != null && target.getItemMeta() instanceof BannerMeta bannerMeta) {
+                    PatternType type = Registry.BANNER_PATTERN.get(NamespacedKey.fromString(h.entryBySlot.get(slot)));
+                    if (type != null) {
+                        if (e.isShiftClick()) {
+                            List<Pattern> patterns = new ArrayList<>(bannerMeta.getPatterns());
+                            for (int i = patterns.size() - 1; i >= 0; i--) {
+                                if (patterns.get(i).getPattern().getKey().equals(type.getKey())) { patterns.remove(i); break; }
+                            }
+                            bannerMeta.setPatterns(patterns);
+                        } else if (bannerMeta.numberOfPatterns() < 6) {
+                            bannerMeta.addPattern(new Pattern(DyeColor.valueOf(h.query), type));
+                        } else {
+                            p.sendMessage(PREFIX + tr("Un estandarte admite un máximo de seis patrones.", "A banner supports at most six patterns."));
+                        }
+                        target.setItemMeta(bannerMeta);
+                        projectService.backupBeforeChange(file);
+                        yaml.set(itemPath, target);
+                        saveYaml(yaml, file);
+                    }
+                }
+                openBannerEditor(p, h.project, h.page, h.targetSlot, h.subPage, h.query);
+            }
+        } else if (h.kind.equals("trim-editor")) {
+            if (slot == 45) openSpecialProperties(p, h.project, h.page, h.targetSlot);
+            else if (slot == 47) openTrimEditor(p, h.project, h.page, h.targetSlot, Math.max(0, h.subPage - 1), h.query);
+            else if (slot == 51) openTrimEditor(p, h.project, h.page, h.targetSlot, h.subPage + 1, h.query);
+            else if (slot == 49) {
+                List<TrimMaterial> materials = new ArrayList<>();
+                for (TrimMaterial material : Registry.TRIM_MATERIAL) materials.add(material);
+                materials.sort(Comparator.comparing(material -> material.getKey().toString()));
+                if (!materials.isEmpty()) {
+                    int index = 0;
+                    for (int i = 0; i < materials.size(); i++) if (materials.get(i).getKey().getKey().equals(h.query)) { index = i; break; }
+                    openTrimEditor(p, h.project, h.page, h.targetSlot, h.subPage, materials.get((index + 1) % materials.size()).getKey().getKey());
+                }
+            } else if (h.entryBySlot.containsKey(slot)) {
+                File file = projectFile(h.project);
+                YamlConfiguration yaml = YamlConfiguration.loadConfiguration(file);
+                String itemPath = "pages." + h.page + "." + h.targetSlot;
+                ItemStack target = yaml.getItemStack(itemPath);
+                if (target != null && target.getItemMeta() instanceof ArmorMeta armorMeta) {
+                    if (e.isShiftClick()) armorMeta.setTrim(null);
+                    else {
+                        NamespacedKey key = NamespacedKey.fromString(h.entryBySlot.get(slot));
+                        TrimPattern pattern = key == null ? null : Registry.TRIM_PATTERN.get(key);
+                        TrimMaterial material = Registry.TRIM_MATERIAL.get(NamespacedKey.minecraft(h.query));
+                        if (pattern != null && material != null) armorMeta.setTrim(new ArmorTrim(material, pattern));
+                    }
+                    target.setItemMeta(armorMeta);
+                    projectService.backupBeforeChange(file);
+                    yaml.set(itemPath, target);
+                    saveYaml(yaml, file);
+                }
+                openTrimEditor(p, h.project, h.page, h.targetSlot, h.subPage, h.query);
+            }
+        } else if (h.kind.equals("firework-editor")) {
+            if (slot == 45) openSpecialProperties(p, h.project, h.page, h.targetSlot);
+            else if (slot == 20 || slot == 22 || slot == 24 || slot == 26 || slot == 30 || slot == 32) {
+                String[] choices = h.query.split("\\|", -1);
+                String typeName = choices.length > 0 ? choices[0] : "BALL";
+                String colorName = choices.length > 1 ? choices[1] : "RED";
+                FireworkEffect.Type[] types = FireworkEffect.Type.values();
+                DyeColor[] colors = DyeColor.values();
+                if (slot == 24) {
+                    int index = 0;
+                    for (int i = 0; i < types.length; i++) if (types[i].name().equals(typeName)) { index = i; break; }
+                    typeName = types[(index + 1) % types.length].name();
+                } else if (slot == 26) {
+                    int index = 0;
+                    for (int i = 0; i < colors.length; i++) if (colors[i].name().equals(colorName)) { index = i; break; }
+                    colorName = colors[(index + 1) % colors.length].name();
+                }
+                ItemStack target = getProjectItem(h.project, h.page, h.targetSlot);
+                if (target != null && target.getItemMeta() instanceof FireworkMeta fireworkMeta) {
+                    if (slot == 20) fireworkMeta.setPower(Math.max(0, Math.min(3, fireworkMeta.getPower() + (e.isRightClick() ? -1 : 1))));
+                    else if (slot == 22) fireworkMeta.addEffect(FireworkEffect.builder()
+                        .with(FireworkEffect.Type.valueOf(typeName))
+                        .withColor(DyeColor.valueOf(colorName).getColor()).withFade(Color.WHITE).trail(true).build());
+                    else if (slot == 30 && fireworkMeta.getEffectsSize() > 0) fireworkMeta.removeEffect(fireworkMeta.getEffectsSize() - 1);
+                    else if (slot == 32) fireworkMeta.clearEffects();
+                    target.setItemMeta(fireworkMeta);
+                    saveProjectItem(h.project, h.page, h.targetSlot, target);
+                }
+                openFireworkEditor(p, h.project, h.page, h.targetSlot, typeName + "|" + colorName);
             }
         } else if (h.kind.equals("catalog")) {
             if (slot == 45) openMain(p);
@@ -1900,7 +2036,7 @@ public final class IxKitsPlugin extends JavaPlugin implements Listener, CommandE
     }
 
     private enum InputType {
-        DUPLICATE_PROJECT, RENAME_PROJECT, ITEM_NAME, ITEM_LORE, MODEL_DATA, LEATHER_COLOR, CATALOG_SEARCH, PROJECT_SEARCH, CREATE_PROJECT, PUBLISH_REVISION_ID
+        DUPLICATE_PROJECT, RENAME_PROJECT, ITEM_NAME, ITEM_LORE, MODEL_DATA, LEATHER_COLOR, CATALOG_SEARCH, PROJECT_SEARCH, CREATE_PROJECT, PUBLISH_REVISION_ID, BOOK_TITLE, BOOK_AUTHOR, BOOK_PAGES, SKULL_OWNER
     }
 
     private static final class PendingInput {
