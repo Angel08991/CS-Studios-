@@ -13,5 +13,6 @@ catalog:
   base-url: ""
   publish-token: ""
   interaction-token: ""
+  interaction-token: ""
   minecraft-version: "1.21.11"
   default-license: "all-rights-reserved"
