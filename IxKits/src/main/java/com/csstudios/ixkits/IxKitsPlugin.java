@@ -2,6 +2,8 @@ package com.csstudios.ixkits;
 
 import org.bukkit.Bukkit;
 import org.bukkit.Color;
+import org.bukkit.DyeColor;
+import org.bukkit.FireworkEffect;
 import org.bukkit.ChatColor;
 import org.bukkit.Material;
 import org.bukkit.NamespacedKey;
@@ -30,9 +32,19 @@ import org.bukkit.inventory.meta.ItemMeta;
 import org.bukkit.inventory.meta.Damageable;
 import org.bukkit.inventory.meta.LeatherArmorMeta;
 import org.bukkit.inventory.meta.PotionMeta;
+import org.bukkit.inventory.meta.BookMeta;
+import org.bukkit.inventory.meta.BannerMeta;
+import org.bukkit.inventory.meta.ArmorMeta;
+import org.bukkit.inventory.meta.SkullMeta;
+import org.bukkit.inventory.meta.FireworkMeta;
+import org.bukkit.inventory.meta.trim.ArmorTrim;
+import org.bukkit.inventory.meta.trim.TrimMaterial;
+import org.bukkit.inventory.meta.trim.TrimPattern;
 import org.bukkit.potion.PotionType;
 import org.bukkit.potion.PotionEffect;
 import org.bukkit.potion.PotionEffectType;
+import org.bukkit.block.banner.Pattern;
+import org.bukkit.block.banner.PatternType;
 import org.bukkit.plugin.java.JavaPlugin;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.minimessage.MiniMessage;
@@ -614,6 +626,202 @@ public final class IxKitsPlugin extends JavaPlugin implements Listener, CommandE
         p.openInventory(inv);
     }
 
+    private void openSpecialProperties(Player p, String project, int page, int targetSlot) {
+        ItemStack target = getProjectItem(project, page, targetSlot);
+        if (target == null || target.getType().isAir()) { openEditor(p, project, page); return; }
+        Inventory inv = menu("special-properties", project, page, targetSlot, 0,
+            tr("§3✦ §bIxKits §8• §0Propiedades especiales", "§3✦ §bIxKits §8• §0Special properties"));
+        border(inv);
+        MenuHolder holder = (MenuHolder) inv.getHolder();
+        inv.setItem(4, target.clone());
+        ItemMeta meta = target.getItemMeta();
+        if (target.getType() == Material.WRITTEN_BOOK && meta instanceof BookMeta) {
+            inv.setItem(20, item(Material.WRITTEN_BOOK, tr("§bEditor de libro", "§bBook editor"), tr("§7Título, autor y páginas MiniMessage.", "§7Title, author and MiniMessage pages.")));
+            holder.entryBySlot.put(20, "book");
+        }
+        if (meta instanceof BannerMeta) {
+            inv.setItem(22, item(Material.WHITE_BANNER, tr("§bPatrones de estandarte", "§bBanner patterns"), tr("§7Añadir y quitar patrones por GUI.", "§7Add and remove patterns from a GUI.")));
+            holder.entryBySlot.put(22, "banner");
+        }
+        if (meta instanceof ArmorMeta) {
+            inv.setItem(24, item(Material.NETHERITE_CHESTPLATE, tr("§bAdornos de armadura", "§bArmor trims"), tr("§7Elegir patrón y material.", "§7Choose a trim pattern and material.")));
+            holder.entryBySlot.put(24, "trim");
+        }
+        if (meta instanceof SkullMeta) {
+            inv.setItem(30, item(Material.PLAYER_HEAD, tr("§bCabeza personalizada", "§bCustom head"), tr("§7Asignar o quitar propietario.", "§7Set or clear head owner.")));
+            holder.entryBySlot.put(30, "skull");
+        }
+        if (meta instanceof FireworkMeta) {
+            inv.setItem(32, item(Material.FIREWORK_ROCKET, tr("§bEditor de fuegos artificiales", "§bFirework editor"), tr("§7Potencia, forma, color y efectos.", "§7Power, shape, color and effects.")));
+            holder.entryBySlot.put(32, "firework");
+        }
+        if (holder.entryBySlot.isEmpty()) {
+            inv.setItem(22, item(Material.BARRIER, tr("§7Sin propiedades especiales disponibles", "§7No special properties available"),
+                tr("§7Este objeto no tiene un editor compatible.", "§7This item has no compatible special editor.")));
+        }
+        inv.setItem(45, item(Material.ARROW, tr("§7Volver al objeto", "§7Back to item")));
+        p.openInventory(inv);
+    }
+
+    private void openBookEditor(Player p, String project, int page, int targetSlot) {
+        ItemStack target = getProjectItem(project, page, targetSlot);
+        if (target == null || !(target.getItemMeta() instanceof BookMeta bookMeta) || target.getType() != Material.WRITTEN_BOOK) {
+            p.sendMessage(PREFIX + tr("El editor de libro requiere un libro escrito.", "The book editor requires a written book."));
+            openItemEditor(p, project, page, targetSlot);
+            return;
+        }
+        Inventory inv = menu("book-editor", project, page, targetSlot, 0,
+            tr("§3✦ §bIxKits §8• §0Editor de libro", "§3✦ §bIxKits §8• §0Book editor"));
+        border(inv);
+        inv.setItem(4, target.clone());
+        inv.setItem(20, item(Material.NAME_TAG, tr("§bTítulo", "§bTitle"),
+            "§7" + (bookMeta.hasTitle() ? bookMeta.getTitle() : tr("Sin título", "Untitled")),
+            tr("§eClic para escribir", "§eClick to type")));
+        inv.setItem(22, item(Material.PLAYER_HEAD, tr("§bAutor", "§bAuthor"),
+            "§7" + (bookMeta.hasAuthor() ? bookMeta.getAuthor() : tr("Sin autor", "No author")),
+            tr("§eClic para escribir", "§eClick to type")));
+        List<String> pagePreview = bookMeta.getPages().stream().limit(3).map(ChatColor::stripColor).toList();
+        inv.setItem(24, item(Material.WRITABLE_BOOK, tr("§bContenido", "§bContents"),
+            "§7" + bookMeta.getPageCount() + " " + tr("página(s)", "page(s)"),
+            pagePreview.isEmpty() ? tr("§8Sin contenido", "§8No content") : "§f" + String.join(" / ", pagePreview),
+            tr("§eClic para editar todas las páginas", "§eClick to edit all pages"),
+            tr("§8Separa páginas con |", "§8Separate pages with |")));
+        inv.setItem(31, item(Material.PAPER, tr("§fUso", "§fHow to use"),
+            tr("§7Escribe texto compatible con", "§7Enter text compatible with"),
+            tr("§7MiniMessage en el chat.", "§7MiniMessage in chat."),
+            tr("§7Usa - para vaciar un campo.", "§7Use - to clear a field.")));
+        inv.setItem(45, item(Material.ARROW, tr("§7Volver a propiedades", "§7Back to special properties")));
+        p.openInventory(inv);
+    }
+
+    private void openBannerEditor(Player p, String project, int projectPage, int targetSlot, int requestedPage, String requestedColor) {
+        ItemStack target = getProjectItem(project, projectPage, targetSlot);
+        if (target == null || !(target.getItemMeta() instanceof BannerMeta bannerMeta)) {
+            p.sendMessage(PREFIX + tr("Este objeto no admite patrones de estandarte.", "This item does not support banner patterns."));
+            openSpecialProperties(p, project, projectPage, targetSlot);
+            return;
+        }
+        List<PatternType> patterns = new ArrayList<>();
+        for (PatternType pattern : Registry.BANNER_PATTERN) patterns.add(pattern);
+        patterns.sort(Comparator.comparing(pattern -> pattern.getKey().toString()));
+        int pages = Math.max(1, (int) Math.ceil(patterns.size() / (double) EDIT_SLOTS.length));
+        int page = Math.max(0, Math.min(requestedPage, pages - 1));
+        String colorName = requestedColor == null ? "WHITE" : requestedColor;
+        try { DyeColor.valueOf(colorName); } catch (IllegalArgumentException ex) { colorName = "WHITE"; }
+        Inventory inv = menu("banner-editor", project, projectPage, targetSlot, page,
+            tr("§3✦ §bIxKits §8• §0Patrones", "§3✦ §bIxKits §8• §0Patterns") + " §7[" + (page + 1) + "/" + pages + "]");
+        MenuHolder holder = (MenuHolder) inv.getHolder();
+        holder.query = colorName;
+        border(inv);
+        inv.setItem(4, target.clone());
+        for (int i = page * EDIT_SLOTS.length; i < Math.min(patterns.size(), (page + 1) * EDIT_SLOTS.length); i++) {
+            PatternType pattern = patterns.get(i);
+            int slot = EDIT_SLOTS[i - page * EDIT_SLOTS.length];
+            long count = bannerMeta.getPatterns().stream().filter(existing -> existing.getPattern().getKey().equals(pattern.getKey())).count();
+            inv.setItem(slot, item(Material.WHITE_BANNER, "§b" + prettyKey(pattern.getKey().getKey()),
+                tr("§7En este objeto: ", "§7On this item: ") + count,
+                tr("§eClic: añadir patrón", "§eClick: add pattern"),
+                tr("§cMayús + clic: quitar uno", "§cShift-click: remove one")));
+            holder.entryBySlot.put(slot, pattern.getKey().toString());
+        }
+        inv.setItem(45, item(Material.ARROW, tr("§7Volver a propiedades", "§7Back to special properties")));
+        inv.setItem(47, item(Material.SPECTRAL_ARROW, tr("§bAnterior", "§bPrevious")));
+        inv.setItem(49, item(Material.INK_SAC, tr("§bColor actual: ", "§bCurrent color: ") + prettyKey(colorName),
+            tr("§7Clic para cambiar el color", "§7Click to change color"),
+            tr("§7Máximo seis patrones", "§7Maximum six patterns"),
+            tr("§7Patrones actuales: ", "§7Current patterns: ") + bannerMeta.numberOfPatterns()));
+        inv.setItem(51, item(Material.SPECTRAL_ARROW, tr("§bSiguiente", "§bNext")));
+        p.openInventory(inv);
+    }
+
+    private void openTrimEditor(Player p, String project, int projectPage, int targetSlot, int requestedPage, String requestedMaterial) {
+        ItemStack target = getProjectItem(project, projectPage, targetSlot);
+        if (target == null || !(target.getItemMeta() instanceof ArmorMeta armorMeta)) {
+            p.sendMessage(PREFIX + tr("Este objeto no admite adornos de armadura.", "This item does not support armor trims."));
+            openSpecialProperties(p, project, projectPage, targetSlot);
+            return;
+        }
+        List<TrimPattern> patterns = new ArrayList<>();
+        for (TrimPattern pattern : Registry.TRIM_PATTERN) patterns.add(pattern);
+        patterns.sort(Comparator.comparing(pattern -> pattern.getKey().toString()));
+        List<TrimMaterial> materials = new ArrayList<>();
+        for (TrimMaterial material : Registry.TRIM_MATERIAL) materials.add(material);
+        materials.sort(Comparator.comparing(material -> material.getKey().toString()));
+        if (materials.isEmpty() || patterns.isEmpty()) {
+            p.sendMessage(PREFIX + tr("Paper no expone patrones de trim en esta versión.", "Paper exposes no trim patterns in this version."));
+            openItemEditor(p, project, projectPage, targetSlot);
+            return;
+        }
+        String materialKey = requestedMaterial;
+        if ((materialKey == null || materialKey.isBlank()) && armorMeta.hasTrim()) {
+            materialKey = armorMeta.getTrim().getMaterial().getKey().getKey();
+        }
+        if (materialKey == null || materials.stream().noneMatch(m -> m.getKey().getKey().equals(materialKey))) {
+            materialKey = materials.get(0).getKey().getKey();
+        }
+        int pages = Math.max(1, (int) Math.ceil(patterns.size() / (double) EDIT_SLOTS.length));
+        int page = Math.max(0, Math.min(requestedPage, pages - 1));
+        Inventory inv = menu("trim-editor", project, projectPage, targetSlot, page,
+            tr("§3✦ §bIxKits §8• §0Adornos de armadura", "§3✦ §bIxKits §8• §0Armor trims") + " §7[" + (page + 1) + "/" + pages + "]");
+        MenuHolder holder = (MenuHolder) inv.getHolder();
+        holder.query = materialKey;
+        border(inv);
+        inv.setItem(4, target.clone());
+        for (int i = page * EDIT_SLOTS.length; i < Math.min(patterns.size(), (page + 1) * EDIT_SLOTS.length); i++) {
+            TrimPattern pattern = patterns.get(i);
+            int slot = EDIT_SLOTS[i - page * EDIT_SLOTS.length];
+            boolean selected = armorMeta.hasTrim() && armorMeta.getTrim().getPattern().getKey().equals(pattern.getKey());
+            inv.setItem(slot, item(selected ? Material.LIME_DYE : Material.AMETHYST_SHARD,
+                "§b" + prettyKey(pattern.getKey().getKey()),
+                selected ? tr("§aPatrón actual", "§aCurrent pattern") : tr("§7Patrón disponible", "§7Available pattern"),
+                tr("§7Material: ", "§7Material: ") + prettyKey(materialKey),
+                tr("§eClic para aplicar", "§eClick to apply"),
+                tr("§cMayús + clic: quitar trim", "§cShift-click: remove trim")));
+            holder.entryBySlot.put(slot, pattern.getKey().toString());
+        }
+        inv.setItem(45, item(Material.ARROW, tr("§7Volver a propiedades", "§7Back to special properties")));
+        inv.setItem(47, item(Material.SPECTRAL_ARROW, tr("§bAnterior", "§bPrevious")));
+        inv.setItem(49, item(Material.IRON_INGOT, tr("§bMaterial: ", "§bMaterial: ") + prettyKey(materialKey),
+            tr("§7Clic para cambiar material", "§7Click to change material")));
+        inv.setItem(51, item(Material.SPECTRAL_ARROW, tr("§bSiguiente", "§bNext")));
+        p.openInventory(inv);
+    }
+
+    private void openFireworkEditor(Player p, String project, int projectPage, int targetSlot, String selection) {
+        ItemStack target = getProjectItem(project, projectPage, targetSlot);
+        if (target == null || !(target.getItemMeta() instanceof FireworkMeta fireworkMeta)) {
+            p.sendMessage(PREFIX + tr("Este objeto no es un cohete de fuegos artificiales.", "This item is not a firework rocket."));
+            openSpecialProperties(p, project, projectPage, targetSlot);
+            return;
+        }
+        String[] choices = (selection == null ? "BALL|RED" : selection).split("\\|", -1);
+        String typeName = choices.length > 0 ? choices[0] : "BALL";
+        String colorName = choices.length > 1 ? choices[1] : "RED";
+        try { FireworkEffect.Type.valueOf(typeName); } catch (IllegalArgumentException ex) { typeName = "BALL"; }
+        try { DyeColor.valueOf(colorName); } catch (IllegalArgumentException ex) { colorName = "RED"; }
+        Inventory inv = menu("firework-editor", project, projectPage, targetSlot, 0,
+            tr("§3✦ §bIxKits §8• §0Fuegos artificiales", "§3✦ §bIxKits §8• §0Fireworks"));
+        MenuHolder holder = (MenuHolder) inv.getHolder();
+        holder.query = typeName + "|" + colorName;
+        border(inv);
+        inv.setItem(4, target.clone());
+        inv.setItem(20, item(Material.CLOCK, tr("§bPotencia: ", "§bPower: ") + fireworkMeta.getPower(),
+            tr("§aClic: aumentar", "§aClick: increase"), tr("§eClic derecho: reducir", "§eRight-click: decrease"), "§7Rango de editor: 0-3"));
+        inv.setItem(22, item(Material.FIREWORK_ROCKET, tr("§bAñadir efecto", "§bAdd effect"),
+            tr("§7Forma: ", "§7Shape: ") + prettyKey(typeName),
+            tr("§7Color: ", "§7Color: ") + prettyKey(colorName),
+            tr("§eClic para añadir", "§eClick to add")));
+        inv.setItem(24, item(Material.FIREWORK_STAR, tr("§bForma del efecto", "§bEffect shape"),
+            "§7" + prettyKey(typeName), tr("§eClic para cambiar", "§eClick to cycle")));
+        inv.setItem(26, item(Material.ORANGE_DYE, tr("§bColor del efecto", "§bEffect color"),
+            "§7" + prettyKey(colorName), tr("§eClic para cambiar", "§eClick to cycle")));
+        inv.setItem(30, item(Material.SHEARS, tr("§cQuitar último efecto", "§cRemove last effect"),
+            tr("§7Efectos actuales: ", "§7Current effects: ") + fireworkMeta.getEffectsSize()));
+        inv.setItem(32, item(Material.BARRIER, tr("§cQuitar todos los efectos", "§cClear all effects")));
+        inv.setItem(45, item(Material.ARROW, tr("§7Volver a propiedades", "§7Back to special properties")));
+        p.openInventory(inv);
+    }
+
     private void openPotionTypes(Player p, String project, int projectPage, int targetSlot, int requestedSubPage) {
         ItemStack target = getProjectItem(project, projectPage, targetSlot);
         if (target == null || !(target.getItemMeta() instanceof PotionMeta potionMeta)) {
@@ -939,9 +1147,13 @@ public final class IxKitsPlugin extends JavaPlugin implements Listener, CommandE
         inv.setItem(15, item(Material.PAPER, tr("§bCopiar objeto", "§bCopy item"),
             tr("§7Guardar una copia exacta en IxKits.", "§7Keep an exact copy in IxKits."),
             tr("§7Después haz clic en una ranura vacía.", "§7Then click an empty project slot.")));
-        inv.setItem(17, item(Material.CHEST, tr("§bPortapapeles", "§bClipboard"),
+        inv.setItem(16, item(Material.CHEST, tr("§bPortapapeles", "§bClipboard"),
             itemClipboard.containsKey(p.getUniqueId()) ? tr("§aHay un objeto copiado", "§aAn item is copied") : tr("§8Está vacío", "§8It is empty"),
             tr("§7Clic para ver el estado", "§7Click to check status")));
+        inv.setItem(14, item(Material.NETHER_STAR, tr("§dPropiedades especiales", "§dSpecial properties"),
+            tr("§7Libros, estandartes, armaduras,", "§7Books, banners, armor trims,"),
+            tr("§7cabezas y fuegos artificiales.", "§7heads and fireworks."),
+            tr("§eClic para abrir", "§eClick to open")));
         inv.setItem(20, item(Material.ENCHANTED_BOOK, tr("§bEncantamientos", "§bEnchantments"),
             tr("§7Añadir, subir o quitar niveles.", "§7Add, raise or lower levels."),
             tr("§eClic para abrir el editor", "§eClick to open the editor")));
@@ -1179,12 +1391,13 @@ public final class IxKitsPlugin extends JavaPlugin implements Listener, CommandE
                     p.sendMessage(PREFIX + tr("Objeto copiado. Haz clic izquierdo en una ranura vacía del proyecto para pegarlo.", "Item copied. Left-click an empty project slot to paste it."));
                 }
                 openItemEditor(p, h.project, h.page, h.targetSlot);
-            } else if (slot == 17) {
+            } else if (slot == 16) {
                 p.sendMessage(PREFIX + (itemClipboard.containsKey(p.getUniqueId())
                     ? tr("El portapapeles contiene: §b", "Clipboard contains: §b") + prettyKey(itemClipboard.get(p.getUniqueId()).getType().name())
                     : tr("El portapapeles está vacío.", "The clipboard is empty.")));
                 openItemEditor(p, h.project, h.page, h.targetSlot);
-            } else if (slot == 20) openEnchantments(p, h.project, h.page, h.targetSlot, 0);
+            } else if (slot == 14) openSpecialProperties(p, h.project, h.page, h.targetSlot);
+            else if (slot == 20) openEnchantments(p, h.project, h.page, h.targetSlot, 0);
             else if (slot == 22) openLoreTemplates(p, 0, h.project, h.page, h.targetSlot);
             else if (slot == 11) promptInput(p, InputType.ITEM_NAME, h.project, h.page, h.targetSlot, "Escribe el nombre MiniMessage del objeto:", "Type the item's MiniMessage name:");
             else if (slot == 13) promptInput(p, InputType.ITEM_LORE, h.project, h.page, h.targetSlot, "Escribe el lore; separa cada línea con |. Usa - para borrar:", "Type the lore; separate each line with |. Use - to clear:");
