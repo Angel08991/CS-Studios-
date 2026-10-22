@@ -1,9 +1,16 @@
 # IxKits - Server configuration
-# Supported interface languages: "es" (Spanish) and "en" (English).
-# You can also open /ixkits idioma in-game to change this setting.
+# Interface language: es (Spanish) or en (English).
 language: es
 
 settings:
   autosave-on-editor-close: true
-  project-format-version: 1
+  project-format-version: 2
   community-catalog-enabled: false
+
+# Optional online catalog. Keep disabled until the API is deployed.
+catalog:
+  enabled: false
+  base-url: ""
+  publish-token: ""
+  minecraft-version: "1.21.11"
+  default-license: "all-rights-reserved"
