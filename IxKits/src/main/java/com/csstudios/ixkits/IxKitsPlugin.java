@@ -31,6 +31,8 @@ import org.bukkit.inventory.meta.Damageable;
 import org.bukkit.inventory.meta.LeatherArmorMeta;
 import org.bukkit.inventory.meta.PotionMeta;
 import org.bukkit.potion.PotionType;
+import org.bukkit.potion.PotionEffect;
+import org.bukkit.potion.PotionEffectType;
 import org.bukkit.plugin.java.JavaPlugin;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.minimessage.MiniMessage;
@@ -528,6 +530,52 @@ public final class IxKitsPlugin extends JavaPlugin implements Listener, CommandE
         p.openInventory(inv);
     }
 
+    private void openPotionEffects(Player p, String project, int projectPage, int targetSlot, int requestedPage) {
+        ItemStack target = getProjectItem(project, projectPage, targetSlot);
+        if (target == null || !(target.getItemMeta() instanceof PotionMeta potionMeta)) {
+            p.sendMessage(PREFIX + tr("Este objeto no admite efectos de poción.", "This item does not support potion effects."));
+            openItemEditor(p, project, projectPage, targetSlot);
+            return;
+        }
+        List<PotionEffectType> types = new ArrayList<>();
+        for (PotionEffectType effectType : Registry.MOB_EFFECT) types.add(effectType);
+        types.sort(Comparator.comparing(type -> type.getKey().toString()));
+        int pages = Math.max(1, (int) Math.ceil(types.size() / (double) EDIT_SLOTS.length));
+        int page = Math.max(0, Math.min(requestedPage, pages - 1));
+        Inventory inv = menu("potion-effects", project, projectPage, targetSlot, page,
+            tr("§3✦ §bIxKits §8• §0Efectos personalizados", "§3✦ §bIxKits §8• §0Custom effects") + " §7[" + (page + 1) + "/" + pages + "]");
+        border(inv);
+        MenuHolder holder = (MenuHolder) inv.getHolder();
+        inv.setItem(4, target.clone());
+        for (int i = page * EDIT_SLOTS.length; i < Math.min(types.size(), (page + 1) * EDIT_SLOTS.length); i++) {
+            PotionEffectType type = types.get(i);
+            int slot = EDIT_SLOTS[i - page * EDIT_SLOTS.length];
+            PotionEffect active = potionMeta.getCustomEffects().stream()
+                .filter(effect -> effect.getType().getKey().equals(type.getKey())).findFirst().orElse(null);
+            List<String> lore = new ArrayList<>();
+            if (active == null) {
+                lore.add(tr("§7No aplicado", "§7Not applied"));
+                lore.add(tr("§aClic izquierdo: añadir nivel I", "§aLeft-click: add level I"));
+            } else {
+                lore.add(tr("§aNivel: §f", "§aLevel: §f") + (active.getAmplifier() + 1));
+                lore.add(tr("§7Duración: §f", "§7Duration: §f") + (active.getDuration() / 20) + "s");
+                lore.add(tr("§eClic izquierdo: quitar", "§eLeft-click: remove"));
+                lore.add(tr("§bClic derecho: subir nivel", "§bRight-click: increase level"));
+                lore.add(tr("§cMayús + clic: quitar", "§cShift-click: remove"));
+            }
+            inv.setItem(slot, itemWithLore(active == null ? Material.POTION : Material.LIME_DYE,
+                "§b" + prettyKey(type.getKey().getKey()), lore));
+            holder.entryBySlot.put(slot, type.getKey().toString());
+        }
+        inv.setItem(45, item(Material.ARROW, tr("§7Volver a tipos de poción", "§7Back to potion types")));
+        inv.setItem(47, item(Material.SPECTRAL_ARROW, tr("§bAnterior", "§bPrevious"), tr("§7Página anterior", "§7Previous page")));
+        inv.setItem(51, item(Material.SPECTRAL_ARROW, tr("§bSiguiente", "§bNext"), tr("§7Página siguiente", "§7Next page")));
+        inv.setItem(49, item(Material.CLOCK, tr("§fDuración inicial: 30s", "§fDefault duration: 30s"),
+            tr("§7Los efectos se pueden subir de nivel.", "§7Effects can be leveled up."),
+            tr("§7Clic izquierdo: alternar.", "§7Left-click: toggle.")));
+        p.openInventory(inv);
+    }
+
     private void openPotionTypes(Player p, String project, int projectPage, int targetSlot, int requestedSubPage) {
         ItemStack target = getProjectItem(project, projectPage, targetSlot);
         if (target == null || !(target.getItemMeta() instanceof PotionMeta potionMeta)) {
@@ -560,7 +608,7 @@ public final class IxKitsPlugin extends JavaPlugin implements Listener, CommandE
         inv.setItem(51, item(Material.SPECTRAL_ARROW, tr("§bSiguiente", "§bNext"), tr("§7Página siguiente", "§7Next page")));
         inv.setItem(49, item(Material.POTION, tr("§fEfectos personalizados", "§fCustom effects"),
             potionMeta.hasCustomEffects() ? tr("§aTiene efectos personalizados", "§aHas custom effects") : tr("§7No tiene efectos personalizados", "§7No custom effects"),
-            tr("§8La gestión de efectos personalizados queda pendiente", "§8Custom effect management is still pending")));
+            tr("§eClic para gestionar efectos", "§eClick to manage effects")));
         p.openInventory(inv);
     }
 
@@ -1120,6 +1168,7 @@ public final class IxKitsPlugin extends JavaPlugin implements Listener, CommandE
         } else if (h.kind.equals("potion-types")) {
             if (slot == 45) openItemEditor(p, h.project, h.page, h.targetSlot);
             else if (slot == 47) openPotionTypes(p, h.project, h.page, h.targetSlot, Math.max(0, h.subPage - 1));
+            else if (slot == 49) openPotionEffects(p, h.project, h.page, h.targetSlot, 0);
             else if (slot == 51) openPotionTypes(p, h.project, h.page, h.targetSlot, h.subPage + 1);
             else if (h.entryBySlot.containsKey(slot)) {
                 File file = projectFile(h.project);
@@ -1137,6 +1186,40 @@ public final class IxKitsPlugin extends JavaPlugin implements Listener, CommandE
                     saveYaml(yaml, file);
                 }
                 openPotionTypes(p, h.project, h.page, h.targetSlot, h.subPage);
+            }
+        } else if (h.kind.equals("potion-effects")) {
+            if (slot == 45) openPotionTypes(p, h.project, h.page, h.targetSlot, 0);
+            else if (slot == 47) openPotionEffects(p, h.project, h.page, h.targetSlot, Math.max(0, h.subPage - 1));
+            else if (slot == 51) openPotionEffects(p, h.project, h.page, h.targetSlot, h.subPage + 1);
+            else if (h.entryBySlot.containsKey(slot)) {
+                File file = projectFile(h.project);
+                YamlConfiguration yaml = YamlConfiguration.loadConfiguration(file);
+                String itemPath = "pages." + h.page + "." + h.targetSlot;
+                ItemStack target = yaml.getItemStack(itemPath);
+                if (target != null && target.getItemMeta() instanceof PotionMeta potionMeta) {
+                    NamespacedKey effectKey = NamespacedKey.fromString(h.entryBySlot.get(slot));
+                    PotionEffectType effectType = effectKey == null ? null : Registry.MOB_EFFECT.get(effectKey);
+                    if (effectType != null) {
+                        PotionEffect active = potionMeta.getCustomEffects().stream()
+                            .filter(effect -> effect.getType().getKey().equals(effectType.getKey())).findFirst().orElse(null);
+                        if (e.isShiftClick() || (active != null && !e.isRightClick())) {
+                            potionMeta.removeCustomEffect(effectType);
+                        } else if (active == null) {
+                            potionMeta.addCustomEffect(new PotionEffect(effectType, 600, 0), true);
+                        } else {
+                            int nextAmplifier = active.getAmplifier() >= 4 ? 0 : active.getAmplifier() + 1;
+                            potionMeta.addCustomEffect(new PotionEffect(effectType, active.getDuration(), nextAmplifier,
+                                active.isAmbient(), active.hasParticles(), active.hasIcon()), true);
+                        }
+                        target.setItemMeta(potionMeta);
+                        projectService.backupBeforeChange(file);
+                        yaml.set(itemPath, target);
+                        yaml.set("format-version", 2);
+                        yaml.set("updated", System.currentTimeMillis());
+                        saveYaml(yaml, file);
+                    }
+                }
+                openPotionEffects(p, h.project, h.page, h.targetSlot, h.subPage);
             }
         } else if (h.kind.equals("flags")) {
             if (slot == 45) openItemEditor(p, h.project, h.page, h.targetSlot);
