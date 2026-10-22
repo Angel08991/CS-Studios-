@@ -356,26 +356,56 @@ public final class IxKitsPlugin extends JavaPlugin implements Listener, CommandE
     }
 
     private void openProjects(Player p) {
-        Inventory inv = menu("projects", null, 0, tr("§3✦ §bIxKits §8• §0Mis proyectos", "§3✦ §bIxKits §8• §0My projects"));
-        border(inv);
-        MenuHolder holder = (MenuHolder) inv.getHolder();
+        openProjects(p, 0, "");
+    }
+
+    private void openProjects(Player p, int requestedPage, String query) {
+        String safeQuery = query == null ? "" : query.trim();
         File[] files = projectsDir.listFiles((d, n) -> n.endsWith(".yml"));
-        if (files != null) {
-            Arrays.sort(files, Comparator.comparing(File::getName));
-            int[] slots = EDIT_SLOTS;
-            for (int i=0; i<Math.min(files.length, slots.length); i++) {
-                String id = files[i].getName().replaceFirst("\\.yml$", "");
-                YamlConfiguration y = YamlConfiguration.loadConfiguration(files[i]);
-                inv.setItem(slots[i], item(Material.CHEST, "§b" + y.getString("name", id),
-                    tr("§7Proyecto editable", "§7Editable project"), "§8ID: " + id, tr("§eClic para abrir", "§eClick to open")));
-                holder.entryBySlot.put(slots[i], id);
-            }
+        List<File> matching = files == null ? new ArrayList<>() : new ArrayList<>(Arrays.asList(files));
+        matching.sort(Comparator.comparing(File::getName));
+        if (!safeQuery.isBlank()) {
+            String needle = safeQuery.toLowerCase(Locale.ROOT);
+            matching.removeIf(file -> {
+                YamlConfiguration yaml = YamlConfiguration.loadConfiguration(file);
+                String display = yaml.getString("name", file.getName());
+                return !display.toLowerCase(Locale.ROOT).contains(needle)
+                    && !file.getName().toLowerCase(Locale.ROOT).contains(needle);
+            });
         }
-        if (files == null || files.length == 0) {
-            inv.setItem(22, item(Material.PAPER, tr("§7Todavía no hay proyectos", "§7No projects yet"), tr("§eUsa /ixkits crear <nombre>", "§eUse /ixkits crear <name>")));
+        int pages = Math.max(1, (int) Math.ceil(matching.size() / (double) EDIT_SLOTS.length));
+        int page = Math.max(0, Math.min(requestedPage, pages - 1));
+        String title = tr("§3✦ §bIxKits §8• §0Mis proyectos", "§3✦ §bIxKits §8• §0My projects")
+            + " §7[" + (page + 1) + "/" + pages + "]";
+        Inventory inv = menu("projects", null, page, title);
+        MenuHolder holder = (MenuHolder) inv.getHolder();
+        holder.query = safeQuery;
+        border(inv);
+        for (int index = page * EDIT_SLOTS.length; index < Math.min(matching.size(), (page + 1) * EDIT_SLOTS.length); index++) {
+            File file = matching.get(index);
+            String id = file.getName().replaceFirst("\\.yml$", "");
+            YamlConfiguration yaml = YamlConfiguration.loadConfiguration(file);
+            int slot = EDIT_SLOTS[index - page * EDIT_SLOTS.length];
+            inv.setItem(slot, item(Material.CHEST, "§b" + yaml.getString("name", id),
+                tr("§7Proyecto editable", "§7Editable project"), "§8ID: " + id,
+                tr("§eClic izquierdo: abrir", "§eLeft-click: open"),
+                tr("§eClic derecho: herramientas", "§eRight-click: tools")));
+            holder.entryBySlot.put(slot, id);
+        }
+        if (matching.isEmpty()) {
+            inv.setItem(22, item(Material.PAPER,
+                safeQuery.isBlank() ? tr("§7Todavía no hay proyectos", "§7No projects yet") : tr("§7No hay resultados", "§7No results"),
+                safeQuery.isBlank() ? tr("§eCrea tu primer proyecto", "§eCreate your first project") : tr("§7Prueba otra búsqueda.", "§7Try another search.")));
         }
         inv.setItem(45, item(Material.ARROW, tr("§7Volver", "§7Back"), tr("§8Menú principal", "§8Main menu")));
-        inv.setItem(49, item(Material.LIME_CONCRETE, tr("§aCrear proyecto", "§aCreate project"), tr("§7Usa /ixkits crear <nombre>", "§7Use /ixkits crear <name>")));
+        inv.setItem(47, item(Material.SPECTRAL_ARROW, tr("§bAnterior", "§bPrevious"), tr("§7Página anterior", "§7Previous page")));
+        inv.setItem(48, item(Material.COMPASS, tr("§bBuscar proyectos", "§bSearch projects"),
+            safeQuery.isBlank() ? tr("§7Buscar por nombre", "§7Search by name") : "§7Filtro: " + safeQuery,
+            tr("§eClic para escribir", "§eClick to type")));
+        inv.setItem(49, item(Material.LIME_CONCRETE, tr("§aCrear proyecto", "§aCreate project"), tr("§eClic para escribir el nombre", "§eClick to type a name")));
+        inv.setItem(51, item(Material.SPECTRAL_ARROW, tr("§bSiguiente", "§bNext"), tr("§7Página siguiente", "§7Next page")));
+        inv.setItem(53, item(Material.PAPER, "§f" + matching.size() + " / " + (files == null ? 0 : files.length),
+            tr("§7Proyectos encontrados", "§7Projects found")));
         p.openInventory(inv);
     }
 
@@ -542,11 +572,43 @@ public final class IxKitsPlugin extends JavaPlugin implements Listener, CommandE
     private void applyPendingInput(Player player, PendingInput pending, String input) {
         if (input.equalsIgnoreCase("-cancelar") || input.equalsIgnoreCase("-cancel")) {
             player.sendMessage(PREFIX + tr("Edición cancelada.", "Edit cancelled."));
-            if (pending.project != null && projectFile(pending.project).isFile()) openItemEditor(player, pending.project, pending.page, pending.slot);
+            if (pending.type == InputType.PROJECT_SEARCH) openProjects(player);
+            else if (pending.type == InputType.CATALOG_SEARCH) openCatalog(player, "");
+            else if (pending.project != null && projectFile(pending.project).isFile()) openItemEditor(player, pending.project, pending.page, pending.slot);
+            else openMain(player);
             return;
         }
         if (pending.type == InputType.CATALOG_SEARCH) {
             openCatalog(player, input);
+            return;
+        }
+        if (pending.type == InputType.PROJECT_SEARCH) {
+            openProjects(player, 0, input);
+            return;
+        }
+        if (pending.type == InputType.CREATE_PROJECT) {
+            String displayName = input.trim();
+            String id = slug(displayName);
+            if (displayName.isBlank() || id.isBlank()) {
+                player.sendMessage(PREFIX + tr("Nombre de proyecto no válido.", "Invalid project name."));
+                openProjects(player);
+                return;
+            }
+            File targetFile = projectFile(id);
+            if (targetFile.exists()) {
+                player.sendMessage(PREFIX + tr("Ya existe un proyecto con ese nombre.", "A project with that name already exists."));
+                openProjects(player);
+                return;
+            }
+            YamlConfiguration projectYaml = new YamlConfiguration();
+            projectYaml.set("name", displayName);
+            projectYaml.set("id", id);
+            projectYaml.set("version", 1);
+            projectYaml.set("format-version", 2);
+            projectYaml.set("created", System.currentTimeMillis());
+            saveYaml(projectYaml, targetFile);
+            player.sendMessage(PREFIX + tr("Proyecto creado: §b", "Project created: §b") + displayName);
+            openEditor(player, id, 0);
             return;
         }
         if (pending.type == InputType.DUPLICATE_PROJECT || pending.type == InputType.RENAME_PROJECT) {
@@ -792,7 +854,10 @@ public final class IxKitsPlugin extends JavaPlugin implements Listener, CommandE
             else if (slot == 23) setLanguage(p, "es");
         } else if (h.kind.equals("projects")) {
             if (slot == 45) openMain(p);
-            else if (slot == 49) p.sendMessage(PREFIX + tr("Crea un proyecto con §f/ixkits crear <nombre>§7.", "Create a project with §f/ixkits crear <name>§7."));
+            else if (slot == 47) openProjects(p, Math.max(0, h.page - 1), h.query);
+            else if (slot == 48) promptInput(p, InputType.PROJECT_SEARCH, null, h.page, -1, "Escribe el nombre que quieras buscar:", "Type the project name to search:");
+            else if (slot == 49) promptInput(p, InputType.CREATE_PROJECT, null, 0, -1, "Escribe el nombre del nuevo proyecto:", "Type a name for the new project:");
+            else if (slot == 51) openProjects(p, h.page + 1, h.query);
             else if (h.entryBySlot.containsKey(slot)) {
                 String project = h.entryBySlot.get(slot);
                 if (e.isRightClick()) openProjectActions(p, project);
@@ -1298,7 +1363,7 @@ public final class IxKitsPlugin extends JavaPlugin implements Listener, CommandE
     }
 
     private enum InputType {
-        DUPLICATE_PROJECT, RENAME_PROJECT, ITEM_NAME, ITEM_LORE, MODEL_DATA, LEATHER_COLOR, CATALOG_SEARCH
+        DUPLICATE_PROJECT, RENAME_PROJECT, ITEM_NAME, ITEM_LORE, MODEL_DATA, LEATHER_COLOR, CATALOG_SEARCH, PROJECT_SEARCH, CREATE_PROJECT
     }
 
     private static final class PendingInput {
