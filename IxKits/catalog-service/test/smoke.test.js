@@ -114,6 +114,25 @@ test("catalog API handles publish, search, ratings, favorites, downloads, and mo
   const search = await fetch(baseUrl + "/api/templates?query=PvP&category=pvp&limit=10").then(response => response.json());
   assert.equal(search.total, 1);
   assert.equal(search.items[0].id, created.id);
+  assert.equal(search.items[0].revision, 1);
+
+  const revisedYaml = projectYaml + "# Revision two\n";
+  const revise = await fetch(baseUrl + "/api/templates/" + created.id + "/versions", {
+    method: "POST",
+    headers: {
+      "content-type": "application/json",
+      authorization: "Bearer " + publishToken
+    },
+    body: JSON.stringify({ projectYaml: revisedYaml, mcVersion: "1.21.11", changelog: "Test revision" })
+  });
+  assert.equal(revise.status, 200);
+  assert.equal((await revise.json()).revision, 2);
+
+  const versions = await fetch(baseUrl + "/api/templates/" + created.id + "/versions").then(response => response.json());
+  assert.equal(versions.currentRevision, 2);
+  assert.equal(versions.versions.length, 2);
+  assert.equal(versions.versions[0].revision, 1);
+  assert.equal(versions.versions[1].revision, 2);
 
   const rating = await fetch(baseUrl + "/api/templates/" + created.id + "/rate", {
     method: "POST",
@@ -132,7 +151,8 @@ test("catalog API handles publish, search, ratings, favorites, downloads, and mo
   assert.equal((await favorite.json()).favorite, true);
 
   const downloaded = await fetch(baseUrl + "/api/templates/" + created.id + "/download").then(response => response.json());
-  assert.equal(downloaded.projectYaml, projectYaml);
+  assert.equal(downloaded.projectYaml, revisedYaml);
+  assert.equal(downloaded.revision, 2);
   assert.equal(downloaded.format, "ixkits-yaml");
 
   const deniedDelete = await fetch(baseUrl + "/api/templates/" + created.id, { method: "DELETE" });
