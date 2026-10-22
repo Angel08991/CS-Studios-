@@ -24,5 +24,7 @@ services:
         generateValue: true
       - key: IXKITS_INTERACTION_TOKEN
         generateValue: true
+      - key: IXKITS_INTERACTION_TOKEN
+        generateValue: true
       - key: IXKITS_CORS_ORIGIN
         value: "*"
