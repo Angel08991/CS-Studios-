@@ -545,6 +545,10 @@ public final class IxKitsPlugin extends JavaPlugin implements Listener, CommandE
             if (pending.project != null && projectFile(pending.project).isFile()) openItemEditor(player, pending.project, pending.page, pending.slot);
             return;
         }
+        if (pending.type == InputType.CATALOG_SEARCH) {
+            openCatalog(player, input);
+            return;
+        }
         if (pending.type == InputType.DUPLICATE_PROJECT || pending.type == InputType.RENAME_PROJECT) {
             try {
                 boolean changed = pending.type == InputType.DUPLICATE_PROJECT
@@ -819,7 +823,8 @@ public final class IxKitsPlugin extends JavaPlugin implements Listener, CommandE
             else if (slot == 49) { exportProject(p, h.project); openProjectActions(p, h.project); }
         } else if (h.kind.equals("catalog")) {
             if (slot == 45) openMain(p);
-            else if (slot == 47 || slot == 51) openCatalog(p, h.query);
+            else if (slot == 47) promptInput(p, InputType.CATALOG_SEARCH, null, 0, -1, "Escribe un texto para buscar plantillas:", "Type a search query for templates:");
+            else if (slot == 51) openCatalog(p, h.query);
             else if (slot == 49) p.sendMessage(PREFIX + tr("Haz clic en una plantilla para descargarla.", "Click a template to download it."));
             else if (h.entryBySlot.containsKey(slot)) {
                 String id = h.entryBySlot.get(slot);
@@ -1293,7 +1298,7 @@ public final class IxKitsPlugin extends JavaPlugin implements Listener, CommandE
     }
 
     private enum InputType {
-        DUPLICATE_PROJECT, RENAME_PROJECT, ITEM_NAME, ITEM_LORE, MODEL_DATA, LEATHER_COLOR
+        DUPLICATE_PROJECT, RENAME_PROJECT, ITEM_NAME, ITEM_LORE, MODEL_DATA, LEATHER_COLOR, CATALOG_SEARCH
     }
 
     private static final class PendingInput {
