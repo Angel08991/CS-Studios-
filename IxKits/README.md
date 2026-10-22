@@ -81,9 +81,9 @@ La exportación a EssentialsX está en plugins/IxKits/exports/. Comprueba el res
 
 El servicio está en IxKits/catalog-service/, usa Node.js 20+ y no necesita dependencias npm externas.
 
-1. Despliega esa carpeta como servicio web (por ejemplo, en Render o en tu propio host Node).
+1. Para Render, importa el repositorio y selecciona el Blueprint raíz render.yaml. Este blueprint usa un plan Starter y un disco persistente; revisa el coste en Render antes de confirmar. Alternativamente, despliega la carpeta como servicio Node en otro host con almacenamiento persistente.
 2. Configura IXKITS_PUBLISH_TOKEN y IXKITS_ADMIN_TOKEN con secretos aleatorios diferentes.
-3. Configura un directorio persistente mediante IXKITS_DATA_DIR; si el disco del hosting es efímero, el catálogo puede perder los datos al reiniciar.
+3. El blueprint configura IXKITS_DATA_DIR en el disco persistente. Si usas otro host, define esa variable apuntando a almacenamiento persistente; con disco efímero el catálogo puede perder los datos al reiniciar.
 4. Verifica https://TU-DOMINIO/health.
 5. En plugins/IxKits/config.yml, configura la URL real:
 
@@ -94,7 +94,7 @@ El servicio está en IxKits/catalog-service/, usa Node.js 20+ y no necesita depe
       minecraft-version: "1.21.11"
       default-license: "all-rights-reserved"
 
-No pongas el token de administración en el plugin. El endpoint de publicación usa un token de publicación y la moderación se gestiona aparte con el token de administración en la API.
+Después del despliegue, copia el valor de IXKITS_PUBLISH_TOKEN desde las variables del servicio al campo catalog.publish-token de plugins/IxKits/config.yml. No pongas el token de administración en el plugin ni publiques ninguno de los dos en un repositorio o chat. La moderación usa el token administrativo solo en la API.
 
 El catálogo es una primera versión técnica: las valoraciones y favoritos no verifican identidad real; antes de abrirlo a una comunidad grande hay que añadir autenticación y moderación. La plantilla se guarda como texto y el servicio no ejecuta comandos ni código de los archivos subidos; aun así, el plugin valida antes de importar.
 
