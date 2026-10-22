@@ -39,6 +39,7 @@ public final class IxKitsPlugin extends JavaPlugin implements Listener, CommandE
     @Override public void onEnable() {
         saveDefaultConfig();
         reloadConfig();
+        if (!getConfig().contains("language")) { getConfig().set("language", "es"); saveConfig(); }
         projectsDir = new File(getDataFolder(), "projects");
         templatesDir = new File(getDataFolder(), "templates");
         exportsDir = new File(getDataFolder(), "exports");
@@ -113,7 +114,7 @@ public final class IxKitsPlugin extends JavaPlugin implements Listener, CommandE
         inv.setItem(24, item(Material.WRITABLE_BOOK, tr("§bExportadores", "§bExport tools"), tr("§7Generar archivos editables.", "§7Generate editable files."), tr("§8Selecciona un proyecto", "§8Choose a project")));
         inv.setItem(30, item(Material.ENDER_CHEST, "§dIxKits Community", tr("§7Catálogo comunitario online.", "§7Online community catalog."), tr("§cServicio web aún no conectado", "§cWeb service not connected yet")));
         inv.setItem(32, item(Material.COMPASS, tr("§fAyuda y comandos", "§fHelp and commands"), "§7/ixkits crear <nombre>", "§7/ixkits idioma"));
-        inv.setItem(40, item(Material.WRITABLE_BOOK, tr("§eIdioma / Language", "§eLanguage / Idioma"), tr("§7Actual: " + (isEnglish() ? "English" : "Español"), "§7Current: " + (isEnglish() ? "English" : "Spanish")), tr("§eClic para cambiar", "§eClick to change")));
+        inv.setItem(40, item(Material.WRITABLE_BOOK, tr("§eIdioma / Language", "§eLanguage / Idioma"), tr("§7Actual: Español", "§7Current: English"), tr("§eClic para cambiar", "§eClick to change")));
         p.openInventory(inv);
     }
 
@@ -165,6 +166,7 @@ public final class IxKitsPlugin extends JavaPlugin implements Listener, CommandE
         inv.setItem(47, item(Material.SPECTRAL_ARROW, tr("§bPágina anterior", "§bPrevious page"), tr("§7Página ", "§7Page ") + Math.max(1, page)));
         inv.setItem(49, item(Material.LIME_CONCRETE, tr("§aGuardar y salir", "§aSave and exit"), tr("§7Guardar los cambios del proyecto", "§7Save project changes")));
         inv.setItem(51, item(Material.SPECTRAL_ARROW, tr("§bPágina siguiente", "§bNext page"), tr("§7Página ", "§7Page ") + Math.min(2, page+2)));
+        inv.setItem(46, item(Material.ENCHANTED_BOOK, tr("§bEditar objeto", "§bEdit item"), tr("§7Clic derecho sobre cualquier objeto", "§7Right-click any item"), tr("§7para abrir su editor.", "§7to open its editor.")));
         inv.setItem(53, item(Material.WRITABLE_BOOK, tr("§dExportar", "§dExport"), tr("§7Generar archivo .ixkit.yml", "§7Generate .ixkit.yml file")));
         p.openInventory(inv);
     }
@@ -192,9 +194,10 @@ public final class IxKitsPlugin extends JavaPlugin implements Listener, CommandE
         for (int i = safePage * EDIT_SLOTS.length; i < Math.min(keys.size(), (safePage + 1) * EDIT_SLOTS.length); i++) {
             String key = keys.get(i);
             int slot = EDIT_SLOTS[i - safePage * EDIT_SLOTS.length];
-            String display = lore.getString(key + ".display", prettyKey(key));
+            String display = lore.getString(key + (isEnglish() ? ".display_en" : ".display"), lore.getString(key + ".display", prettyKey(key)));
             List<String> preview = new ArrayList<>();
-            List<String> configured = lore.getStringList(key + ".lore");
+            List<String> configured = lore.getStringList(key + (isEnglish() ? ".lore_en" : ".lore"));
+            if (configured.isEmpty()) configured = lore.getStringList(key + ".lore");
             for (String line : configured.stream().limit(4).toList()) preview.add(ChatColor.translateAlternateColorCodes('&', line));
             preview.add("");
             preview.add(tr("§eClic para aplicar al objeto en mano", "§eClick to apply to item in hand"));
@@ -426,7 +429,7 @@ public final class IxKitsPlugin extends JavaPlugin implements Listener, CommandE
 
     private void handleLore(Player p, String action, String name) {
         ItemStack item = p.getInventory().getItemInMainHand();
-        if (item.getType().isAir() || !item.hasItemMeta()) { p.sendMessage(PREFIX + "Sostén primero el objeto que quieres editar."); return; }
+        if (item.getType().isAir()) { p.sendMessage(PREFIX + tr("Sostén primero el objeto que quieres editar.", "Hold the item you want to edit first.")); return; }
         File file = new File(templatesDir, "lore.yml");
         YamlConfiguration y = YamlConfiguration.loadConfiguration(file);
         if (action.equalsIgnoreCase("guardar")) {
@@ -478,15 +481,24 @@ public final class IxKitsPlugin extends JavaPlugin implements Listener, CommandE
     private void initializeTemplates() {
         File loreFile = new File(templatesDir, "lore.yml");
         YamlConfiguration lore = YamlConfiguration.loadConfiguration(loreFile);
-        ensureLoreTemplate(lore, "clean_pvp", "&b✦ &lPvP limpio",
+        ensureLoreTemplate(lore, "clean_pvp", "&b✦ &lPvP limpio", "&b✦ &lClean PvP",
+            List.of("&8&m━━━━━━━━━━━━━━━━━━━━", "&b✦ &lEQUIPO DE COMBATE", "&7Diseñado para combates competitivos.", "",
+                    "&8▸ &7Clase: &bCombate", "&8▸ &7Rareza: &fRara", "",
+                    "&b➤ &fListo para la próxima batalla", "&8&m━━━━━━━━━━━━━━━━━━━━"),
             List.of("&8&m━━━━━━━━━━━━━━━━━━━━", "&b✦ &lTACTICAL GEAR", "&7Built for competitive battles.", "",
                     "&8▸ &7Class: &bCombat", "&8▸ &7Rarity: &fRare", "",
                     "&b➤ &fReady for the next fight", "&8&m━━━━━━━━━━━━━━━━━━━━"));
-        ensureLoreTemplate(lore, "legendary", "&6✦ &lLegendary",
+        ensureLoreTemplate(lore, "legendary", "&6✦ &lLegendario", "&6✦ &lLegendary",
+            List.of("&8&m━━━━━━━━━━━━━━━━━━━━", "&6✦ &lLEGENDARIO", "&7Un artefacto digno de una leyenda.", "",
+                    "&6◆ &7Rareza: &6Legendario", "&6◆ &7Calidad: &fMítica", "",
+                    "&e➤ &fLibera todo su potencial", "&8&m━━━━━━━━━━━━━━━━━━━━"),
             List.of("&8&m━━━━━━━━━━━━━━━━━━━━", "&6✦ &lLEGENDARY", "&7An artifact worthy of a legend.", "",
                     "&6◆ &7Rarity: &6Legendary", "&6◆ &7Quality: &fMythic", "",
                     "&e➤ &fUnleash its full potential", "&8&m━━━━━━━━━━━━━━━━━━━━"));
-        ensureLoreTemplate(lore, "miner", "&b⛏ &lMinería",
+        ensureLoreTemplate(lore, "miner", "&b⛏ &lMinero", "&b⛏ &lMiner",
+            List.of("&8&m━━━━━━━━━━━━━━━━━━━━", "&3⛏ &lHERRAMIENTA MINERA", "&7Creada para expediciones profundas.", "",
+                    "&3▸ &7Categoría: &bMinería", "&3▸ &7Uso: &fRecolección de recursos", "",
+                    "&b➤ &fExcava más profundo. Encuentra más.", "&8&m━━━━━━━━━━━━━━━━━━━━"),
             List.of("&8&m━━━━━━━━━━━━━━━━━━━━", "&3⛏ &lMINER'S TOOL", "&7Crafted for deep expeditions.", "",
                     "&3▸ &7Category: &bMining", "&3▸ &7Utility: &fResource gathering", "",
                     "&b➤ &fDig deeper. Find more.", "&8&m━━━━━━━━━━━━━━━━━━━━"));
@@ -513,9 +525,11 @@ public final class IxKitsPlugin extends JavaPlugin implements Listener, CommandE
         saveYaml(enchants, enchantFile);
     }
 
-    private Inventory menu    private void ensureLoreTemplate(YamlConfiguration yaml, String key, String display, List<String> lore) {
-        if (!yaml.contains(key + ".lore")) yaml.set(key + ".lore", lore);
-        if (!yaml.contains(key + ".display")) yaml.set(key + ".display", display);
+    private Inventory menu    private void ensureLoreTemplate(YamlConfiguration yaml, String key, String displayEs, String displayEn, List<String> loreEs, List<String> loreEn) {
+        if (!yaml.contains(key + ".lore")) yaml.set(key + ".lore", loreEs);
+        if (!yaml.contains(key + ".lore_en")) yaml.set(key + ".lore_en", loreEn);
+        if (!yaml.contains(key + ".display")) yaml.set(key + ".display", displayEs);
+        if (!yaml.contains(key + ".display_en")) yaml.set(key + ".display_en", displayEn);
     }
 
     private void applyLoreTemplateToHand(Player p, String key) {
@@ -525,7 +539,8 @@ public final class IxKitsPlugin extends JavaPlugin implements Listener, CommandE
             return;
         }
         YamlConfiguration yaml = YamlConfiguration.loadConfiguration(new File(templatesDir, "lore.yml"));
-        List<String> lines = yaml.getStringList(key + ".lore");
+        List<String> lines = yaml.getStringList(key + (isEnglish() ? ".lore_en" : ".lore"));
+        if (lines.isEmpty()) lines = yaml.getStringList(key + ".lore");
         if (lines.isEmpty()) {
             p.sendMessage(PREFIX + tr("La plantilla no contiene líneas de lore.", "That template contains no lore lines."));
             return;
@@ -537,7 +552,7 @@ public final class IxKitsPlugin extends JavaPlugin implements Listener, CommandE
         }
         meta.setLore(color(lines));
         held.setItemMeta(meta);
-        p.sendMessage(PREFIX + tr("Lore aplicado: §b", "Lore applied: §b") + yaml.getString(key + ".display", prettyKey(key)));
+        p.sendMessage(PREFIX + tr("Lore aplicado: §b", "Lore applied: §b") + yaml.getString(key + (isEnglish() ? ".display_en" : ".display"), yaml.getString(key + ".display", prettyKey(key))));
     }
 
     private void setLanguage(Player p, String requested) {
