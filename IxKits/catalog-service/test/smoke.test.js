@@ -55,6 +55,16 @@ test("catalog API handles publish, search, ratings, favorites, downloads, and mo
     },
     stdio: "ignore"
   });
+  t.after(async () => {
+    if (child && child.exitCode === null) {
+      child.kill("SIGTERM");
+      await new Promise(resolve => {
+        const timeout = setTimeout(resolve, 1000);
+        child.once("exit", () => { clearTimeout(timeout); resolve(); });
+      });
+    }
+    if (dataDir) await fsp.rm(dataDir, { recursive: true, force: true });
+  });
 
   let healthy = false;
   for (let attempt = 0; attempt < 60; attempt++) {
@@ -137,14 +147,4 @@ test("catalog API handles publish, search, ratings, favorites, downloads, and mo
   const gone = await fetch(baseUrl + "/api/templates/" + created.id);
   assert.equal(gone.status, 404);
 
-  t.after(async () => {
-    if (child && child.exitCode === null) {
-      child.kill("SIGTERM");
-      await new Promise(resolve => {
-        const timeout = setTimeout(resolve, 1000);
-        child.once("exit", () => { clearTimeout(timeout); resolve(); });
-      });
-    }
-    if (dataDir) await fsp.rm(dataDir, { recursive: true, force: true });
-  });
 });
