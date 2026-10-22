@@ -15,6 +15,8 @@ import org.bukkit.plugin.java.JavaPlugin;
 import java.io.File;
 import java.io.IOException;
 import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.AtomicMoveNotSupportedException;
 import java.nio.file.StandardCopyOption;
 import java.text.SimpleDateFormat;
 import java.util.*;
@@ -43,6 +45,27 @@ public final class ProjectService {
         trashDir.mkdirs();
         importsDir.mkdirs();
         exportsDir.mkdirs();
+    }
+
+    /**
+     * Saves YAML through a sibling temporary file, replacing the destination
+     * atomically when supported to reduce the risk of truncated project files.
+     */
+    private void saveAtomically(YamlConfiguration yaml, File destination) throws IOException {
+        Path target = destination.toPath().toAbsolutePath();
+        Path parent = target.getParent();
+        if (parent != null) Files.createDirectories(parent);
+        Path temporary = Files.createTempFile(parent, destination.getName() + ".", ".tmp");
+        try {
+            yaml.save(temporary.toFile());
+            try {
+                Files.move(temporary, target, StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE);
+            } catch (AtomicMoveNotSupportedException ignored) {
+                Files.move(temporary, target, StandardCopyOption.REPLACE_EXISTING);
+            }
+        } finally {
+            Files.deleteIfExists(temporary);
+        }
     }
 
     public File projectFile(String id) {
@@ -97,7 +120,7 @@ public final class ProjectService {
         yaml.set("created", System.currentTimeMillis());
         yaml.set("updated", System.currentTimeMillis());
         yaml.set("format-version", Math.max(2, yaml.getInt("format-version", 1)));
-        yaml.save(target);
+        saveAtomically(yaml, target);
         return true;
     }
 
@@ -111,7 +134,7 @@ public final class ProjectService {
         yaml.set("name", targetName.trim());
         yaml.set("id", targetId);
         yaml.set("updated", System.currentTimeMillis());
-        yaml.save(target);
+        saveAtomically(yaml, target);
         Files.deleteIfExists(source.toPath());
         return true;
     }
@@ -160,7 +183,7 @@ public final class ProjectService {
         yaml.set("id", slug(id));
         yaml.set("format-version", Math.max(2, yaml.getInt("format-version", 1)));
         yaml.set("updated", System.currentTimeMillis());
-        yaml.save(target);
+        saveAtomically(yaml, target);
         Files.deleteIfExists(latest.toPath());
         File[] remaining = directory.listFiles();
         if (remaining != null && remaining.length == 0) Files.deleteIfExists(directory.toPath());
@@ -183,7 +206,7 @@ public final class ProjectService {
         Files.deleteIfExists(latest.toPath());
         YamlConfiguration yaml = YamlConfiguration.loadConfiguration(current);
         yaml.set("updated", System.currentTimeMillis());
-        yaml.save(current);
+        saveAtomically(yaml, current);
         return true;
     }
 
@@ -199,7 +222,7 @@ public final class ProjectService {
         Files.deleteIfExists(snapshot.toPath());
         YamlConfiguration yaml = YamlConfiguration.loadConfiguration(current);
         yaml.set("updated", System.currentTimeMillis());
-        yaml.save(current);
+        saveAtomically(yaml, current);
         return true;
     }
 
@@ -232,7 +255,7 @@ public final class ProjectService {
         imported.set("format-version", 2);
         imported.set("created", System.currentTimeMillis());
         imported.set("updated", System.currentTimeMillis());
-        imported.save(target);
+        saveAtomically(imported, target);
         return true;
     }
 
@@ -309,7 +332,7 @@ public final class ProjectService {
         }
         out.set("kits." + kitName + ".items", itemLines);
         File destination = new File(exportsDir, kitName + ".essentials.yml");
-        out.save(destination);
+        saveAtomically(out, destination);
         return destination;
     }
 
@@ -359,7 +382,7 @@ public final class ProjectService {
             project.set("pages." + page + "." + slot, item);
         }
         if (project.getConfigurationSection("pages") == null) return false;
-        project.save(target);
+        saveAtomically(project, target);
         return true;
     }
 
