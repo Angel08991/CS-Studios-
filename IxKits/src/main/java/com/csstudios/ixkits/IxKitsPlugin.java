@@ -191,6 +191,11 @@ public final class IxKitsPlugin extends JavaPlugin implements Listener, CommandE
                 args.length >= 4 ? String.join(" ", Arrays.copyOfRange(args, 3, args.length)) : "Created with IxKits by CS Studios");
             return true;
         }
+        if (sub.equals("actualizar-publicacion") && args.length >= 3) {
+            publishProjectRevision(player, args[1], slug(args[2]),
+                args.length >= 4 ? String.join(" ", Arrays.copyOfRange(args, 3, args.length)) : "Updated from IxKits");
+            return true;
+        }
         if (sub.equals("valorar") && args.length >= 3) {
             int rating;
             try { rating = Integer.parseInt(args[2]); } catch (NumberFormatException ex) {
@@ -234,6 +239,7 @@ public final class IxKitsPlugin extends JavaPlugin implements Listener, CommandE
         player.sendMessage("§f/ixkits equipamiento <proyecto>");
         player.sendMessage("§f/ixkits catalogo [búsqueda] · /ixkits buscar <texto>");
         player.sendMessage("§f/ixkits publicar <proyecto> <categoría> [descripción]");
+        player.sendMessage("§f/ixkits actualizar-publicacion <id> <proyecto> [cambios]");
         player.sendMessage("§f/ixkits descargar <id> · valorar <id> <1-5> · favorito <id>");
         player.sendMessage(tr("§f/ixkits lore guardar|aplicar <nombre>", "§f/ixkits lore guardar|aplicar <name>"));
         player.sendMessage(tr("§f/ixkits paleta aplicar <nombre>", "§f/ixkits paleta aplicar <name>"));
@@ -274,6 +280,7 @@ public final class IxKitsPlugin extends JavaPlugin implements Listener, CommandE
                         "§7" + tr("Categoría: ", "Category: ") + template.category(),
                         "§7" + tr("Versión: ", "Version: ") + template.mcVersion(),
                         "§7" + tr("Descargas: ", "Downloads: ") + template.downloads(),
+                        "§7" + tr("Versión: ", "Revision: ") + Math.max(1, template.revision()),
                         "§7" + tr("Valoración: ", "Rating: ") + rating,
                         tr("§eClic: descargar", "§eClick: download"),
                         tr("§eClic derecho: favorito", "§eRight-click: favorite")));
@@ -315,6 +322,35 @@ public final class IxKitsPlugin extends JavaPlugin implements Listener, CommandE
                     p.sendMessage(PREFIX + "§c" + ex.getMessage());
                 }
             }));
+    }
+
+    private void publishProjectRevision(Player p, String templateId, String project, String changelog) {
+        if (!catalogClient.isEnabled()) {
+            p.sendMessage(PREFIX + tr("Configura primero el catálogo online en config.yml.", "Configure the online catalog in config.yml first."));
+            return;
+        }
+        File file = projectFile(project);
+        if (!file.isFile()) {
+            p.sendMessage(PREFIX + tr("No existe ese proyecto.", "Project not found."));
+            return;
+        }
+        List<String> issues = projectService.validate(project);
+        if (issues.stream().anyMatch(line -> line.startsWith("ERROR:"))) {
+            p.sendMessage(PREFIX + tr("El proyecto tiene errores; corrígelos antes de publicarlo.", "The project has errors; fix them before publishing."));
+            for (String issue : issues) if (issue.startsWith("ERROR:")) p.sendMessage(PREFIX + "§c" + issue);
+            return;
+        }
+        try {
+            String yaml = Files.readString(file.toPath(), java.nio.charset.StandardCharsets.UTF_8);
+            String version = getConfig().getString("catalog.minecraft-version", "1.21.11");
+            catalogClient.publishRevision(templateId, version, changelog, yaml).whenComplete((updated, error) ->
+                Bukkit.getScheduler().runTask(this, () -> {
+                    if (error != null) p.sendMessage(PREFIX + tr("No se pudo actualizar la publicación: ", "Could not update publication: ") + rootMessage(error));
+                    else p.sendMessage(PREFIX + tr("Publicación actualizada a la versión §b", "Publication updated to revision §b") + updated.revision());
+                }));
+        } catch (IOException ex) {
+            p.sendMessage(PREFIX + "§c" + ex.getMessage());
+        }
     }
 
     private void publishProject(Player p, String project, String category, String description) {
@@ -456,7 +492,8 @@ public final class IxKitsPlugin extends JavaPlugin implements Listener, CommandE
         inv.setItem(24, item(Material.TNT, tr("§cEliminar", "§cDelete"), tr("§7Mover a la papelera recuperable.", "§7Move it to recoverable trash."), tr("§eSolicita confirmación", "§eRequires confirmation")));
         inv.setItem(30, item(Material.WRITABLE_BOOK, tr("§bValidar proyecto", "§bValidate project"), tr("§7Comprobar objetos y formato.", "§7Check items and project format.")));
         inv.setItem(32, item(Material.PAPER, tr("§aExportar EssentialsX", "§aExport to EssentialsX"), tr("§7Crea un kits.yml compatible.", "§7Create a compatible kits.yml."), tr("§cPuede perder metadatos avanzados", "§cAdvanced metadata may be lost")));
-        inv.setItem(34, item(Material.ENDER_CHEST, tr("§dPublicar en Community", "§dPublish to Community"), tr("§7Publica una plantilla validada.", "§7Publish a validated template."), tr("§8Requiere token de publicación.", "§8Requires a publish token.")));
+        inv.setItem(34, item(Material.ENDER_CHEST, tr("§dPublicar en Community", "§dPublish to Community"), tr("§7Publica una plantilla nueva.", "§7Publish a new template."), tr("§8Requiere token de publicación.", "§8Requires a publish token.")));
+        inv.setItem(38, item(Material.ENDER_CHEST, tr("§bActualizar publicación", "§bUpdate publication"), tr("§7Subir nueva versión de esta plantilla.", "§7Upload a new version of this template."), tr("§eClic y escribe el ID en el chat.", "§eClick and type the template ID in chat.")));
         inv.setItem(40, item(Material.CLOCK, tr("§eDeshacer último cambio", "§eUndo last change"), tr("§7Restaurar una copia anterior.", "§7Restore a previous backup.")));
         inv.setItem(49, item(Material.WRITABLE_BOOK, tr("§dExportar IxKits", "§dExport IxKits"), tr("§7Conserva los objetos serializados.", "§7Preserves serialized items.")));
         inv.setItem(45, item(Material.ARROW, tr("§7Volver", "§7Back"), tr("§8Biblioteca de proyectos", "§8Project library")));
@@ -654,6 +691,10 @@ public final class IxKitsPlugin extends JavaPlugin implements Listener, CommandE
         }
         if (pending.type == InputType.PROJECT_SEARCH) {
             openProjects(player, 0, input);
+            return;
+        }
+        if (pending.type == InputType.PUBLISH_REVISION_ID) {
+            publishProjectRevision(player, input.trim(), pending.project, "Updated from IxKits GUI");
             return;
         }
         if (pending.type == InputType.CREATE_PROJECT) {
@@ -980,6 +1021,7 @@ public final class IxKitsPlugin extends JavaPlugin implements Listener, CommandE
                 } catch (IOException ex) { p.sendMessage(PREFIX + "§c" + ex.getMessage()); }
                 openProjectActions(p, h.project);
             } else if (slot == 34) publishProject(p, h.project, "misc", "Created with IxKits by CS Studios");
+            else if (slot == 38) promptInput(p, InputType.PUBLISH_REVISION_ID, h.project, 0, -1, "Escribe el ID de la plantilla publicada:", "Type the ID of the published template:");
             else if (slot == 49) { exportProject(p, h.project); openProjectActions(p, h.project); }
         } else if (h.kind.equals("catalog")) {
             if (slot == 45) openMain(p);
@@ -1505,7 +1547,7 @@ public final class IxKitsPlugin extends JavaPlugin implements Listener, CommandE
     }
 
     private enum InputType {
-        DUPLICATE_PROJECT, RENAME_PROJECT, ITEM_NAME, ITEM_LORE, MODEL_DATA, LEATHER_COLOR, CATALOG_SEARCH, PROJECT_SEARCH, CREATE_PROJECT
+        DUPLICATE_PROJECT, RENAME_PROJECT, ITEM_NAME, ITEM_LORE, MODEL_DATA, LEATHER_COLOR, CATALOG_SEARCH, PROJECT_SEARCH, CREATE_PROJECT, PUBLISH_REVISION_ID
     }
 
     private static final class PendingInput {
