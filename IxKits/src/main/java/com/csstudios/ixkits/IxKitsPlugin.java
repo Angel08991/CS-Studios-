@@ -246,6 +246,41 @@ public final class IxKitsPlugin extends JavaPlugin implements Listener, CommandE
                     : tr("No se pudo actualizar: ", "Could not update favorite: ") + rootMessage(error)))));
             return true;
         }
+        if (sub.equals("importar-mano") && args.length >= 4) {
+            String project = slug(args[1]);
+            int pageNumber;
+            int slot;
+            try {
+                pageNumber = Integer.parseInt(args[2]);
+                slot = Integer.parseInt(args[3]);
+            } catch (NumberFormatException ex) {
+                player.sendMessage(PREFIX + tr("Uso: /ixkits importar-mano <proyecto> <página 1-2> <ranura GUI>.", "Usage: /ixkits importar-mano <project> <page 1-2> <GUI slot>."));
+                return true;
+            }
+            ItemStack held = player.getInventory().getItemInMainHand();
+            if (!projectFile(project).isFile()) {
+                player.sendMessage(PREFIX + tr("No existe ese proyecto.", "That project does not exist."));
+                return true;
+            }
+            if (pageNumber < 1 || pageNumber > 2 || !contains(EDIT_SLOTS, slot)) {
+                player.sendMessage(PREFIX + tr("Página o ranura inválida. Usa página 1-2 y una ranura editable del inventario.", "Invalid page or slot. Use page 1-2 and an editable inventory slot."));
+                return true;
+            }
+            if (held == null || held.getType().isAir()) {
+                player.sendMessage(PREFIX + tr("Sostén primero el objeto que quieras importar.", "Hold the item you want to import first."));
+                return true;
+            }
+            File targetFile = projectFile(project);
+            projectService.backupBeforeChange(targetFile);
+            YamlConfiguration yaml = YamlConfiguration.loadConfiguration(targetFile);
+            yaml.set("format-version", 2);
+            yaml.set("updated", System.currentTimeMillis());
+            yaml.set("pages." + (pageNumber - 1) + "." + slot, held.clone());
+            saveYaml(yaml, targetFile);
+            player.sendMessage(PREFIX + tr("Objeto importado conservando sus metadatos en página ", "Item imported with its metadata preserved on page ") + pageNumber + tr(", ranura ", ", slot ") + slot + ".");
+            openEditor(player, project, pageNumber - 1);
+            return true;
+        }
         if (sub.equals("equipamiento") && args.length >= 2) {
             if (projectFile(slug(args[1])).exists()) openEquipment(player, slug(args[1]));
             else player.sendMessage(PREFIX + tr("No existe ese proyecto.", "That project does not exist."));
@@ -267,6 +302,7 @@ public final class IxKitsPlugin extends JavaPlugin implements Listener, CommandE
         player.sendMessage("§f/ixkits eliminar|deshacer|rehacer|validar <proyecto>");
         player.sendMessage("§f/ixkits papelera · /ixkits restaurar-eliminado <proyecto>");
         player.sendMessage("§f/ixkits equipamiento <proyecto>");
+        player.sendMessage("§f/ixkits importar-mano <proyecto> <página 1-2> <ranura GUI>");
         player.sendMessage("§f/ixkits catalogo [búsqueda] · /ixkits buscar <texto>");
         player.sendMessage("§f/ixkits publicar <proyecto> <categoría> [descripción]");
         player.sendMessage("§f/ixkits actualizar-publicacion <id> <proyecto> [cambios]");
