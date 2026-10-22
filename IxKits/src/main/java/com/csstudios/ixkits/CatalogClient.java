@@ -118,15 +118,29 @@ public final class CatalogClient {
         });
     }
 
+    private String interactionToken() {
+        return plugin.getConfig().getString("catalog.interaction-token", "").trim();
+    }
+
     public CompletableFuture<Void> rate(String templateId, String playerId, int rating) {
+        String token = interactionToken();
+        if (token.isBlank()) {
+            return CompletableFuture.failedFuture(new IllegalStateException(
+                "Set catalog.interaction-token in config.yml to enable ratings."));
+        }
         Map<String, Object> payload = Map.of("reviewerId", playerId, "value", rating);
-        return request("POST", "/api/templates/" + encodePath(templateId) + "/rate", Json.stringify(payload), null)
+        return request("POST", "/api/templates/" + encodePath(templateId) + "/rate", Json.stringify(payload), token)
             .thenApply(ignored -> null);
     }
 
     public CompletableFuture<Void> toggleFavorite(String templateId, String playerId) {
+        String token = interactionToken();
+        if (token.isBlank()) {
+            return CompletableFuture.failedFuture(new IllegalStateException(
+                "Set catalog.interaction-token in config.yml to enable favorites."));
+        }
         Map<String, Object> payload = Map.of("userId", playerId);
-        return request("POST", "/api/templates/" + encodePath(templateId) + "/favorite", Json.stringify(payload), null)
+        return request("POST", "/api/templates/" + encodePath(templateId) + "/favorite", Json.stringify(payload), token)
             .thenApply(ignored -> null);
     }
 
