@@ -240,18 +240,23 @@ public final class IxKitsPlugin extends JavaPlugin implements Listener, CommandE
     }
 
     private void openCatalog(Player p, String query) {
+        openCatalog(p, query, 1);
+    }
+
+    private void openCatalog(Player p, String query, int requestedPage) {
+        int page = Math.max(1, requestedPage);
         if (!catalogClient.isEnabled()) {
             p.sendMessage(PREFIX + tr("El catálogo todavía no está configurado. Activa catalog.enabled y define catalog.base-url en config.yml.", "The catalog is not configured yet. Enable catalog.enabled and set catalog.base-url in config.yml."));
             return;
         }
         p.sendMessage(PREFIX + tr("Conectando con IxKits Community...", "Connecting to IxKits Community..."));
-        catalogClient.search(query, 1, EDIT_SLOTS.length).whenComplete((items, error) ->
+        catalogClient.search(query, page, EDIT_SLOTS.length).whenComplete((items, error) ->
             Bukkit.getScheduler().runTask(this, () -> {
                 if (error != null) {
                     p.sendMessage(PREFIX + tr("No se pudo cargar el catálogo: ", "Could not load catalog: ") + rootMessage(error));
                     return;
                 }
-                Inventory inv = menu("catalog", null, 0, tr("§3✦ §bIxKits §8• §0Community", "§3✦ §bIxKits §8• §0Community"));
+                Inventory inv = menu("catalog", null, page, tr("§3✦ §bIxKits §8• §0Community", "§3✦ §bIxKits §8• §0Community") + " §7[" + page + "]");
                 ((MenuHolder) inv.getHolder()).query = query;
                 border(inv);
                 MenuHolder holder = (MenuHolder) inv.getHolder();
@@ -939,8 +944,10 @@ public final class IxKitsPlugin extends JavaPlugin implements Listener, CommandE
             else if (slot == 49) { exportProject(p, h.project); openProjectActions(p, h.project); }
         } else if (h.kind.equals("catalog")) {
             if (slot == 45) openMain(p);
-            else if (slot == 47) promptInput(p, InputType.CATALOG_SEARCH, null, 0, -1, "Escribe un texto para buscar plantillas:", "Type a search query for templates:");
-            else if (slot == 51) openCatalog(p, h.query);
+            else if (slot == 47) {
+                if (h.page > 1) openCatalog(p, h.query, h.page - 1);
+                else promptInput(p, InputType.CATALOG_SEARCH, null, h.page, -1, "Escribe un texto para buscar plantillas:", "Type a search query for templates:");
+            } else if (slot == 51) openCatalog(p, h.query, h.page + 1);
             else if (slot == 49) p.sendMessage(PREFIX + tr("Haz clic en una plantilla para descargarla.", "Click a template to download it."));
             else if (h.entryBySlot.containsKey(slot)) {
                 String id = h.entryBySlot.get(slot);
