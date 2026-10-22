@@ -9,6 +9,7 @@ IxKits es un plugin administrativo para diseñar, personalizar, organizar, valid
 - GUI de estudio con bordes y editor de inventario en dos páginas.
 - Editor de encantamientos: clic izquierdo sube el nivel; clic derecho lo baja; Mayús + clic elimina ese encantamiento.
 - Editor de pociones para escoger el tipo base y añadir/quitar efectos personalizados o subir su nivel desde una GUI.
+- Papelera recuperable en la GUI del navegador de proyectos, con acciones para deshacer y rehacer.
 - Portapapeles de objetos para duplicar una copia exacta desde un proyecto a otra ranura vacía.
 - Tres plantillas de lore bilingües: PvP limpio, Legendario y Minero.
 - Editor de nombre y lore con MiniMessage; separa las líneas de lore usando el separador vertical.
@@ -49,7 +50,10 @@ También se cambia con /ixkits idioma. Para que el cambio manual del archivo se 
 | /ixkits duplicar <origen> <nuevo nombre> | Duplicar proyecto |
 | /ixkits renombrar <origen> <nuevo nombre> | Renombrar |
 | /ixkits eliminar <proyecto> | Mover a papelera recuperable |
+| /ixkits papelera | Abrir la papelera desde el servidor |
+| /ixkits restaurar-eliminado <proyecto> | Restaurar un proyecto eliminado |
 | /ixkits deshacer <proyecto> | Restaurar la última copia de seguridad disponible |
+| /ixkits rehacer <proyecto> | Reaplicar el cambio deshecho más reciente |
 | /ixkits validar <proyecto> | Comprobar problemas básicos |
 | /ixkits equipamiento <proyecto> | Editar las cinco ranuras de equipamiento |
 | /ixkits exportar <proyecto> | Exportar formato nativo .ixkit.yml |
