@@ -1,0 +1,15 @@
+name: IxKits
+version: '${version}'
+main: com.csstudios.ixkits.IxKitsPlugin
+api-version: '1.21'
+author: CS Studios
+description: Editor visual para crear, personalizar y exportar kits.
+commands:
+  ixkits:
+    description: Abre el editor profesional de IxKits
+    usage: /ixkits
+    permission: ixkits.admin
+permissions:
+  ixkits.admin:
+    description: Permite crear y administrar proyectos de IxKits
+    default: op
