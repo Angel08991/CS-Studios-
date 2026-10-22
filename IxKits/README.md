@@ -25,7 +25,7 @@ La compatibilidad con ItemEdit está planteada como **opcional**: IxKits no requ
 
 ## Requisitos
 
-- Paper 1.21.x; se compila contra Paper API 1.21.4.
+- Paper 1.21.11; se compila contra Paper API 1.21.11.
 - Java 21.
 - Gradle 8.10.2 o compatible para compilar localmente.
 
