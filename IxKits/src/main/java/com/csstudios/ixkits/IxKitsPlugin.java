@@ -43,6 +43,7 @@ import java.util.UUID;
 public final class IxKitsPlugin extends JavaPlugin implements Listener, CommandExecutor {
     private File projectsDir, templatesDir, exportsDir;
     private ProjectService projectService;
+    private CatalogClient catalogClient;
     private final Map<UUID, PendingInput> pendingInputs = new ConcurrentHashMap<>();
     private static final int[] EQUIP_SLOTS = {19, 21, 23, 25, 31};
     private static final List<String> EDITABLE_ATTRIBUTES = List.of("max_health", "attack_damage", "attack_speed", "armor", "armor_toughness", "knockback_resistance", "movement_speed", "luck");
@@ -61,6 +62,7 @@ public final class IxKitsPlugin extends JavaPlugin implements Listener, CommandE
         exportsDir = new File(getDataFolder(), "exports");
         projectsDir.mkdirs(); templatesDir.mkdirs(); exportsDir.mkdirs();
         projectService = new ProjectService(this, getDataFolder());
+        catalogClient = new CatalogClient(this);
         initializeTemplates();
         Objects.requireNonNull(getCommand("ixkits")).setExecutor(this);
         Bukkit.getPluginManager().registerEvents(this, this);
@@ -172,6 +174,41 @@ public final class IxKitsPlugin extends JavaPlugin implements Listener, CommandE
             } catch (IOException ex) { player.sendMessage(PREFIX + "§c" + ex.getMessage()); }
             return true;
         }
+        if (sub.equals("catalogo") || sub.equals("catálogo") || sub.equals("buscar")) {
+            String query = args.length >= 2 ? String.join(" ", Arrays.copyOfRange(args, 1, args.length)) : "";
+            openCatalog(player, query);
+            return true;
+        }
+        if (sub.equals("descargar") && args.length >= 2) {
+            downloadCatalogTemplate(player, args[1]);
+            return true;
+        }
+        if (sub.equals("publicar") && args.length >= 3) {
+            publishProject(player, slug(args[1]), args[2],
+                args.length >= 4 ? String.join(" ", Arrays.copyOfRange(args, 3, args.length)) : "Created with IxKits by CS Studios");
+            return true;
+        }
+        if (sub.equals("valorar") && args.length >= 3) {
+            int rating;
+            try { rating = Integer.parseInt(args[2]); } catch (NumberFormatException ex) {
+                player.sendMessage(PREFIX + tr("La valoración debe ser un número del 1 al 5.", "Rating must be a number from 1 to 5.")); return true;
+            }
+            if (rating < 1 || rating > 5) {
+                player.sendMessage(PREFIX + tr("La valoración debe ser del 1 al 5.", "Rating must be from 1 to 5.")); return true;
+            }
+            catalogClient.rate(args[1], player.getUniqueId().toString(), rating).whenComplete((ignored, error) ->
+                Bukkit.getScheduler().runTask(this, () -> player.sendMessage(PREFIX + (error == null
+                    ? tr("Valoración enviada.", "Rating submitted.")
+                    : tr("No se pudo valorar: ", "Rating failed: ") + rootMessage(error)))));
+            return true;
+        }
+        if (sub.equals("favorito") && args.length >= 2) {
+            catalogClient.toggleFavorite(args[1], player.getUniqueId().toString()).whenComplete((ignored, error) ->
+                Bukkit.getScheduler().runTask(this, () -> player.sendMessage(PREFIX + (error == null
+                    ? tr("Favorito actualizado.", "Favorite updated.")
+                    : tr("No se pudo actualizar: ", "Could not update favorite: ") + rootMessage(error)))));
+            return true;
+        }
         if (sub.equals("equipamiento") && args.length >= 2) {
             if (projectFile(slug(args[1])).exists()) openEquipment(player, slug(args[1]));
             else player.sendMessage(PREFIX + tr("No existe ese proyecto.", "That project does not exist."));
@@ -192,6 +229,9 @@ public final class IxKitsPlugin extends JavaPlugin implements Listener, CommandE
         player.sendMessage("§f/ixkits duplicar|renombrar <proyecto> <nuevo nombre>");
         player.sendMessage("§f/ixkits eliminar|deshacer|validar <proyecto>");
         player.sendMessage("§f/ixkits equipamiento <proyecto>");
+        player.sendMessage("§f/ixkits catalogo [búsqueda] · /ixkits buscar <texto>");
+        player.sendMessage("§f/ixkits publicar <proyecto> <categoría> [descripción]");
+        player.sendMessage("§f/ixkits descargar <id> · valorar <id> <1-5> · favorito <id>");
         player.sendMessage(tr("§f/ixkits lore guardar|aplicar <nombre>", "§f/ixkits lore guardar|aplicar <name>"));
         player.sendMessage(tr("§f/ixkits paleta aplicar <nombre>", "§f/ixkits paleta aplicar <name>"));
         player.sendMessage(tr("§f/ixkits encantamientos guardar|aplicar <nombre>", "§f/ixkits encantamientos guardar|aplicar <name>"));
