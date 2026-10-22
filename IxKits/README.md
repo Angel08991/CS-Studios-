@@ -8,11 +8,13 @@ IxKits es un plugin administrativo para diseñar, personalizar, organizar, valid
 
 - GUI de estudio con bordes y editor de inventario en dos páginas.
 - Editor de encantamientos: clic izquierdo sube el nivel; clic derecho lo baja; Mayús + clic elimina ese encantamiento.
+- Editor de pociones para escoger el tipo base y añadir/quitar efectos personalizados o subir su nivel desde una GUI.
+- Portapapeles de objetos para duplicar una copia exacta desde un proyecto a otra ranura vacía.
 - Tres plantillas de lore bilingües: PvP limpio, Legendario y Minero.
 - Editor de nombre y lore con MiniMessage; separa las líneas de lore usando el separador vertical.
 - Alternar irrompible, cambiar durabilidad, custom model data, flags, color de armadura de cuero y modificadores propios de atributos.
 - Editor de equipamiento separado para casco, peto, pantalones, botas y mano secundaria.
-- Biblioteca de proyectos: abrir, duplicar, renombrar, eliminar moviendo a papelera, validar y restaurar una copia anterior.
+- Biblioteca de proyectos con paginación y búsqueda: crear desde la GUI, abrir, duplicar, renombrar, eliminar moviendo a papelera, validar y restaurar una copia anterior.
 - Backups locales rotativos; importación y exportación del formato nativo.
 - Adaptador de EssentialsX en formato legible con avisos por posible pérdida de metadatos.
 - Selector de idioma en español e inglés.
@@ -41,7 +43,7 @@ También se cambia con /ixkits idioma. Para que el cambio manual del archivo se 
 | /ixkits | Abrir la GUI principal |
 | /ixkits crear <nombre> | Crear un proyecto |
 | /ixkits editar <proyecto> | Abrir un proyecto |
-| /ixkits proyectos | Abrir la biblioteca |
+| /ixkits proyectos | Abrir la biblioteca paginada y con búsqueda |
 | /ixkits plantillas | Explorar los lores predeterminados |
 | /ixkits idioma o /ixkits idioma es/en | Cambiar idioma |
 | /ixkits duplicar <origen> <nuevo nombre> | Duplicar proyecto |
@@ -65,6 +67,7 @@ También se cambia con /ixkits idioma. Para que el cambio manual del archivo se 
 | /ixkits descargar <id> | Descargar una plantilla del catálogo |
 | /ixkits valorar <id> <1-5> | Valorar una plantilla |
 | /ixkits favorito <id> | Alternar favorito |
+| /ixkits actualizar-publicacion <id> <proyecto> [cambios] | Publicar una nueva versión de una plantilla comunitaria |
 
 En la biblioteca de proyectos, clic izquierdo abre y clic derecho muestra las herramientas del proyecto.
 
