@@ -14,6 +14,7 @@ Set environment variables before starting:
 - IXKITS_PUBLISH_TOKEN: required Bearer token for publishing templates
 - IXKITS_ADMIN_TOKEN: required Bearer token for removing templates
 - IXKITS_INTERACTION_TOKEN: required Bearer token for submitting ratings and favorites
+- IXKITS_INTERACTION_TOKEN: required Bearer token for submitting ratings and favorites
 - IXKITS_DATA_DIR: persistent directory for catalog.json; mount a persistent disk here in production
 - IXKITS_CORS_ORIGIN: optional allowed browser origin; default * is convenient for a development API
 
