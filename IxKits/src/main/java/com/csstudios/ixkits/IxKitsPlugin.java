@@ -147,6 +147,21 @@ public final class IxKitsPlugin extends JavaPlugin implements Listener, CommandE
             } catch (IOException ex) { player.sendMessage(PREFIX + "§c" + ex.getMessage()); }
             return true;
         }
+        if (sub.equals("rehacer") && args.length >= 2) {
+            try {
+                if (projectService.redo(slug(args[1]))) player.sendMessage(PREFIX + tr("Se rehizo el último cambio deshecho.", "The last undone change was redone."));
+                else player.sendMessage(PREFIX + tr("No hay una acción para rehacer.", "There is no action to redo."));
+            } catch (IOException ex) { player.sendMessage(PREFIX + "§c" + ex.getMessage()); }
+            return true;
+        }
+        if (sub.equals("papelera")) { openTrash(player); return true; }
+        if (sub.equals("restaurar-eliminado") && args.length >= 2) {
+            try {
+                if (projectService.restoreFromTrash(slug(args[1]))) player.sendMessage(PREFIX + tr("Proyecto restaurado desde la papelera.", "Project restored from trash."));
+                else player.sendMessage(PREFIX + tr("No se pudo restaurar: no existe en la papelera o el ID ya está ocupado.", "Restore failed: item is not in trash or the project ID is already in use."));
+            } catch (IOException ex) { player.sendMessage(PREFIX + "§c" + ex.getMessage()); }
+            return true;
+        }
         if (sub.equals("validar") && args.length >= 2) {
             for (String line : projectService.validate(slug(args[1]))) player.sendMessage(PREFIX + "§7" + line);
             return true;
@@ -237,7 +252,8 @@ public final class IxKitsPlugin extends JavaPlugin implements Listener, CommandE
         player.sendMessage("§f/ixkits importar <archivo.yml> [nombre]");
         player.sendMessage("§f/ixkits importar-essentials <archivo.yml> <kit> <nombre>");
         player.sendMessage("§f/ixkits duplicar|renombrar <proyecto> <nuevo nombre>");
-        player.sendMessage("§f/ixkits eliminar|deshacer|validar <proyecto>");
+        player.sendMessage("§f/ixkits eliminar|deshacer|rehacer|validar <proyecto>");
+        player.sendMessage("§f/ixkits papelera · /ixkits restaurar-eliminado <proyecto>");
         player.sendMessage("§f/ixkits equipamiento <proyecto>");
         player.sendMessage("§f/ixkits catalogo [búsqueda] · /ixkits buscar <texto>");
         player.sendMessage("§f/ixkits publicar <proyecto> <categoría> [descripción]");
@@ -449,6 +465,7 @@ public final class IxKitsPlugin extends JavaPlugin implements Listener, CommandE
             safeQuery.isBlank() ? tr("§7Buscar por nombre", "§7Search by name") : "§7Filtro: " + safeQuery,
             tr("§eClic para escribir", "§eClick to type")));
         inv.setItem(49, item(Material.LIME_CONCRETE, tr("§aCrear proyecto", "§aCreate project"), tr("§eClic para escribir el nombre", "§eClick to type a name")));
+        inv.setItem(50, item(Material.CHEST, tr("§6Papelera", "§6Trash"), tr("§7Restaurar proyectos eliminados.", "§7Restore deleted projects."), tr("§eClic para abrir", "§eClick to open")));
         inv.setItem(51, item(Material.SPECTRAL_ARROW, tr("§bSiguiente", "§bNext"), tr("§7Página siguiente", "§7Next page")));
         inv.setItem(53, item(Material.PAPER, "§f" + matching.size() + " / " + (files == null ? 0 : files.length),
             tr("§7Proyectos encontrados", "§7Projects found")));
@@ -482,6 +499,27 @@ public final class IxKitsPlugin extends JavaPlugin implements Listener, CommandE
         inv.setItem(46, item(Material.ENCHANTED_BOOK, tr("§bEditar objeto", "§bEdit item"), tr("§7Clic derecho sobre cualquier objeto", "§7Right-click any item"), tr("§7para abrir su editor.", "§7to open its editor.")));
         inv.setItem(44, item(Material.IRON_CHESTPLATE, tr("§bEquipamiento", "§bEquipment"), tr("§7Casco, peto, pantalones, botas", "§7Helmet, chestplate, leggings, boots"), tr("§7y mano secundaria", "§7and offhand")));
         inv.setItem(53, item(Material.WRITABLE_BOOK, tr("§dExportar", "§dExport"), tr("§7Generar archivo .ixkit.yml", "§7Generate .ixkit.yml file")));
+        p.openInventory(inv);
+    }
+
+    private void openTrash(Player p) {
+        List<String> trashed = projectService.listTrash();
+        Inventory inv = menu("trash", null, 0, tr("§3✦ §bIxKits §8• §0Papelera", "§3✦ §bIxKits §8• §0Trash"));
+        border(inv);
+        MenuHolder holder = (MenuHolder) inv.getHolder();
+        int index = 0;
+        for (String id : trashed) {
+            if (index >= EDIT_SLOTS.length) break;
+            int slot = EDIT_SLOTS[index++];
+            inv.setItem(slot, item(Material.CHEST, "§6" + projectService.trashedProjectName(id),
+                "§8ID: " + id,
+                tr("§7Proyecto conservado en papelera.", "§7Project retained in trash."),
+                tr("§eClic para restaurar", "§eClick to restore")));
+            holder.entryBySlot.put(slot, id);
+        }
+        if (trashed.isEmpty()) inv.setItem(22, item(Material.PAPER, tr("§7La papelera está vacía.", "§7Trash is empty.")));
+        inv.setItem(45, item(Material.ARROW, tr("§7Volver", "§7Back"), tr("§8Biblioteca", "§8Project library")));
+        inv.setItem(49, item(Material.REFRESH, tr("§bActualizar", "§bRefresh")));
         p.openInventory(inv);
     }
 
@@ -1041,6 +1079,7 @@ public final class IxKitsPlugin extends JavaPlugin implements Listener, CommandE
             else if (slot == 47) openProjects(p, Math.max(0, h.page - 1), h.query);
             else if (slot == 48) promptInput(p, InputType.PROJECT_SEARCH, null, h.page, -1, "Escribe el nombre que quieras buscar:", "Type the project name to search:");
             else if (slot == 49) promptInput(p, InputType.CREATE_PROJECT, null, 0, -1, "Escribe el nombre del nuevo proyecto:", "Type a name for the new project:");
+            else if (slot == 50) openTrash(p);
             else if (slot == 51) openProjects(p, h.page + 1, h.query);
             else if (h.entryBySlot.containsKey(slot)) {
                 String project = h.entryBySlot.get(slot);
@@ -1068,9 +1107,26 @@ public final class IxKitsPlugin extends JavaPlugin implements Listener, CommandE
                     else p.sendMessage(PREFIX + tr("No hay copias para restaurar.", "No backups are available."));
                 } catch (IOException ex) { p.sendMessage(PREFIX + "§c" + ex.getMessage()); }
                 openProjectActions(p, h.project);
+            } else if (slot == 42) {
+                try {
+                    if (projectService.redo(h.project)) p.sendMessage(PREFIX + tr("Último cambio rehecho.", "Last change redone."));
+                    else p.sendMessage(PREFIX + tr("No hay una acción para rehacer.", "There is no action to redo."));
+                } catch (IOException ex) { p.sendMessage(PREFIX + "§c" + ex.getMessage()); }
+                openProjectActions(p, h.project);
             } else if (slot == 34) publishProject(p, h.project, "misc", "Created with IxKits by CS Studios");
             else if (slot == 38) promptInput(p, InputType.PUBLISH_REVISION_ID, h.project, 0, -1, "Escribe el ID de la plantilla publicada:", "Type the ID of the published template:");
             else if (slot == 49) { exportProject(p, h.project); openProjectActions(p, h.project); }
+        } else if (h.kind.equals("trash")) {
+            if (slot == 45) openProjects(p);
+            else if (slot == 49) openTrash(p);
+            else if (h.entryBySlot.containsKey(slot)) {
+                String id = h.entryBySlot.get(slot);
+                try {
+                    if (projectService.restoreFromTrash(id)) p.sendMessage(PREFIX + tr("Proyecto restaurado: §b", "Project restored: §b") + projectService.trashedProjectName(id));
+                    else p.sendMessage(PREFIX + tr("No se pudo restaurar porque el ID ya está ocupado o el proyecto no existe.", "Restore failed because the ID is occupied or the project is missing."));
+                } catch (IOException ex) { p.sendMessage(PREFIX + "§c" + ex.getMessage()); }
+                openTrash(p);
+            }
         } else if (h.kind.equals("catalog")) {
             if (slot == 45) openMain(p);
             else if (slot == 47) {
