@@ -281,6 +281,31 @@ public final class IxKitsPlugin extends JavaPlugin implements Listener, CommandE
             openEditor(player, project, pageNumber - 1);
             return true;
         }
+        if ((sub.equals("versiones") || sub.equals("versions")) && args.length >= 2) {
+            String templateId = args[1];
+            catalogClient.versions(templateId).whenComplete((versions, error) ->
+                Bukkit.getScheduler().runTask(this, () -> {
+                    if (error != null) {
+                        player.sendMessage(PREFIX + tr("No se pudo cargar el historial: ", "Could not load version history: ") + rootMessage(error));
+                        return;
+                    }
+                    if (versions.isEmpty()) {
+                        player.sendMessage(PREFIX + tr("No hay versiones disponibles para esa plantilla.", "No versions are available for that template."));
+                        return;
+                    }
+                    player.sendMessage(PREFIX + tr("Historial de versiones de §d", "Version history for §d") + templateId + "§7:");
+                    for (Map<String, Object> version : versions) {
+                        Object revision = version.getOrDefault("revision", "?");
+                        Object mcVersion = version.getOrDefault("mcVersion", "unknown");
+                        Object author = version.getOrDefault("author", "unknown");
+                        Object changelog = version.getOrDefault("changelog", "");
+                        Object publishedAt = version.getOrDefault("publishedAt", "");
+                        player.sendMessage("§8• §b#" + revision + " §7Minecraft §f" + mcVersion + " §8| §7" + author);
+                        player.sendMessage("  §7" + String.valueOf(changelog) + " §8(" + publishedAt + ")");
+                    }
+                }));
+            return true;
+        }
         if (sub.equals("equipamiento") && args.length >= 2) {
             if (projectFile(slug(args[1])).exists()) openEquipment(player, slug(args[1]));
             else player.sendMessage(PREFIX + tr("No existe ese proyecto.", "That project does not exist."));
@@ -307,6 +332,7 @@ public final class IxKitsPlugin extends JavaPlugin implements Listener, CommandE
         player.sendMessage("§f/ixkits publicar <proyecto> <categoría> [descripción]");
         player.sendMessage("§f/ixkits actualizar-publicacion <id> <proyecto> [cambios]");
         player.sendMessage("§f/ixkits descargar <id> · valorar <id> <1-5> · favorito <id>");
+        player.sendMessage("§f/ixkits versiones <id>");
         player.sendMessage(tr("§f/ixkits lore guardar|aplicar <nombre>", "§f/ixkits lore guardar|aplicar <name>"));
         player.sendMessage(tr("§f/ixkits paleta aplicar <nombre>", "§f/ixkits paleta aplicar <name>"));
         player.sendMessage(tr("§f/ixkits encantamientos guardar|aplicar <nombre>", "§f/ixkits encantamientos guardar|aplicar <name>"));
