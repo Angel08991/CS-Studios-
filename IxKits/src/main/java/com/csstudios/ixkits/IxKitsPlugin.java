@@ -519,7 +519,7 @@ public final class IxKitsPlugin extends JavaPlugin implements Listener, CommandE
         }
         if (trashed.isEmpty()) inv.setItem(22, item(Material.PAPER, tr("§7La papelera está vacía.", "§7Trash is empty.")));
         inv.setItem(45, item(Material.ARROW, tr("§7Volver", "§7Back"), tr("§8Biblioteca", "§8Project library")));
-        inv.setItem(49, item(Material.REFRESH, tr("§bActualizar", "§bRefresh")));
+        inv.setItem(49, item(Material.CLOCK, tr("§bActualizar", "§bRefresh")));
         p.openInventory(inv);
     }
 
