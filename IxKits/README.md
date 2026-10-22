@@ -108,10 +108,11 @@ El servicio está en IxKits/catalog-service/, usa Node.js 20+ y no necesita depe
       enabled: true
       base-url: "https://TU-DOMINIO"
       publish-token: "EL_TOKEN_DE_PUBLICACION"
+      interaction-token: "EL_TOKEN_DE_INTERACCIONES"
       minecraft-version: "1.21.11"
       default-license: "all-rights-reserved"
 
-Después del despliegue, copia el valor de IXKITS_PUBLISH_TOKEN desde las variables del servicio al campo catalog.publish-token de plugins/IxKits/config.yml. No pongas el token de administración en el plugin ni publiques ninguno de los dos en un repositorio o chat. La moderación usa el token administrativo solo en la API.
+Después del despliegue, copia IXKITS_PUBLISH_TOKEN al campo catalog.publish-token e IXKITS_INTERACTION_TOKEN al campo catalog.interaction-token de plugins/IxKits/config.yml. No pongas el token de administración en el plugin ni publiques ninguno de los secretos en un repositorio o chat. Las valoraciones y favoritos requieren el token de interacción; la moderación usa el token administrativo solo en la API.
 
 El catálogo es una primera versión técnica: las valoraciones y favoritos no verifican identidad real; antes de abrirlo a una comunidad grande hay que añadir autenticación y moderación. La plantilla se guarda como texto y el servicio no ejecuta comandos ni código de los archivos subidos; aun así, el plugin valida antes de importar.
 
