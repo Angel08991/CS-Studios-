@@ -108,18 +108,30 @@ function slug(value) {
   return text(value, 100).toLowerCase().replace(/[^a-z0-9_-]+/g, "-").replace(/[-_]{2,}/g, "-").replace(/^[-_.]+|[-_.]+$/g, "").slice(0, 80);
 }
 
+let dbPromise;
+
 async function loadDb() {
-  await fs.mkdir(DATA_DIR, { recursive: true });
-  try {
-    const parsed = JSON.parse(await fs.readFile(DB_FILE, "utf8"));
-    if (!parsed || !Array.isArray(parsed.templates)) throw new Error("Invalid catalog data");
-    return parsed;
-  } catch (error) {
-    if (error.code !== "ENOENT") console.error("Catalog database could not be read; initializing an empty catalog:", error.message);
-    const fresh = { schemaVersion: 1, templates: [] };
-    await saveDb(fresh);
-    return fresh;
+  if (!dbPromise) {
+    dbPromise = (async () => {
+      await fs.mkdir(DATA_DIR, { recursive: true });
+      try {
+        const parsed = JSON.parse(await fs.readFile(DB_FILE, "utf8"));
+        if (!parsed || !Array.isArray(parsed.templates)) throw new Error("Invalid catalog data");
+        return parsed;
+      } catch (error) {
+        if (error.code !== "ENOENT") {
+          console.error("Catalog database could not be read; initializing an empty catalog:", error.message);
+        }
+        const fresh = { schemaVersion: 1, templates: [] };
+        await saveDb(fresh);
+        return fresh;
+      }
+    })().catch(error => {
+      dbPromise = undefined;
+      throw error;
+    });
   }
+  return dbPromise;
 }
 
 let dbQueue = Promise.resolve();
