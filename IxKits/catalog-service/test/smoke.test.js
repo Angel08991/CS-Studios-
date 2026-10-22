@@ -35,6 +35,7 @@ test("catalog source contains upload limits and safe token comparison", () => {
   assert.match(serverSource, /MAX_PROJECT_BYTES = 500 \* 1024/);
   assert.match(serverSource, /MAX_BODY_BYTES = 700 \* 1024/);
   assert.match(serverSource, /timingSafeEqual/);
+  assert.match(serverSource, /configuredTokenRequired/);
   assert.match(serverSource, /IXKITS_PUBLISH_TOKEN/);
   assert.match(serverSource, /IXKITS_ADMIN_TOKEN/);
   assert.match(serverSource, /IXKITS_INTERACTION_TOKEN/);
@@ -231,4 +232,59 @@ test("catalog refuses to overwrite a corrupted existing database", async t => {
   assert.equal(response.status, 500, "API should report database recovery is required");
   assert.equal(await fsp.readFile(corruptFile, "utf8"), originalContents,
     "the original catalog file must remain untouched for recovery");
+});
+
+
+test("catalog responds clearly when protected-action tokens are not configured", async t => {
+  const missingTokenPort = await freePort();
+  const missingTokenBaseUrl = "http://127.0.0.1:" + missingTokenPort;
+  const missingTokenDataDir = await fsp.mkdtemp(path.join(os.tmpdir(), "ixkits-catalog-no-token-"));
+  const missingTokenChild = spawn(process.execPath, [serverPath], {
+    env: {
+      ...process.env,
+      PORT: String(missingTokenPort),
+      HOST: "127.0.0.1",
+      IXKITS_DATA_DIR: missingTokenDataDir
+    },
+    stdio: "ignore"
+  });
+
+  t.after(async () => {
+    if (missingTokenChild && missingTokenChild.exitCode === null) {
+      missingTokenChild.kill("SIGTERM");
+      await new Promise(resolve => {
+        const timeout = setTimeout(resolve, 1000);
+        missingTokenChild.once("exit", () => { clearTimeout(timeout); resolve(); });
+      });
+    }
+    await fsp.rm(missingTokenDataDir, { recursive: true, force: true });
+  });
+
+  let healthy = false;
+  for (let attempt = 0; attempt < 60; attempt++) {
+    try {
+      const response = await fetch(missingTokenBaseUrl + "/health");
+      if (response.ok) { healthy = true; break; }
+    } catch { }
+    await new Promise(resolve => setTimeout(resolve, 100));
+  }
+  assert.equal(healthy, true, "catalog process should start");
+
+  const publish = await fetch(missingTokenBaseUrl + "/api/templates", {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ title: "Kit", author: "Tester", category: "pvp", mcVersion: "1.21.11", projectYaml: "format-version: 2\npages: {}\n" })
+  });
+  assert.equal(publish.status, 503);
+  assert.match((await publish.json()).error, /not configured/);
+
+  const rating = await fetch(missingTokenBaseUrl + "/api/templates/missing/rate", {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ reviewerId: "tester", value: 5 })
+  });
+  assert.equal(rating.status, 503);
+
+  const moderation = await fetch(missingTokenBaseUrl + "/api/templates/missing", { method: "DELETE" });
+  assert.equal(moderation.status, 503);
 });
