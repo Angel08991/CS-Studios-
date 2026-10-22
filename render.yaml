@@ -1,0 +1,26 @@
+# Render Blueprint for the optional IxKits Community Catalog API.
+# A persistent disk keeps catalog entries across restarts; use a plan that supports disks.
+services:
+  - type: web
+    name: ixkits-catalog
+    runtime: node
+    plan: starter
+    rootDir: IxKits/catalog-service
+    buildCommand: npm install
+    startCommand: npm start
+    healthCheckPath: /health
+    disk:
+      name: ixkits-catalog-data
+      mountPath: /var/data/ixkits
+      sizeGB: 1
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: IXKITS_DATA_DIR
+        value: /var/data/ixkits
+      - key: IXKITS_PUBLISH_TOKEN
+        generateValue: true
+      - key: IXKITS_ADMIN_TOKEN
+        generateValue: true
+      - key: IXKITS_CORS_ORIGIN
+        value: "*"
