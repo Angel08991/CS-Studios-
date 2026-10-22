@@ -13,6 +13,7 @@ const serverPath = path.join(__dirname, "..", "server.js");
 const serverSource = fs.readFileSync(serverPath, "utf8");
 const publishToken = "test-publish-token";
 const adminToken = "test-admin-token";
+const interactionToken = "test-interaction-token";
 let port;
 let baseUrl;
 let dataDir;
@@ -36,6 +37,7 @@ test("catalog source contains upload limits and safe token comparison", () => {
   assert.match(serverSource, /timingSafeEqual/);
   assert.match(serverSource, /IXKITS_PUBLISH_TOKEN/);
   assert.match(serverSource, /IXKITS_ADMIN_TOKEN/);
+  assert.match(serverSource, /IXKITS_INTERACTION_TOKEN/);
   assert.match(serverSource, /format-version\|version/);
 });
 
@@ -51,6 +53,7 @@ test("catalog API handles publish, search, ratings, favorites, downloads, and mo
       IXKITS_DATA_DIR: dataDir,
       IXKITS_PUBLISH_TOKEN: publishToken,
       IXKITS_ADMIN_TOKEN: adminToken,
+      IXKITS_INTERACTION_TOKEN: interactionToken,
       IXKITS_CORS_ORIGIN: "http://localhost"
     },
     stdio: "ignore"
@@ -134,9 +137,19 @@ test("catalog API handles publish, search, ratings, favorites, downloads, and mo
   assert.equal(versions.versions[0].revision, 1);
   assert.equal(versions.versions[1].revision, 2);
 
-  const rating = await fetch(baseUrl + "/api/templates/" + created.id + "/rate", {
+  const deniedRating = await fetch(baseUrl + "/api/templates/" + created.id + "/rate", {
     method: "POST",
     headers: { "content-type": "application/json" },
+    body: JSON.stringify({ reviewerId: "spoofed-user", value: 1 })
+  });
+  assert.equal(deniedRating.status, 401, "ratings must require a trusted server token");
+
+  const rating = await fetch(baseUrl + "/api/templates/" + created.id + "/rate", {
+    method: "POST",
+    headers: {
+      "content-type": "application/json",
+      authorization: "Bearer " + interactionToken
+    },
     body: JSON.stringify({ reviewerId: "tester-1", value: 5 })
   });
   assert.equal(rating.status, 200);
@@ -144,7 +157,10 @@ test("catalog API handles publish, search, ratings, favorites, downloads, and mo
 
   const favorite = await fetch(baseUrl + "/api/templates/" + created.id + "/favorite", {
     method: "POST",
-    headers: { "content-type": "application/json" },
+    headers: {
+      "content-type": "application/json",
+      authorization: "Bearer " + interactionToken
+    },
     body: JSON.stringify({ userId: "tester-1" })
   });
   assert.equal(favorite.status, 200);
