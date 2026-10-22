@@ -163,6 +163,14 @@ function authRequired(req, res, expected, reason) {
   return false;
 }
 
+function configuredTokenRequired(req, res, expected, scope) {
+  if (!expected) {
+    send(res, 503, { error: scope + " token is not configured on this service." });
+    return false;
+  }
+  return authRequired(req, res, expected, scope + " token is invalid.");
+}
+
 async function handler(req, res) {
   if (req.method === "OPTIONS") {
     res.writeHead(204, {
@@ -226,7 +234,7 @@ async function handler(req, res) {
 
   if (req.method === "POST" && parts.length === 4 && parts[3] === "versions") {
     if (!template) return send(res, 404, { error: "Template not found." });
-    if (!PUBLISH_TOKEN || !authRequired(req, res, PUBLISH_TOKEN, "Catalog publishing is not configured or the token is invalid.")) return;
+    if (!configuredTokenRequired(req, res, PUBLISH_TOKEN, "Catalog publishing")) return;
     const body = await readBody(req);
     if (!isValidProjectYaml(body.projectYaml)) return send(res, 400, { error: "A valid IxKits project YAML under 500 KB is required." });
     const now = new Date().toISOString();
@@ -257,7 +265,7 @@ async function handler(req, res) {
   }
 
   if (req.method === "POST" && parts.length === 2) {
-    if (!PUBLISH_TOKEN || !authRequired(req, res, PUBLISH_TOKEN, "Catalog publishing is not configured or the token is invalid.")) return;
+    if (!configuredTokenRequired(req, res, PUBLISH_TOKEN, "Catalog publishing")) return;
     const body = await readBody(req);
     const title = text(body.title, 100);
     const author = text(body.author, 80);
@@ -281,7 +289,7 @@ async function handler(req, res) {
   }
 
   if (req.method === "POST" && parts.length === 4 && parts[3] === "rate") {
-    if (!INTERACTION_TOKEN || !authRequired(req, res, INTERACTION_TOKEN, "Catalog interactions are not configured or the token is invalid.")) return;
+    if (!configuredTokenRequired(req, res, INTERACTION_TOKEN, "Catalog interactions")) return;
     if (!template) return send(res, 404, { error: "Template not found." });
     const body = await readBody(req);
     const reviewerId = text(body.reviewerId, 80);
@@ -296,7 +304,7 @@ async function handler(req, res) {
   }
 
   if (req.method === "POST" && parts.length === 4 && parts[3] === "favorite") {
-    if (!INTERACTION_TOKEN || !authRequired(req, res, INTERACTION_TOKEN, "Catalog interactions are not configured or the token is invalid.")) return;
+    if (!configuredTokenRequired(req, res, INTERACTION_TOKEN, "Catalog interactions")) return;
     if (!template) return send(res, 404, { error: "Template not found." });
     const body = await readBody(req);
     const userId = text(body.userId, 80);
@@ -310,7 +318,7 @@ async function handler(req, res) {
   }
 
   if (req.method === "DELETE" && parts.length === 3) {
-    if (!ADMIN_TOKEN || !authRequired(req, res, ADMIN_TOKEN, "Catalog moderation is not configured or the token is invalid.")) return;
+    if (!configuredTokenRequired(req, res, ADMIN_TOKEN, "Catalog moderation")) return;
     const target = db.templates.find(item => item.id === id);
     if (!target) return send(res, 404, { error: "Template not found." });
     target.status = "removed";
