@@ -6,9 +6,12 @@ IxKits es un plugin administrativo para diseñar, personalizar, organizar, valid
 
 ## Estado actual
 
+La compilación de CI se ejecuta contra Paper API 1.21.11. La GUI debe probarse también en un servidor Paper 1.21.11 real antes de producción.
+
 - GUI de estudio con bordes y editor de inventario en dos páginas.
 - Editor de encantamientos: clic izquierdo sube el nivel; clic derecho lo baja; Mayús + clic elimina ese encantamiento.
 - Editor de pociones para escoger el tipo base y añadir/quitar efectos personalizados o subir su nivel desde una GUI.
+- Menú de propiedades especiales para libros escritos (título, autor y páginas MiniMessage), patrones y colores de estandartes, trims de armadura, propietario de cabezas y fuegos artificiales (potencia, tipo/color de efecto y eliminación de efectos).
 - Papelera recuperable en la GUI del navegador de proyectos, con acciones para deshacer y rehacer.
 - Portapapeles de objetos para duplicar una copia exacta desde un proyecto a otra ranura vacía.
 - Tres plantillas de lore bilingües: PvP limpio, Legendario y Minero.
