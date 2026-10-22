@@ -740,7 +740,7 @@ public final class IxKitsPlugin extends JavaPlugin implements Listener, CommandE
         Inventory inv = menu("item-editor", project, page, targetSlot, 0, tr("§3✦ §bIxKits §8• §0Editor de objeto", "§3✦ §bIxKits §8• §0Item editor"));
         border(inv);
         inv.setItem(4, target.clone());
-        inv.setItem(15, item(Material.COPY, tr("§bCopiar objeto", "§bCopy item"),
+        inv.setItem(15, item(Material.PAPER, tr("§bCopiar objeto", "§bCopy item"),
             tr("§7Guardar una copia exacta en IxKits.", "§7Keep an exact copy in IxKits."),
             tr("§7Después haz clic en una ranura vacía.", "§7Then click an empty project slot.")));
         inv.setItem(17, item(Material.CHEST, tr("§bPortapapeles", "§bClipboard"),
@@ -858,7 +858,7 @@ public final class IxKitsPlugin extends JavaPlugin implements Listener, CommandE
                 e.setCancelled(true);
                 if (cursor != null && !cursor.getType().isAir()) {
                     e.getView().getTopInventory().setItem(slot, cursor.clone());
-                    e.getView().setCursor(null);
+                    e.getView().setCursor(new ItemStack(Material.AIR));
                 }
             }
             return;
