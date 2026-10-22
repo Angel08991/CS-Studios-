@@ -265,6 +265,207 @@ public final class IxKitsPlugin extends JavaPlugin implements Listener, CommandE
         p.openInventory(inv);
     }
 
+    private void openProjectActions(Player p, String project) {
+        YamlConfiguration yaml = YamlConfiguration.loadConfiguration(projectFile(project));
+        Inventory inv = menu("project-actions", project, 0, tr("§3✦ §bIxKits §8• §0" + yaml.getString("name", project), "§3✦ §bIxKits §8• §0" + yaml.getString("name", project)));
+        border(inv);
+        inv.setItem(20, item(Material.CHEST, tr("§bDuplicar", "§bDuplicate"), tr("§7Crear una copia independiente.", "§7Create an independent copy."), tr("§eClic y escribe un nombre en el chat", "§eClick and type a name in chat")));
+        inv.setItem(22, item(Material.NAME_TAG, tr("§bRenombrar", "§bRename"), tr("§7Cambiar el nombre del proyecto.", "§7Change the project name."), tr("§eClic y escribe un nombre en el chat", "§eClick and type a name in chat")));
+        inv.setItem(24, item(Material.TNT, tr("§cEliminar", "§cDelete"), tr("§7Mover a la papelera recuperable.", "§7Move it to recoverable trash."), tr("§eSolicita confirmación", "§eRequires confirmation")));
+        inv.setItem(30, item(Material.WRITABLE_BOOK, tr("§bValidar proyecto", "§bValidate project"), tr("§7Comprobar objetos y formato.", "§7Check items and project format.")));
+        inv.setItem(32, item(Material.PAPER, tr("§aExportar EssentialsX", "§aExport to EssentialsX"), tr("§7Crea un kits.yml compatible.", "§7Create a compatible kits.yml."), tr("§cPuede perder metadatos avanzados", "§cAdvanced metadata may be lost")));
+        inv.setItem(40, item(Material.CLOCK, tr("§eDeshacer último cambio", "§eUndo last change"), tr("§7Restaurar una copia anterior.", "§7Restore a previous backup.")));
+        inv.setItem(49, item(Material.WRITABLE_BOOK, tr("§dExportar IxKits", "§dExport IxKits"), tr("§7Conserva los objetos serializados.", "§7Preserves serialized items.")));
+        inv.setItem(45, item(Material.ARROW, tr("§7Volver", "§7Back"), tr("§8Biblioteca de proyectos", "§8Project library")));
+        p.openInventory(inv);
+    }
+
+    private void openDeleteConfirm(Player p, String project) {
+        Inventory inv = menu("project-delete-confirm", project, 0, tr("§4Confirmar eliminación", "§4Confirm deletion"));
+        border(inv);
+        inv.setItem(21, item(Material.RED_CONCRETE, tr("§cSí, mover a papelera", "§cYes, move to trash"), tr("§7El archivo se conserva para recuperación.", "§7The file is kept for recovery.")));
+        inv.setItem(23, item(Material.LIME_CONCRETE, tr("§aCancelar", "§aCancel"), tr("§7No se eliminará nada.", "§7Nothing will be deleted.")));
+        inv.setItem(45, item(Material.ARROW, tr("§7Volver", "§7Back")));
+        p.openInventory(inv);
+    }
+
+    private void openEquipment(Player p, String project) {
+        YamlConfiguration yaml = YamlConfiguration.loadConfiguration(projectFile(project));
+        Inventory inv = menu("equipment", project, 0, tr("§3✦ §bIxKits §8• §0Equipamiento", "§3✦ §bIxKits §8• §0Equipment"));
+        border(inv);
+        inv.setItem(19, yaml.getItemStack("equipment.helmet", null));
+        inv.setItem(21, yaml.getItemStack("equipment.chestplate", null));
+        inv.setItem(23, yaml.getItemStack("equipment.leggings", null));
+        inv.setItem(25, yaml.getItemStack("equipment.boots", null));
+        inv.setItem(31, yaml.getItemStack("equipment.offhand", null));
+        if (inv.getItem(19) == null) inv.setItem(19, item(Material.LEATHER_HELMET, tr("§bCasco", "§bHelmet"), tr("§7Coloca aquí el casco", "§7Place the helmet here")));
+        if (inv.getItem(21) == null) inv.setItem(21, item(Material.LEATHER_CHESTPLATE, tr("§bPeto", "§bChestplate"), tr("§7Coloca aquí el peto", "§7Place the chestplate here")));
+        if (inv.getItem(23) == null) inv.setItem(23, item(Material.LEATHER_LEGGINGS, tr("§bPantalones", "§bLeggings"), tr("§7Coloca aquí los pantalones", "§7Place leggings here")));
+        if (inv.getItem(25) == null) inv.setItem(25, item(Material.LEATHER_BOOTS, tr("§bBotas", "§bBoots"), tr("§7Coloca aquí las botas", "§7Place the boots here")));
+        if (inv.getItem(31) == null) inv.setItem(31, item(Material.SHIELD, tr("§bMano secundaria", "§bOffhand"), tr("§7Escudo, tótem u otro objeto", "§7Shield, totem or another item")));
+        inv.setItem(40, item(Material.PAPER, tr("§fCómo usarlo", "§fHow to use"), tr("§7Mueve objetos del inventario", "§7Move items from your inventory"), tr("§7a las cinco ranuras disponibles.", "§7into the five available slots."), tr("§7Se guarda al cerrar.", "§7Saved when closed.")));
+        inv.setItem(45, item(Material.ARROW, tr("§7Volver al proyecto", "§7Back to project")));
+        p.openInventory(inv);
+    }
+
+    private void openAttributes(Player p, String project, int page, int targetSlot) {
+        YamlConfiguration yaml = YamlConfiguration.loadConfiguration(projectFile(project));
+        ItemStack target = yaml.getItemStack("pages." + page + "." + targetSlot);
+        if (target == null || target.getType().isAir()) { openEditor(p, project, page); return; }
+        Inventory inv = menu("attributes", project, page, targetSlot, 0, tr("§3✦ §bIxKits §8• §0Atributos", "§3✦ §bIxKits §8• §0Attributes"));
+        border(inv);
+        MenuHolder holder = (MenuHolder) inv.getHolder();
+        inv.setItem(4, target.clone());
+        for (int i = 0; i < EDITABLE_ATTRIBUTES.size(); i++) {
+            String key = EDITABLE_ATTRIBUTES.get(i);
+            int slot = EDIT_SLOTS[i];
+            Attribute attribute = Registry.ATTRIBUTE.get(NamespacedKey.minecraft(key));
+            if (attribute == null) continue;
+            double amount = ownedAttributeAmount(target, key);
+            List<String> lore = new ArrayList<>();
+            lore.add(tr("§7Modificador IxKits: §b", "§7IxKits modifier: §b") + String.format(Locale.US, "%.2f", amount));
+            lore.add("");
+            lore.add(tr("§aClic izquierdo: +0.5", "§aLeft-click: +0.5"));
+            lore.add(tr("§eClic derecho: -0.5", "§eRight-click: -0.5"));
+            lore.add(tr("§cMayús + clic: quitar modificador propio", "§cShift-click: remove IxKits modifier"));
+            inv.setItem(slot, itemWithLore(Material.AMETHYST_SHARD, "§b" + prettyKey(key), lore));
+            holder.entryBySlot.put(slot, key);
+        }
+        inv.setItem(45, item(Material.ARROW, tr("§7Volver al objeto", "§7Back to item")));
+        inv.setItem(49, item(Material.PAPER, tr("§fAyuda", "§fHelp"), tr("§7Solo modifica atributos de IxKits.", "§7Only IxKits attributes are changed.")));
+        p.openInventory(inv);
+    }
+
+    private double ownedAttributeAmount(ItemStack stack, String key) {
+        Attribute attribute = Registry.ATTRIBUTE.get(NamespacedKey.minecraft(key));
+        if (attribute == null || stack.getItemMeta() == null) return 0.0;
+        NamespacedKey modifierKey = new NamespacedKey(this, "attr_" + key);
+        Collection<AttributeModifier> modifiers = stack.getItemMeta().getAttributeModifiers(attribute);
+        if (modifiers == null) return 0.0;
+        for (AttributeModifier modifier : modifiers) {
+            if (modifier.getKey().equals(modifierKey)) return modifier.getAmount();
+        }
+        return 0.0;
+    }
+
+    private void adjustAttribute(Player p, MenuHolder holder, String key, boolean decrease, boolean remove) {
+        File file = projectFile(holder.project);
+        YamlConfiguration yaml = YamlConfiguration.loadConfiguration(file);
+        String path = "pages." + holder.page + "." + holder.targetSlot;
+        ItemStack target = yaml.getItemStack(path);
+        if (target == null || target.getType().isAir()) { openEditor(p, holder.project, holder.page); return; }
+        Attribute attribute = Registry.ATTRIBUTE.get(NamespacedKey.minecraft(key));
+        if (attribute == null) { p.sendMessage(PREFIX + tr("Atributo no disponible en esta versión.", "Attribute is unavailable in this version.")); return; }
+        ItemMeta meta = target.getItemMeta();
+        NamespacedKey modifierKey = new NamespacedKey(this, "attr_" + key);
+        Collection<AttributeModifier> currentModifiers = meta.getAttributeModifiers(attribute);
+        if (currentModifiers != null) {
+            for (AttributeModifier modifier : new ArrayList<>(currentModifiers)) {
+                if (modifier.getKey().equals(modifierKey)) meta.removeAttributeModifier(attribute, modifier);
+            }
+        }
+        if (!remove) {
+            double current = 0.0;
+            if (currentModifiers != null) for (AttributeModifier modifier : currentModifiers) if (modifier.getKey().equals(modifierKey)) current = modifier.getAmount();
+            double next = current + (decrease ? -0.5 : 0.5);
+            if (Math.abs(next) > 0.001) {
+                meta.addAttributeModifier(attribute, new AttributeModifier(modifierKey, next, AttributeModifier.Operation.ADD_NUMBER, EquipmentSlotGroup.ANY));
+            }
+        }
+        target.setItemMeta(meta);
+        yaml.set(path, target);
+        projectService.backupBeforeChange(file);
+        saveYaml(yaml, file);
+        openAttributes(p, holder.project, holder.page, holder.targetSlot);
+    }
+
+    private void promptInput(Player p, InputType type, String project, int page, int slot, String promptEs, String promptEn) {
+        pendingInputs.put(p.getUniqueId(), new PendingInput(type, project, page, slot));
+        p.closeInventory();
+        p.sendMessage(PREFIX + tr(promptEs, promptEn));
+        p.sendMessage(PREFIX + tr("§7Escribe §c-cancelar §7para salir.", "§7Type §c-cancel §7to exit."));
+    }
+
+    @EventHandler public void onAsyncChat(AsyncPlayerChatEvent event) {
+        UUID uuid = event.getPlayer().getUniqueId();
+        PendingInput pending = pendingInputs.remove(uuid);
+        if (pending == null) return;
+        event.setCancelled(true);
+        String input = event.getMessage();
+        Bukkit.getScheduler().runTask(this, () -> applyPendingInput(event.getPlayer(), pending, input));
+    }
+
+    private void applyPendingInput(Player player, PendingInput pending, String input) {
+        if (input.equalsIgnoreCase("-cancelar") || input.equalsIgnoreCase("-cancel")) {
+            player.sendMessage(PREFIX + tr("Edición cancelada.", "Edit cancelled."));
+            if (pending.project != null && projectFile(pending.project).isFile()) openItemEditor(player, pending.project, pending.page, pending.slot);
+            return;
+        }
+        if (pending.type == InputType.DUPLICATE_PROJECT || pending.type == InputType.RENAME_PROJECT) {
+            try {
+                boolean changed = pending.type == InputType.DUPLICATE_PROJECT
+                    ? projectService.duplicate(pending.project, input)
+                    : projectService.rename(pending.project, input);
+                player.sendMessage(PREFIX + (changed ? tr("Operación completada.", "Operation completed.") : tr("No se pudo completar. Comprueba que el nombre no esté ocupado.", "Could not complete. Make sure the name is not already in use.")));
+                openProjects(player);
+            } catch (IOException ex) { player.sendMessage(PREFIX + "§c" + ex.getMessage()); }
+            return;
+        }
+        File file = projectFile(pending.project);
+        YamlConfiguration yaml = YamlConfiguration.loadConfiguration(file);
+        String itemPath = "pages." + pending.page + "." + pending.slot;
+        ItemStack target = yaml.getItemStack(itemPath);
+        if (target == null || target.getType().isAir()) { player.sendMessage(PREFIX + tr("No se encontró el objeto.", "Item not found.")); openEditor(player, pending.project, pending.page); return; }
+        ItemMeta meta = target.getItemMeta();
+        try {
+            switch (pending.type) {
+                case ITEM_NAME -> {
+                    if (input.equals("-")) meta.setDisplayName(null);
+                    else meta.displayName(MiniMessage.miniMessage().deserialize(input));
+                }
+                case ITEM_LORE -> {
+                    if (input.equals("-")) meta.lore(null);
+                    else meta.lore(Arrays.stream(input.split("\\|", -1)).map(MiniMessage.miniMessage()::deserialize).toList());
+                }
+                case MODEL_DATA -> {
+                    if (input.equals("-")) meta.setCustomModelData(null);
+                    else meta.setCustomModelData(Integer.parseInt(input.trim()));
+                }
+                case LEATHER_COLOR -> {
+                    if (!(meta instanceof LeatherArmorMeta leather)) {
+                        player.sendMessage(PREFIX + tr("Este objeto no es una armadura de cuero.", "This item is not leather armor."));
+                        openItemEditor(player, pending.project, pending.page, pending.slot);
+                        return;
+                    }
+                    Color color;
+                    if (input.startsWith("#") && input.length() == 7) color = Color.fromRGB(Integer.parseInt(input.substring(1), 16));
+                    else {
+                        String[] rgb = input.split(",");
+                        if (rgb.length != 3) throw new IllegalArgumentException("Use #RRGGBB or R,G,B.");
+                        color = Color.fromRGB(clampColor(Integer.parseInt(rgb[0].trim())), clampColor(Integer.parseInt(rgb[1].trim())), clampColor(Integer.parseInt(rgb[2].trim())));
+                    }
+                    leather.setColor(color);
+                }
+                default -> { }
+            }
+        } catch (IllegalArgumentException ex) {
+            player.sendMessage(PREFIX + tr("Entrada inválida: ", "Invalid input: ") + ex.getMessage());
+            promptInput(player, pending.type, pending.project, pending.page, pending.slot,
+                "Vuelve a escribir el valor:", "Type the value again:");
+            return;
+        }
+        target.setItemMeta(meta);
+        projectService.backupBeforeChange(file);
+        yaml.set(itemPath, target);
+        yaml.set("format-version", 2);
+        yaml.set("updated", System.currentTimeMillis());
+        saveYaml(yaml, file);
+        player.sendMessage(PREFIX + tr("Objeto actualizado.", "Item updated."));
+        openItemEditor(player, pending.project, pending.page, pending.slot);
+    }
+
+    private int clampColor(int value) { return Math.max(0, Math.min(255, value)); }
+
     private void openLanguages(Player p) {
         Inventory inv = menu("language", null, 0, tr("§3✦ §bIxKits §8• §0Idioma", "§3✦ §bIxKits §8• §0Language"));
         border(inv);
