@@ -52,6 +52,9 @@ import net.kyori.adventure.text.minimessage.MiniMessage;
 import java.io.File;
 import java.io.IOException;
 import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.AtomicMoveNotSupportedException;
+import java.nio.file.StandardCopyOption;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.UUID;
@@ -2092,9 +2095,31 @@ public final class IxKitsPlugin extends JavaPlugin implements Listener, CommandE
     private List<String> color(List<String> lines) { return lines.stream().map(s -> ChatColor.translateAlternateColorCodes('&', s)).toList(); }
     private String slug(String in) { return in.toLowerCase(Locale.ROOT).replaceAll("[^a-z0-9_-]", "-").replaceAll("-+", "-"); }
     private File projectFile(String name) { return projectService == null ? new File(projectsDir, slug(name) + ".yml") : projectService.projectFile(name); }
+    /**
+     * Writes YAML through a temporary file so an interrupted write does not leave
+     * the last good project file truncated or half-written.
+     */
     private void saveYaml(YamlConfiguration yaml, File file) {
-        try { File parent=file.getParentFile(); if(parent!=null) parent.mkdirs(); yaml.save(file); }
-        catch (IOException ex) { getLogger().severe("No se pudo guardar " + file.getName() + ": " + ex.getMessage()); }
+        Path temporary = null;
+        try {
+            Path destination = file.toPath().toAbsolutePath();
+            Path parent = destination.getParent();
+            if (parent != null) Files.createDirectories(parent);
+            temporary = Files.createTempFile(parent, file.getName() + ".", ".tmp");
+            yaml.save(temporary.toFile());
+            try {
+                Files.move(temporary, destination, StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE);
+            } catch (AtomicMoveNotSupportedException ignored) {
+                Files.move(temporary, destination, StandardCopyOption.REPLACE_EXISTING);
+            }
+        } catch (IOException ex) {
+            getLogger().severe("No se pudo guardar " + file.getName() + ": " + ex.getMessage());
+        } finally {
+            if (temporary != null) {
+                try { Files.deleteIfExists(temporary); }
+                catch (IOException ignored) { }
+            }
+        }
     }
 
     private enum InputType {
