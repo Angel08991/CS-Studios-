@@ -402,7 +402,7 @@ public final class IxKitsPlugin extends JavaPlugin implements Listener, CommandE
         }
     }
 
-    @EventHandler public void onClose    @EventHandler public void onClose(InventoryCloseEvent e) {
+    @EventHandler public void onClose(InventoryCloseEvent e) {
         if (e.getInventory().getHolder() instanceof MenuHolder h && h.kind.equals("editor")) savePage(e.getInventory(), h);
     }
 
@@ -525,7 +525,7 @@ public final class IxKitsPlugin extends JavaPlugin implements Listener, CommandE
         saveYaml(enchants, enchantFile);
     }
 
-    private Inventory menu    private void ensureLoreTemplate(YamlConfiguration yaml, String key, String displayEs, String displayEn, List<String> loreEs, List<String> loreEn) {
+    private void ensureLoreTemplate(YamlConfiguration yaml, String key, String displayEs, String displayEn, List<String> loreEs, List<String> loreEn) {
         if (!yaml.contains(key + ".lore")) yaml.set(key + ".lore", loreEs);
         if (!yaml.contains(key + ".lore_en")) yaml.set(key + ".lore_en", loreEn);
         if (!yaml.contains(key + ".display")) yaml.set(key + ".display", displayEs);
