@@ -49,7 +49,8 @@ public final class CatalogClient {
                         string(item, "category"), string(item, "mcVersion"), string(item, "description"),
                         number(item.get("downloads")).longValue(),
                         number(item.get("averageRating")).doubleValue(),
-                        number(item.get("ratingCount")).intValue()
+                        number(item.get("ratingCount")).intValue(),
+                        number(item.get("revision")).intValue()
                     ));
                 }
             }
@@ -84,7 +85,36 @@ public final class CatalogClient {
             return new TemplateSummary(string(item, "id"), string(item, "title"), string(item, "author"),
                 string(item, "category"), string(item, "mcVersion"), string(item, "description"),
                 number(item.get("downloads")).longValue(), number(item.get("averageRating")).doubleValue(),
-                number(item.get("ratingCount")).intValue());
+                number(item.get("ratingCount")).intValue(),
+                number(item.get("revision")).intValue());
+        });
+    }
+
+    public CompletableFuture<TemplateSummary> publishRevision(String templateId, String minecraftVersion,
+                                                               String changelog, String projectYaml) {
+        String token = plugin.getConfig().getString("catalog.publish-token", "").trim();
+        if (token.isBlank()) return CompletableFuture.failedFuture(new IllegalStateException("catalog.publish-token is empty in config.yml."));
+        Map<String, Object> payload = new LinkedHashMap<>();
+        payload.put("mcVersion", minecraftVersion);
+        payload.put("changelog", changelog);
+        payload.put("projectYaml", projectYaml);
+        return request("POST", "/api/templates/" + encodePath(templateId) + "/versions", Json.stringify(payload), token)
+            .thenApply(body -> {
+                Map<String, Object> item = asMap(Json.parse(body));
+                return new TemplateSummary(string(item, "id"), string(item, "title"), string(item, "author"),
+                    string(item, "category"), string(item, "mcVersion"), string(item, "description"),
+                    number(item.get("downloads")).longValue(), number(item.get("averageRating")).doubleValue(),
+                    number(item.get("ratingCount")).intValue(), number(item.get("revision")).intValue());
+            });
+    }
+
+    public CompletableFuture<List<Map<String, Object>>> versions(String templateId) {
+        return get("/api/templates/" + encodePath(templateId) + "/versions").thenApply(body -> {
+            Map<String, Object> root = asMap(Json.parse(body));
+            Object raw = root.get("versions");
+            List<Map<String, Object>> result = new ArrayList<>();
+            if (raw instanceof List<?> list) for (Object item : list) result.add(asMap(item));
+            return result;
         });
     }
 
@@ -146,7 +176,7 @@ public final class CatalogClient {
     }
 
     public record TemplateSummary(String id, String title, String author, String category, String mcVersion,
-                                 String description, long downloads, double averageRating, int ratingCount) {}
+                                 String description, long downloads, double averageRating, int ratingCount, int revision) {}
     public record DownloadedTemplate(String id, String title, String projectYaml) {}
 
     /** Tiny dependency-free JSON codec for the API's object/array/string/number payloads. */
