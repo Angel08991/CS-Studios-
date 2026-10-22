@@ -116,15 +116,20 @@ async function loadDb() {
       await fs.mkdir(DATA_DIR, { recursive: true });
       try {
         const parsed = JSON.parse(await fs.readFile(DB_FILE, "utf8"));
-        if (!parsed || !Array.isArray(parsed.templates)) throw new Error("Invalid catalog data");
+        if (!parsed || !Array.isArray(parsed.templates)) {
+          throw new Error("Catalog database has an invalid structure.");
+        }
         return parsed;
       } catch (error) {
-        if (error.code !== "ENOENT") {
-          console.error("Catalog database could not be read; initializing an empty catalog:", error.message);
+        if (error.code === "ENOENT") {
+          const fresh = { schemaVersion: 1, templates: [] };
+          await saveDb(fresh);
+          return fresh;
         }
-        const fresh = { schemaVersion: 1, templates: [] };
-        await saveDb(fresh);
-        return fresh;
+        // Never silently replace an existing catalog that cannot be parsed.
+        // Operators can recover the original file instead of losing published data.
+        console.error("Catalog database is unreadable; refusing to overwrite it:", error.message);
+        throw new Error("Catalog database is unreadable. Restore a valid catalog.json backup before retrying.", { cause: error });
       }
     })().catch(error => {
       dbPromise = undefined;
