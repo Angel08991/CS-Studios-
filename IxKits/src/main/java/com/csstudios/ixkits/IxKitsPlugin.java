@@ -357,6 +357,7 @@ public final class IxKitsPlugin extends JavaPlugin implements Listener, CommandE
         Attribute attribute = Registry.ATTRIBUTE.get(NamespacedKey.minecraft(key));
         if (attribute == null) { p.sendMessage(PREFIX + tr("Atributo no disponible en esta versión.", "Attribute is unavailable in this version.")); return; }
         ItemMeta meta = target.getItemMeta();
+        double previousAmount = ownedAttributeAmount(target, key);
         NamespacedKey modifierKey = new NamespacedKey(this, "attr_" + key);
         Collection<AttributeModifier> currentModifiers = meta.getAttributeModifiers(attribute);
         if (currentModifiers != null) {
@@ -365,9 +366,7 @@ public final class IxKitsPlugin extends JavaPlugin implements Listener, CommandE
             }
         }
         if (!remove) {
-            double current = 0.0;
-            if (currentModifiers != null) for (AttributeModifier modifier : currentModifiers) if (modifier.getKey().equals(modifierKey)) current = modifier.getAmount();
-            double next = current + (decrease ? -0.5 : 0.5);
+            double next = previousAmount + (decrease ? -0.5 : 0.5);
             if (Math.abs(next) > 0.001) {
                 meta.addAttributeModifier(attribute, new AttributeModifier(modifierKey, next, AttributeModifier.Operation.ADD_NUMBER, EquipmentSlotGroup.ANY));
             }
@@ -1131,6 +1130,23 @@ public final class IxKitsPlugin extends JavaPlugin implements Listener, CommandE
     private void saveYaml(YamlConfiguration yaml, File file) {
         try { File parent=file.getParentFile(); if(parent!=null) parent.mkdirs(); yaml.save(file); }
         catch (IOException ex) { getLogger().severe("No se pudo guardar " + file.getName() + ": " + ex.getMessage()); }
+    }
+
+    private enum InputType {
+        DUPLICATE_PROJECT, RENAME_PROJECT, ITEM_NAME, ITEM_LORE, MODEL_DATA, LEATHER_COLOR
+    }
+
+    private static final class PendingInput {
+        final InputType type;
+        final String project;
+        final int page;
+        final int slot;
+        PendingInput(InputType type, String project, int page, int slot) {
+            this.type = type;
+            this.project = project;
+            this.page = page;
+            this.slot = slot;
+        }
     }
 
     private static final class MenuHolder implements InventoryHolder {
