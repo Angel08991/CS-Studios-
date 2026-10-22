@@ -168,3 +168,51 @@ test("catalog API handles publish, search, ratings, favorites, downloads, and mo
   assert.equal(gone.status, 404);
 
 });
+
+
+test("catalog refuses to overwrite a corrupted existing database", async t => {
+  const corruptPort = await freePort();
+  const corruptBaseUrl = "http://127.0.0.1:" + corruptPort;
+  const corruptDataDir = await fsp.mkdtemp(path.join(os.tmpdir(), "ixkits-catalog-corrupt-"));
+  const corruptFile = path.join(corruptDataDir, "catalog.json");
+  const originalContents = "{ definitely not valid JSON";
+  await fsp.writeFile(corruptFile, originalContents, "utf8");
+
+  const corruptChild = spawn(process.execPath, [serverPath], {
+    env: {
+      ...process.env,
+      PORT: String(corruptPort),
+      HOST: "127.0.0.1",
+      IXKITS_DATA_DIR: corruptDataDir,
+      IXKITS_PUBLISH_TOKEN: publishToken,
+      IXKITS_ADMIN_TOKEN: adminToken
+    },
+    stdio: "ignore"
+  });
+
+  t.after(async () => {
+    if (corruptChild && corruptChild.exitCode === null) {
+      corruptChild.kill("SIGTERM");
+      await new Promise(resolve => {
+        const timeout = setTimeout(resolve, 1000);
+        corruptChild.once("exit", () => { clearTimeout(timeout); resolve(); });
+      });
+    }
+    await fsp.rm(corruptDataDir, { recursive: true, force: true });
+  });
+
+  let healthy = false;
+  for (let attempt = 0; attempt < 60; attempt++) {
+    try {
+      const response = await fetch(corruptBaseUrl + "/health");
+      if (response.ok) { healthy = true; break; }
+    } catch { }
+    await new Promise(resolve => setTimeout(resolve, 100));
+  }
+  assert.equal(healthy, true, "catalog process should start even if the database needs recovery");
+
+  const response = await fetch(corruptBaseUrl + "/api/templates");
+  assert.equal(response.status, 500, "API should report database recovery is required");
+  assert.equal(await fsp.readFile(corruptFile, "utf8"), originalContents,
+    "the original catalog file must remain untouched for recovery");
+});
