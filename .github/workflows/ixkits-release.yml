@@ -1,0 +1,42 @@
+name: Release IxKits
+
+on:
+  push:
+    tags:
+      - 'ixkits-v*'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    name: Build and publish JAR
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@v4
+
+      - name: Set up Java 21
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.10.2'
+
+      - name: Compile IxKits
+        run: gradle --no-daemon -p IxKits clean build
+
+      - name: Verify JAR exists
+        run: test -s IxKits/build/libs/IxKits-0.1.0.jar
+
+      - name: Publish GitHub release
+        uses: softprops/action-gh-release@v2
+        with:
+          name: IxKits ${{ github.ref_name }}
+          generate_release_notes: true
+          files: IxKits/build/libs/IxKits-*.jar
