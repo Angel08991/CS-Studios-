@@ -274,7 +274,7 @@ public final class IxKitsPlugin extends JavaPlugin implements Listener, CommandE
                 inv.setItem(45, item(Material.ARROW, tr("§7Volver", "§7Back"), tr("§8Menú principal", "§8Main menu")));
                 inv.setItem(47, item(Material.COMPASS, tr("§bNueva búsqueda", "§bNew search"), tr("§7Usa /ixkits buscar <texto>", "§7Use /ixkits buscar <text>")));
                 inv.setItem(49, item(Material.BOOK, tr("§fCómo descargar", "§fHow to download"), tr("§7Clic izquierdo en una plantilla.", "§7Left-click a template.")));
-                inv.setItem(51, item(Material.REFRESH, tr("§bActualizar", "§bRefresh"), tr("§7Volver a cargar el catálogo.", "§7Reload the catalog.")));
+                inv.setItem(51, item(Material.CLOCK, tr("§bActualizar", "§bRefresh"), tr("§7Volver a cargar el catálogo.", "§7Reload the catalog.")));
                 p.openInventory(inv);
             }));
     }
