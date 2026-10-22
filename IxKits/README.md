@@ -59,6 +59,7 @@ También se cambia con /ixkits idioma. Para que el cambio manual del archivo se 
 | /ixkits rehacer <proyecto> | Reaplicar el cambio deshecho más reciente |
 | /ixkits validar <proyecto> | Comprobar problemas básicos |
 | /ixkits equipamiento <proyecto> | Editar las cinco ranuras de equipamiento |
+| /ixkits importar-mano <proyecto> <página 1-2> <ranura GUI> | Copiar el objeto de tu mano al proyecto conservando sus metadatos Bukkit/Paper |
 | /ixkits exportar <proyecto> | Exportar formato nativo .ixkit.yml |
 | /ixkits importar <archivo.yml> [nombre] | Importar desde plugins/IxKits/imports/ |
 | /ixkits exportar-essentials <proyecto> | Crear exportación legible para EssentialsX |
@@ -75,8 +76,17 @@ También se cambia con /ixkits idioma. Para que el cambio manual del archivo se 
 | /ixkits valorar <id> <1-5> | Valorar una plantilla |
 | /ixkits favorito <id> | Alternar favorito |
 | /ixkits actualizar-publicacion <id> <proyecto> [cambios] | Publicar una nueva versión de una plantilla comunitaria |
+| /ixkits versiones <id> | Consultar el historial de revisiones de una plantilla comunitaria |
 
 En la biblioteca de proyectos, clic izquierdo abre y clic derecho muestra las herramientas del proyecto.
+
+### Importar objetos creados con otros plugins
+
+IxKits no depende de ItemEdit ni de otro editor de objetos. Para copiar a un proyecto un objeto personalizado que tengas en la mano (incluidos objetos editados con ItemEdit), usa:
+
+    /ixkits importar-mano <proyecto> <página 1-2> <ranura GUI>
+
+Ejemplo: `/ixkits importar-mano espada-pvp 1 10` guarda una copia del objeto en la ranura GUI 10 de la primera página. El objeto se guarda mediante la serialización de Bukkit/Paper para conservar los metadatos que esa versión pueda serializar. Haz una prueba con objetos de plugins externos antes de producción: metadatos privados o componentes no estándar de otro plugin pueden no ser portables entre versiones. Esta función copia el objeto; no ejecuta comandos ni necesita que ItemEdit esté instalado.
 
 ### Importación y exportación
 
