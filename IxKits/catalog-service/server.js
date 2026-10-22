@@ -86,7 +86,7 @@ function text(value, max = 160) {
 }
 
 function publicTemplate(template) {
-  const { projectYaml, ratings, favorites, ...publicData } = template;
+  const { projectYaml, ratings, favorites, revisions, ...publicData } = template;
   const ratingValues = Object.values(ratings || {}).map(value => Number(value.value)).filter(value => value >= 1 && value <= 5);
   publicData.averageRating = ratingValues.length
     ? Math.round((ratingValues.reduce((sum, value) => sum + value, 0) / ratingValues.length) * 100) / 100
@@ -202,11 +202,52 @@ async function handler(req, res) {
     return send(res, 200, publicTemplate(template));
   }
 
+  if (req.method === "GET" && parts.length === 4 && parts[3] === "versions") {
+    if (!template) return send(res, 404, { error: "Template not found." });
+    const history = (Array.isArray(template.revisions) ? template.revisions : []).map(revision => ({
+      revision: revision.revision, changelog: revision.changelog, author: revision.author,
+      mcVersion: revision.mcVersion, publishedAt: revision.publishedAt
+    }));
+    history.push({
+      revision: Number(template.revision) || 1,
+      changelog: text(template.changelog, 300),
+      author: template.author,
+      mcVersion: template.mcVersion,
+      publishedAt: template.updatedAt || template.publishedAt
+    });
+    return send(res, 200, { id: template.id, currentRevision: Number(template.revision) || 1, versions: history });
+  }
+
+  if (req.method === "POST" && parts.length === 4 && parts[3] === "versions") {
+    if (!template) return send(res, 404, { error: "Template not found." });
+    if (!PUBLISH_TOKEN || !authRequired(req, res, PUBLISH_TOKEN, "Catalog publishing is not configured or the token is invalid.")) return;
+    const body = await readBody(req);
+    if (!isValidProjectYaml(body.projectYaml)) return send(res, 400, { error: "A valid IxKits project YAML under 500 KB is required." });
+    const now = new Date().toISOString();
+    template.revisions = Array.isArray(template.revisions) ? template.revisions : [];
+    template.revisions.push({
+      revision: Number(template.revision) || 1,
+      changelog: text(template.changelog, 300),
+      author: template.author,
+      mcVersion: template.mcVersion,
+      publishedAt: template.updatedAt || template.publishedAt,
+      projectYaml: template.projectYaml
+    });
+    if (template.revisions.length > 30) template.revisions.splice(0, template.revisions.length - 30);
+    template.revision = (Number(template.revision) || 1) + 1;
+    template.projectYaml = body.projectYaml;
+    template.changelog = text(body.changelog || "Updated template", 300);
+    template.mcVersion = text(body.mcVersion || template.mcVersion, 40);
+    template.updatedAt = now;
+    await persist(db);
+    return send(res, 200, publicTemplate(template));
+  }
+
   if (req.method === "GET" && parts.length === 4 && parts[3] === "download") {
     if (!template) return send(res, 404, { error: "Template not found." });
     template.downloads = (Number(template.downloads) || 0) + 1;
     await persist(db);
-    return send(res, 200, { id: template.id, title: template.title, projectYaml: template.projectYaml, format: "ixkits-yaml" });
+    return send(res, 200, { id: template.id, title: template.title, revision: Number(template.revision) || 1, projectYaml: template.projectYaml, format: "ixkits-yaml" });
   }
 
   if (req.method === "POST" && parts.length === 2) {
@@ -225,8 +266,8 @@ async function handler(req, res) {
     const now = new Date().toISOString();
     const created = {
       id, title, author, category, description, mcVersion, license,
-      status: "published", publishedAt: now, updatedAt: now,
-      downloads: 0, projectYaml: body.projectYaml, ratings: {}, favorites: []
+      status: "published", publishedAt: now, updatedAt: now, revision: 1, changelog: "Initial publication",
+      downloads: 0, projectYaml: body.projectYaml, revisions: [], ratings: {}, favorites: []
     };
     db.templates.push(created);
     await persist(db);
