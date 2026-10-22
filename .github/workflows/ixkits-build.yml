@@ -38,6 +38,14 @@ jobs:
       - name: Compile IxKits
         run: gradle --no-daemon -p IxKits clean build
 
+      - name: Set up Node.js for catalog checks
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Test community catalog API
+        run: npm test --prefix IxKits/catalog-service
+
       - name: Verify JAR exists
         run: test -s IxKits/build/libs/IxKits-0.1.0.jar
 
