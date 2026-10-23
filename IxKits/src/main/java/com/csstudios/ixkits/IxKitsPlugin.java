@@ -1881,7 +1881,7 @@ public final class IxKitsPlugin extends JavaPlugin implements Listener, CommandE
             ItemMeta lineMeta = lineItem.getItemMeta();
             lineMeta.displayName(net.kyori.adventure.text.Component.text("§bLínea " + (index + 1)));
             List<net.kyori.adventure.text.Component> previewLore = new ArrayList<>();
-            previewLore.add(net.kyori.adventure.text.Component.text("§7Vista previa: ").append(lines.get(index)));
+            previewLore.add(legacy.deserialize("§7Vista previa: ").append(lines.get(index)));
             previewLore.add(net.kyori.adventure.text.Component.empty());
             previewLore.add(net.kyori.adventure.text.Component.text(tr("§eClic: editar esta línea", "§eClick: edit this line")));
             previewLore.add(net.kyori.adventure.text.Component.text(tr("§cClic derecho: borrar", "§cRight-click: delete")));
@@ -2450,7 +2450,7 @@ public final class IxKitsPlugin extends JavaPlugin implements Listener, CommandE
             else if (slot == 48) promptLoreInput(p, InputType.LORE_ADD_LINE, h.project, h.page, h.targetSlot, -1,
                 "Escribe la nueva línea de lore (MiniMessage/RGB):", "Type the new lore line (MiniMessage/RGB):");
             else if (slot == 49) promptLoreInput(p, InputType.LORE_CLEAR_CONFIRM, h.project, h.page, h.targetSlot, -1,
-                "Escribe BORRAR para quitar todo el lore, o -cancelar para conservarlo:", "Type CLEAR to remove all lore, or -cancel to keep it:");
+                "Escribe BORRAR para quitar todo el lore, o Cancelar para conservarlo:", "Type CLEAR to remove all lore, or Cancel to keep it:");
             else if (slot == 51) openLoreEditor(p, h.project, h.page, h.targetSlot, h.subPage + 1);
             else if (h.entryBySlot.containsKey(slot)) {
                 int lineIndex = Integer.parseInt(h.entryBySlot.get(slot));
