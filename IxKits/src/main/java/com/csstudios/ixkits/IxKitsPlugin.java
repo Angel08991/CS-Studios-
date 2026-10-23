@@ -72,6 +72,7 @@ public final class IxKitsPlugin extends JavaPlugin implements Listener, CommandE
     private final Map<UUID, Long> abilityCooldowns = new ConcurrentHashMap<>();
     private NamespacedKey tntOnHitKey;
     private static final int[] EQUIP_SLOTS = {19, 21, 23, 25, 31};
+    private static final String[] EQUIPMENT_KEYS = {"helmet", "chestplate", "leggings", "boots", "offhand"};
     private static final List<String> EDITABLE_ATTRIBUTES = List.of("max_health", "attack_damage", "attack_speed", "armor", "armor_toughness", "knockback_resistance", "movement_speed", "luck");
     private static final String PREFIX = "§8[§bIxKits§8] §7";
     private static final int[] EDIT_SLOTS = {
