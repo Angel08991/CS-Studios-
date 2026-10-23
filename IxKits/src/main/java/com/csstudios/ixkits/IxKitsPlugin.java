@@ -73,6 +73,9 @@ public final class IxKitsPlugin extends JavaPlugin implements Listener, CommandE
     private NamespacedKey tntOnHitKey;
     private NamespacedKey lightningOnHitKey;
     private NamespacedKey lifeStealOnHitKey;
+    private NamespacedKey tntCooldownKey;
+    private NamespacedKey lightningCooldownKey;
+    private NamespacedKey lifeStealCooldownKey;
     private static final int[] EQUIP_SLOTS = {19, 21, 23, 25, 31};
     private static final String[] EQUIPMENT_KEYS = {"helmet", "chestplate", "leggings", "boots", "offhand"};
     private static final List<String> EDITABLE_ATTRIBUTES = List.of("max_health", "attack_damage", "attack_speed", "armor", "armor_toughness", "knockback_resistance", "movement_speed", "luck");
@@ -95,6 +98,9 @@ public final class IxKitsPlugin extends JavaPlugin implements Listener, CommandE
         tntOnHitKey = new NamespacedKey(this, "ability_tnt_on_hit");
         lightningOnHitKey = new NamespacedKey(this, "ability_lightning_on_hit");
         lifeStealOnHitKey = new NamespacedKey(this, "ability_lifesteal_on_hit");
+        tntCooldownKey = new NamespacedKey(this, "ability_tnt_cooldown_ms");
+        lightningCooldownKey = new NamespacedKey(this, "ability_lightning_cooldown_ms");
+        lifeStealCooldownKey = new NamespacedKey(this, "ability_lifesteal_cooldown_ms");
         initializeTemplates();
         Objects.requireNonNull(getCommand("ixkits")).setExecutor(this);
         Bukkit.getPluginManager().registerEvents(this, this);
@@ -112,6 +118,7 @@ public final class IxKitsPlugin extends JavaPlugin implements Listener, CommandE
         }
         if (args.length == 0) { openMain(player); return true; }
         String sub = args[0].toLowerCase(Locale.ROOT);
+        if (sub.equals("cancelar") || sub.equals("cancel")) { cancelPendingInput(player); return true; }
         if (sub.equals("idioma") || sub.equals("language")) {
             if (args.length >= 2) setLanguage(player, args[1]);
             else openLanguages(player);
@@ -1062,10 +1069,59 @@ public final class IxKitsPlugin extends JavaPlugin implements Listener, CommandE
     }
 
     private void promptInput(Player p, InputType type, String project, int page, int slot, String promptEs, String promptEn) {
-        pendingInputs.put(p.getUniqueId(), new PendingInput(type, project, page, slot));
+        promptInput(p, type, project, page, slot, promptEs, promptEn, null);
+    }
+
+    private void promptInput(Player p, InputType type, String project, int page, int slot, String promptEs, String promptEn, String argument) {
+        pendingInputs.put(p.getUniqueId(), new PendingInput(type, project, page, slot, -1, argument));
         p.closeInventory();
         p.sendMessage(PREFIX + tr(promptEs, promptEn));
-        p.sendMessage(PREFIX + tr("§7Escribe §c-cancelar §7para salir.", "§7Type §c-cancel §7to exit."));
+        sendCancelPrompt(p);
+    }
+
+    private void sendCancelPrompt(Player p) {
+        var legacy = net.kyori.adventure.text.serializer.legacy.LegacyComponentSerializer.legacySection();
+        net.kyori.adventure.text.Component beginning = legacy.deserialize(PREFIX + "§7Pulsa ");
+        net.kyori.adventure.text.Component cancel = net.kyori.adventure.text.Component
+            .text(tr("Cancelar", "Cancel"), net.kyori.adventure.text.format.NamedTextColor.RED)
+            .decorate(net.kyori.adventure.text.format.TextDecoration.UNDERLINED)
+            .clickEvent(net.kyori.adventure.text.event.ClickEvent.runCommand("/ixkits cancelar"))
+            .hoverEvent(net.kyori.adventure.text.event.HoverEvent.showText(
+                net.kyori.adventure.text.Component.text(tr("Haz clic para cancelar la edición.", "Click to cancel this edit."))));
+        net.kyori.adventure.text.Component ending = legacy.deserialize(
+            tr(" §7o escribe §fcancelar §7en el chat.", " §7or type §fcancel §7in chat."));
+        p.sendMessage(beginning.append(cancel).append(ending));
+    }
+
+    private boolean isCancelInput(String input) {
+        if (input == null) return false;
+        String normalized = input.trim().toLowerCase(Locale.ROOT);
+        return normalized.equals("cancelar") || normalized.equals("cancel") || normalized.equals("-cancelar") || normalized.equals("-cancel");
+    }
+
+    private void returnFromCancelledInput(Player player, PendingInput pending) {
+        player.sendMessage(PREFIX + tr("Edición cancelada.", "Edit cancelled."));
+        if (pending.type == InputType.PROJECT_SEARCH) openProjects(player);
+        else if (pending.type == InputType.CATALOG_SEARCH) openCatalog(player, "");
+        else if (pending.project != null && projectFile(pending.project).isFile()
+            && (pending.type == InputType.LORE_ADD_LINE || pending.type == InputType.LORE_EDIT_LINE || pending.type == InputType.LORE_CLEAR_CONFIRM))
+            openLoreEditor(player, pending.project, pending.page, pending.slot, 0);
+        else if (pending.project != null && projectFile(pending.project).isFile() && pending.type == InputType.ABILITY_COOLDOWN)
+            openAbilities(player, pending.project, pending.page, pending.slot);
+        else if (pending.project != null && projectFile(pending.project).isFile() && pending.type == InputType.ENCHANTMENT_LEVEL)
+            openEnchantments(player, pending.project, pending.page, pending.slot, 0);
+        else if (pending.project != null && projectFile(pending.project).isFile())
+            openItemEditor(player, pending.project, pending.page, pending.slot);
+        else openMain(player);
+    }
+
+    private void cancelPendingInput(Player player) {
+        PendingInput pending = pendingInputs.remove(player.getUniqueId());
+        if (pending == null) {
+            player.sendMessage(PREFIX + tr("No tienes ninguna edición pendiente para cancelar.", "There is no pending edit to cancel."));
+            return;
+        }
+        returnFromCancelledInput(player, pending);
     }
 
     @EventHandler public void onAsyncChat(AsyncPlayerChatEvent event) {
@@ -1078,15 +1134,8 @@ public final class IxKitsPlugin extends JavaPlugin implements Listener, CommandE
     }
 
     private void applyPendingInput(Player player, PendingInput pending, String input) {
-        if (input.equalsIgnoreCase("-cancelar") || input.equalsIgnoreCase("-cancel")) {
-            player.sendMessage(PREFIX + tr("Edición cancelada.", "Edit cancelled."));
-            if (pending.type == InputType.PROJECT_SEARCH) openProjects(player);
-            else if (pending.type == InputType.CATALOG_SEARCH) openCatalog(player, "");
-            else if (pending.project != null && projectFile(pending.project).isFile()
-                && (pending.type == InputType.LORE_ADD_LINE || pending.type == InputType.LORE_EDIT_LINE || pending.type == InputType.LORE_CLEAR_CONFIRM))
-                openLoreEditor(player, pending.project, pending.page, pending.slot, 0);
-            else if (pending.project != null && projectFile(pending.project).isFile()) openItemEditor(player, pending.project, pending.page, pending.slot);
-            else openMain(player);
+        if (isCancelInput(input)) {
+            returnFromCancelledInput(player, pending);
             return;
         }
         if (pending.type == InputType.CATALOG_SEARCH) {
@@ -1352,8 +1401,7 @@ public final class IxKitsPlugin extends JavaPlugin implements Listener, CommandE
         pendingInputs.put(p.getUniqueId(), new PendingInput(type, project, page, targetSlot, lineIndex));
         p.closeInventory();
         p.sendMessage(PREFIX + tr(spanish, english));
-        p.sendMessage(PREFIX + tr("§7Puedes usar MiniMessage/RGB. Escribe §c-cancelar §7para salir.",
-            "§7MiniMessage/RGB are supported. Type §c-cancel §7to exit."));
+        sendCancelPrompt(p);
     }
 
     private void openLoreEditor(Player p, String project, int page, int targetSlot, int requestedPage) {
@@ -2526,7 +2574,7 @@ public final class IxKitsPlugin extends JavaPlugin implements Listener, CommandE
     }
 
     private enum InputType {
-        DUPLICATE_PROJECT, RENAME_PROJECT, ITEM_NAME, ITEM_LORE, LORE_ADD_LINE, LORE_EDIT_LINE, LORE_CLEAR_CONFIRM, MODEL_DATA, LEATHER_COLOR, CATALOG_SEARCH, PROJECT_SEARCH, CREATE_PROJECT, PUBLISH_REVISION_ID, BOOK_TITLE, BOOK_AUTHOR, BOOK_PAGES, SKULL_OWNER
+        DUPLICATE_PROJECT, RENAME_PROJECT, ITEM_NAME, ITEM_LORE, LORE_ADD_LINE, LORE_EDIT_LINE, LORE_CLEAR_CONFIRM, MODEL_DATA, LEATHER_COLOR, CATALOG_SEARCH, PROJECT_SEARCH, CREATE_PROJECT, PUBLISH_REVISION_ID, BOOK_TITLE, BOOK_AUTHOR, BOOK_PAGES, SKULL_OWNER, ENCHANTMENT_LEVEL, ABILITY_COOLDOWN
     }
 
     private static final class PendingInput {
@@ -2535,15 +2583,20 @@ public final class IxKitsPlugin extends JavaPlugin implements Listener, CommandE
         final int page;
         final int slot;
         final int lineIndex;
+        final String argument;
         PendingInput(InputType type, String project, int page, int slot) {
-            this(type, project, page, slot, -1);
+            this(type, project, page, slot, -1, null);
         }
         PendingInput(InputType type, String project, int page, int slot, int lineIndex) {
+            this(type, project, page, slot, lineIndex, null);
+        }
+        PendingInput(InputType type, String project, int page, int slot, int lineIndex, String argument) {
             this.type = type;
             this.project = project;
             this.page = page;
             this.slot = slot;
             this.lineIndex = lineIndex;
+            this.argument = argument;
         }
     }
 
