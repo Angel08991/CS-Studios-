@@ -13,6 +13,11 @@ catalog:
   base-url: ""
   publish-token: ""
   interaction-token: ""
-  interaction-token: ""
   minecraft-version: "1.21.11"
   default-license: "all-rights-reserved"
+
+# Item abilities. TNT-on-hit settings apply to items where the ability is enabled in the GUI.
+abilities:
+  tnt-on-hit-cooldown-ms: 3000
+  tnt-on-hit-fuse-ticks: 40
+  tnt-on-hit-yield: 2.0
