@@ -2682,14 +2682,52 @@ public final class IxKitsPlugin extends JavaPlugin implements Listener, CommandE
             List.of("&8&m━━━━━━━━━━━━━━━━━━━━", "&3⛏ &lMINER'S TOOL", "&7Crafted for deep expeditions.", "",
                     "&3▸ &7Category: &bMining", "&3▸ &7Utility: &fResource gathering", "",
                     "&b➤ &fDig deeper. Find more.", "&8&m━━━━━━━━━━━━━━━━━━━━"));
+        ensureLoreTemplate(lore, "demonic", "&4✦ &lDemoníaco", "&4✦ &lDemonic",
+            List.of("&8&m━━━━━━━━━━━━━━━━━━━━", "&4☠ &lARTEFACTO DEMONÍACO", "&7Forjado en las profundidades.", "",
+                "&4◆ &7Rareza: &cMaldita", "&4◆ &7Poder: &fExtremo", "",
+                "&c➤ &fQue tiemblen tus enemigos", "&8&m━━━━━━━━━━━━━━━━━━━━"),
+            List.of("&8&m━━━━━━━━━━━━━━━━━━━━", "&4☠ &lDEMONIC ARTIFACT", "&7Forged in the depths.", "",
+                "&4◆ &7Rarity: &cCursed", "&4◆ &7Power: &fExtreme", "",
+                "&c➤ &fLet your enemies tremble", "&8&m━━━━━━━━━━━━━━━━━━━━"));
+        ensureLoreTemplate(lore, "cosmic", "&d✧ &lCósmico", "&d✧ &lCosmic",
+            List.of("&8&m━━━━━━━━━━━━━━━━━━━━", "&d✦ &lEQUIPO CÓSMICO", "&7Energía nacida entre estrellas.", "",
+                "&d▸ &7Clase: &fAstral", "&d▸ &7Rareza: &dCelestial", "",
+                "&d➤ &fEl universo está en tus manos", "&8&m━━━━━━━━━━━━━━━━━━━━"),
+            List.of("&8&m━━━━━━━━━━━━━━━━━━━━", "&d✦ &lCOSMIC GEAR", "&7Energy born among the stars.", "",
+                "&d▸ &7Class: &fAstral", "&d▸ &7Rarity: &dCelestial", "",
+                "&d➤ &fThe universe is in your hands", "&8&m━━━━━━━━━━━━━━━━━━━━"));
+        ensureLoreTemplate(lore, "frost", "&b❄ &lEscarcha", "&b❄ &lFrost",
+            List.of("&8&m━━━━━━━━━━━━━━━━━━━━", "&b❄ &lRELIQUIA DE HIELO", "&7Fría como el vacío invernal.", "",
+                "&b▸ &7Afinidad: &fHielo", "&b▸ &7Estado: &fImperturbable", "",
+                "&b➤ &fDeja una huella de escarcha", "&8&m━━━━━━━━━━━━━━━━━━━━"),
+            List.of("&8&m━━━━━━━━━━━━━━━━━━━━", "&b❄ &lFROST RELIC", "&7Cold as the winter void.", "",
+                "&b▸ &7Affinity: &fIce", "&b▸ &7State: &fUnyielding", "",
+                "&b➤ &fLeave a trail of frost", "&8&m━━━━━━━━━━━━━━━━━━━━"));
+        ensureLoreTemplate(lore, "emerald", "&a❖ &lEsmeralda", "&a❖ &lEmerald",
+            List.of("&8&m━━━━━━━━━━━━━━━━━━━━", "&a❖ &lTESORO ESMERALDA", "&7Una pieza de valor excepcional.", "",
+                "&a▸ &7Calidad: &fPremium", "&a▸ &7Origen: &2Antiguo", "",
+                "&a➤ &fUn tesoro digno de leyenda", "&8&m━━━━━━━━━━━━━━━━━━━━"),
+            List.of("&8&m━━━━━━━━━━━━━━━━━━━━", "&a❖ &lEMERALD TREASURE", "&7An item of exceptional value.", "",
+                "&a▸ &7Quality: &fPremium", "&a▸ &7Origin: &2Ancient", "",
+                "&a➤ &fA treasure worthy of legend", "&8&m━━━━━━━━━━━━━━━━━━━━"));
         saveYaml(lore, loreFile);
 
         File paletteFile = new File(templatesDir, "palettes.yml");
         YamlConfiguration palettes = YamlConfiguration.loadConfiguration(paletteFile);
-        if (!palettes.contains("ocean.color")) palettes.set("ocean.color", "&b");
-        if (!palettes.contains("royal.color")) palettes.set("royal.color", "&5");
-        if (!palettes.contains("inferno.color")) palettes.set("inferno.color", "&c");
-        if (!palettes.contains("gold.color")) palettes.set("gold.color", "&6");
+        ensurePalette(palettes, "ocean", "Océano", "&b", "&3");
+        ensurePalette(palettes, "royal", "Real", "&5", "&d");
+        ensurePalette(palettes, "inferno", "Infernal", "&c", "&6");
+        ensurePalette(palettes, "gold", "Oro", "&6", "&e");
+        ensurePalette(palettes, "emerald", "Esmeralda", "&a", "&2");
+        ensurePalette(palettes, "frost", "Escarcha", "#A7E8FF", "#FFFFFF");
+        ensurePalette(palettes, "rose", "Rosa", "#FF6FAE", "#FFD1E4");
+        ensurePalette(palettes, "shadow", "Sombra", "&8", "&5");
+        ensurePalette(palettes, "sunset", "Atardecer", "#FF7A35", "#FFC857");
+        ensurePalette(palettes, "void", "Vacío", "#9D4EDD", "#3C096C");
+        ensurePalette(palettes, "nature", "Naturaleza", "#62D26F", "#C7F9CC");
+        ensurePalette(palettes, "ice", "Hielo", "#5CE1E6", "#DDFBFF");
+        ensurePalette(palettes, "ruby", "Rubí", "#FF334F", "#990018");
+        ensurePalette(palettes, "sand", "Arena", "#D9B382", "#FFF0C2");
         saveYaml(palettes, paletteFile);
 
         File enchantFile = new File(templatesDir, "enchantments.yml");
@@ -2702,7 +2740,28 @@ public final class IxKitsPlugin extends JavaPlugin implements Listener, CommandE
         if (!enchants.contains("mining_pickaxe.fortune")) enchants.set("mining_pickaxe.fortune", 3);
         if (!enchants.contains("protection.protection")) enchants.set("protection.protection", 4);
         if (!enchants.contains("protection.unbreaking")) enchants.set("protection.unbreaking", 3);
+        setPresetDefaults(enchants, "god_sword", Map.of("sharpness", 8, "unbreaking", 5, "fire_aspect", 2, "looting", 4, "sweeping_edge", 4, "mending", 1));
+        setPresetDefaults(enchants, "archer_bow", Map.of("power", 6, "punch", 2, "flame", 1, "infinity", 1, "unbreaking", 4));
+        setPresetDefaults(enchants, "tank_armor", Map.of("protection", 5, "unbreaking", 5, "thorns", 3, "mending", 1));
+        setPresetDefaults(enchants, "miner_tool", Map.of("efficiency", 7, "unbreaking", 5, "fortune", 4, "mending", 1));
+        setPresetDefaults(enchants, "ocean_trident", Map.of("loyalty", 3, "impaling", 5, "channeling", 1, "unbreaking", 4, "mending", 1));
+        setPresetDefaults(enchants, "mace_burst", Map.of("density", 5, "breach", 4, "wind_burst", 2, "unbreaking", 4, "mending", 1));
+        setPresetDefaults(enchants, "swift_boots", Map.of("feather_falling", 5, "depth_strider", 4, "soul_speed", 3, "unbreaking", 4, "mending", 1));
+        setPresetDefaults(enchants, "fishing_rod", Map.of("luck_of_the_sea", 4, "lure", 4, "unbreaking", 4, "mending", 1));
         saveYaml(enchants, enchantFile);
+    }
+
+    private void ensurePalette(YamlConfiguration yaml, String key, String display, String color, String accent) {
+        if (!yaml.contains(key + ".display")) yaml.set(key + ".display", display);
+        if (!yaml.contains(key + ".color")) yaml.set(key + ".color", color);
+        if (!yaml.contains(key + ".accent")) yaml.set(key + ".accent", accent);
+    }
+
+    private void setPresetDefaults(YamlConfiguration yaml, String preset, Map<String, Integer> values) {
+        for (Map.Entry<String, Integer> entry : values.entrySet()) {
+            String path = preset + "." + entry.getKey();
+            if (!yaml.contains(path)) yaml.set(path, entry.getValue());
+        }
     }
 
     private void ensureLoreTemplate(YamlConfiguration yaml, String key, String displayEs, String displayEn, List<String> loreEs, List<String> loreEn) {
