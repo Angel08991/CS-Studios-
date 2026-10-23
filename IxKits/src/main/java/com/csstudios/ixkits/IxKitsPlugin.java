@@ -1314,9 +1314,11 @@ public final class IxKitsPlugin extends JavaPlugin implements Listener, CommandE
     }
 
     private void promptInput(Player p, InputType type, String project, int page, int slot, String promptEs, String promptEn, String argument) {
-        pendingInputs.put(p.getUniqueId(), new PendingInput(type, project, page, slot, -1, argument));
+        PendingInput pending = new PendingInput(type, project, page, slot, -1, argument);
+        pendingInputs.put(p.getUniqueId(), pending);
         p.closeInventory();
         p.sendMessage(PREFIX + tr(promptEs, promptEn));
+        sendCurrentValueAssist(p, pending);
         sendCancelPrompt(p);
     }
 
@@ -1332,6 +1334,84 @@ public final class IxKitsPlugin extends JavaPlugin implements Listener, CommandE
         net.kyori.adventure.text.Component ending = legacy.deserialize(
             tr(" §7o escribe §fcancelar §7en el chat.", " §7or type §fcancel §7in chat."));
         p.sendMessage(beginning.append(cancel).append(ending));
+    }
+
+    private void sendCurrentValueAssist(Player player, PendingInput pending) {
+        String currentValue = currentInputValue(pending);
+        if (currentValue == null || currentValue.isBlank()) return;
+        String label;
+        String hover;
+        if (pending.type == InputType.ITEM_NAME) {
+            label = tr("Cargar nombre actual", "Load current name");
+            hover = tr("Pulsa para insertar el nombre actual en el chat y editarlo.", "Click to insert the current name into chat and edit it.");
+        } else if (pending.type == InputType.LORE_EDIT_LINE) {
+            label = tr("Cargar línea actual", "Load current line");
+            hover = tr("Pulsa para insertar esta línea con su formato y editarla.", "Click to insert this line with its formatting and edit it.");
+        } else {
+            label = tr("Cargar lore actual", "Load current lore");
+            hover = tr("Pulsa para insertar el lore actual y modificarlo.", "Click to insert the current lore and modify it.");
+        }
+        net.kyori.adventure.text.Component link = net.kyori.adventure.text.Component
+            .text("[" + label + "]", net.kyori.adventure.text.format.NamedTextColor.AQUA)
+            .decorate(net.kyori.adventure.text.format.TextDecoration.UNDERLINED)
+            .clickEvent(net.kyori.adventure.text.event.ClickEvent.suggestCommand(currentValue))
+            .hoverEvent(net.kyori.adventure.text.event.HoverEvent.showText(net.kyori.adventure.text.Component.text(hover)));
+        var legacy = net.kyori.adventure.text.serializer.legacy.LegacyComponentSerializer.legacySection();
+        player.sendMessage(legacy.deserialize(PREFIX + "§7").append(link));
+    }
+
+    private String currentInputValue(PendingInput pending) {
+        if (pending.project == null || !projectFile(pending.project).isFile()) return null;
+        ItemStack target = getProjectItem(pending.project, pending.page, pending.slot);
+        if (target == null || target.getType().isAir()) return null;
+        ItemMeta meta = target.getItemMeta();
+        if (meta == null) return null;
+        if (pending.type == InputType.ITEM_NAME) {
+            net.kyori.adventure.text.Component display = meta.hasDisplayName() && meta.displayName() != null
+                ? meta.displayName()
+                : net.kyori.adventure.text.Component.text(prettyKey(target.getType().name()));
+            return MiniMessage.miniMessage().serialize(display);
+        }
+        if (pending.type == InputType.ITEM_LORE) {
+            List<net.kyori.adventure.text.Component> lore = meta.lore();
+            return lore == null ? null : lore.stream().map(MiniMessage.miniMessage()::serialize).collect(java.util.stream.Collectors.joining("|"));
+        }
+        if (pending.type == InputType.LORE_EDIT_LINE) {
+            List<net.kyori.adventure.text.Component> lore = meta.lore();
+            if (lore == null || pending.lineIndex < 0 || pending.lineIndex >= lore.size()) return null;
+            return MiniMessage.miniMessage().serialize(lore.get(pending.lineIndex));
+        }
+        return null;
+    }
+
+    private net.kyori.adventure.text.Component deserializeLoreLine(String line) {
+        if (line == null || line.isEmpty()) return net.kyori.adventure.text.Component.empty();
+        String trimmed = line.trim();
+        if (trimmed.matches("(?is).*<(?:/?(?:gradient|rainbow|bold|italic|underlined|strikethrough|obfuscated|reset|newline|color|white|gray|grey|dark_gray|dark_grey|black|dark_blue|blue|dark_green|green|dark_aqua|aqua|dark_red|red|dark_purple|light_purple|gold|yellow)|#[0-9a-f]{6})(?::[^>]*)?>.*")) {
+            try {
+                return MiniMessage.miniMessage().deserialize(line);
+            } catch (RuntimeException ignored) {
+                // Fall back to legacy color translation for malformed MiniMessage.
+            }
+        }
+        return net.kyori.adventure.text.serializer.legacy.LegacyComponentSerializer.legacySection()
+            .deserialize(translateLoreColors(line));
+    }
+
+    private List<net.kyori.adventure.text.Component> loreComponents(List<String> lines) {
+        if (lines == null) return List.of();
+        return lines.stream().map(this::deserializeLoreLine).toList();
+    }
+
+    private String translateLoreColors(String line) {
+        java.util.regex.Matcher matcher = java.util.regex.Pattern.compile("(?i)&#([0-9a-f]{6})").matcher(line);
+        StringBuffer converted = new StringBuffer();
+        while (matcher.find()) {
+            String rgb = paletteLegacyColor("#" + matcher.group(1));
+            matcher.appendReplacement(converted, java.util.regex.Matcher.quoteReplacement(rgb));
+        }
+        matcher.appendTail(converted);
+        return ChatColor.translateAlternateColorCodes('&', converted.toString());
     }
 
     private boolean isCancelInput(String input) {
@@ -1646,13 +1726,18 @@ public final class IxKitsPlugin extends JavaPlugin implements Listener, CommandE
             List<String> preview = new ArrayList<>();
             List<String> configured = lore.getStringList(key + (isEnglish() ? ".lore_en" : ".lore"));
             if (configured.isEmpty()) configured = lore.getStringList(key + ".lore");
-            for (String line : configured.stream().limit(4).toList()) preview.add(ChatColor.translateAlternateColorCodes('&', line));
+            preview.addAll(configured.stream().limit(4).toList());
             preview.add("");
             preview.add(project == null
                 ? tr("§eClic izquierdo: aplicar al objeto en mano", "§eLeft-click: apply to held item")
                 : tr("§eClic izquierdo: aplicar al objeto del kit", "§eLeft-click: apply to kit item"));
             preview.add(tr("§dClic derecho: publicar en Community", "§dRight-click: publish to Community"));
-            inv.setItem(slot, itemWithLore(Material.WRITABLE_BOOK, ChatColor.translateAlternateColorCodes('&', display), preview));
+            ItemStack templateIcon = new ItemStack(Material.WRITABLE_BOOK);
+            ItemMeta templateMeta = templateIcon.getItemMeta();
+            templateMeta.displayName(deserializeLoreLine(display));
+            templateMeta.lore(loreComponents(preview));
+            templateIcon.setItemMeta(templateMeta);
+            inv.setItem(slot, templateIcon);
             holder.entryBySlot.put(slot, key);
         }
         inv.setItem(45, item(Material.ARROW, tr("§7Volver", "§7Back"), project == null
@@ -1883,9 +1968,11 @@ public final class IxKitsPlugin extends JavaPlugin implements Listener, CommandE
     }
 
     private void promptLoreInput(Player p, InputType type, String project, int page, int targetSlot, int lineIndex, String spanish, String english) {
-        pendingInputs.put(p.getUniqueId(), new PendingInput(type, project, page, targetSlot, lineIndex));
+        PendingInput pending = new PendingInput(type, project, page, targetSlot, lineIndex);
+        pendingInputs.put(p.getUniqueId(), pending);
         p.closeInventory();
         p.sendMessage(PREFIX + tr(spanish, english));
+        sendCurrentValueAssist(p, pending);
         sendCancelPrompt(p);
     }
 
@@ -2927,7 +3014,7 @@ public final class IxKitsPlugin extends JavaPlugin implements Listener, CommandE
         List<String> lore = y.getStringList(name + (isEnglish() ? ".lore_en" : ".lore"));
         if (lore.isEmpty()) lore = y.getStringList(name + ".lore");
         if (lore.isEmpty()) { p.sendMessage(PREFIX + tr("No existe esa plantilla de lore.", "That lore template does not exist.")); return; }
-        ItemMeta meta = item.getItemMeta(); meta.setLore(color(lore)); item.setItemMeta(meta);
+        ItemMeta meta = item.getItemMeta(); meta.lore(loreComponents(lore)); item.setItemMeta(meta);
         p.sendMessage(PREFIX + tr("Plantilla aplicada: §b", "Template applied: §b") + name);
     }
 
@@ -3094,7 +3181,7 @@ public final class IxKitsPlugin extends JavaPlugin implements Listener, CommandE
             p.sendMessage(PREFIX + tr("No se pudo editar ese objeto.", "Could not edit that item."));
             return;
         }
-        meta.setLore(color(lines));
+        meta.lore(loreComponents(lines));
         target.setItemMeta(meta);
         yaml.set(itemPath, target);
         saveYaml(yaml, file);
@@ -3128,7 +3215,7 @@ public final class IxKitsPlugin extends JavaPlugin implements Listener, CommandE
             p.sendMessage(PREFIX + tr("No se pudo editar ese objeto.", "Could not edit that item."));
             return;
         }
-        meta.setLore(color(lines));
+        meta.lore(loreComponents(lines));
         held.setItemMeta(meta);
         p.sendMessage(PREFIX + tr("Lore aplicado: §b", "Lore applied: §b") + yaml.getString(key + (isEnglish() ? ".display_en" : ".display"), yaml.getString(key + ".display", prettyKey(key))));
     }
@@ -3205,7 +3292,7 @@ public final class IxKitsPlugin extends JavaPlugin implements Listener, CommandE
         stack.setItemMeta(meta); return stack;
     }
     private boolean contains(int[] arr, int value) { for (int n : arr) if (n == value) return true; return false; }
-    private List<String> color(List<String> lines) { return lines.stream().map(s -> ChatColor.translateAlternateColorCodes('&', s)).toList(); }
+    private List<String> color(List<String> lines) { return lines.stream().map(this::translateLoreColors).toList(); }
     private String slug(String in) { return in.toLowerCase(Locale.ROOT).replaceAll("[^a-z0-9_-]", "-").replaceAll("-+", "-"); }
     private File projectFile(String name) { return projectService == null ? new File(projectsDir, slug(name) + ".yml") : projectService.projectFile(name); }
     /**
