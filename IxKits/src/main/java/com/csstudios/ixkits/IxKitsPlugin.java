@@ -1757,16 +1757,24 @@ public final class IxKitsPlugin extends JavaPlugin implements Listener, CommandE
         String color = palettes.getString(key + ".color");
         if (color == null || target == null || target.getType().isAir()) return;
         String legacyColor = paletteLegacyColor(color);
+        String legacyAccent = paletteLegacyColor(palettes.getString(key + ".accent", color));
         ItemMeta meta = target.getItemMeta();
         if (meta == null) return;
         String name = meta.hasDisplayName() ? meta.getDisplayName() : prettyKey(target.getType().name());
         meta.setDisplayName(legacyColor + ChatColor.stripColor(name));
         if (meta.lore() != null) {
             var legacy = net.kyori.adventure.text.serializer.legacy.LegacyComponentSerializer.legacySection();
-            List<String> lore = meta.lore().stream()
-                .map(line -> legacyColor + ChatColor.stripColor(legacy.serialize(line)))
-                .toList();
-            meta.setLore(lore);
+            List<String> recolored = new ArrayList<>();
+            int visibleLine = 0;
+            for (net.kyori.adventure.text.Component line : meta.lore()) {
+                String plain = ChatColor.stripColor(legacy.serialize(line));
+                if (plain.isBlank()) recolored.add("");
+                else {
+                    recolored.add((visibleLine % 2 == 0 ? legacyColor : legacyAccent) + plain);
+                    visibleLine++;
+                }
+            }
+            meta.setLore(recolored);
         }
         target.setItemMeta(meta);
     }
@@ -1875,8 +1883,6 @@ public final class IxKitsPlugin extends JavaPlugin implements Listener, CommandE
         int start = currentPage * EDIT_SLOTS.length;
         for (int index = start; index < Math.min(lines.size(), start + EDIT_SLOTS.length); index++) {
             int slot = EDIT_SLOTS[index - start];
-            String preview = legacy.serialize(lines.get(index));
-            if (preview.length() > 80) preview = preview.substring(0, 77) + "...";
             ItemStack lineItem = new ItemStack(Material.PAPER);
             ItemMeta lineMeta = lineItem.getItemMeta();
             lineMeta.displayName(net.kyori.adventure.text.Component.text("§bLínea " + (index + 1)));
