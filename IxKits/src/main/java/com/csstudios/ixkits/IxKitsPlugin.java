@@ -112,13 +112,20 @@ public final class IxKitsPlugin extends JavaPlugin implements Listener, CommandE
             sender.sendMessage(tr("IxKits: este comando requiere un jugador.", "IxKits: this command requires a player."));
             return true;
         }
-        if (!player.hasPermission("ixkits.admin")) {
-            player.sendMessage(PREFIX + tr("No tienes permiso para administrar IxKits.", "You do not have permission to manage IxKits."));
+        if (args.length == 0) {
+            if (!player.hasPermission("ixkits.admin")) {
+                player.sendMessage(PREFIX + tr("Para usar el editor necesitas ixkits.admin. Para la comunidad usa /ixkits comunidad.", "The editor requires ixkits.admin. To browse Community, use /ixkits comunidad."));
+            } else openMain(player);
             return true;
         }
-        if (args.length == 0) { openMain(player); return true; }
         String sub = args[0].toLowerCase(Locale.ROOT);
+        boolean communityCommand = Set.of("comunidad", "community", "catalogo", "catálogo", "buscar", "descargar", "valorar", "favorito", "versiones", "versions").contains(sub);
+        if (!player.hasPermission("ixkits.admin") && !communityCommand) {
+            player.sendMessage(PREFIX + tr("No tienes permiso para administrar IxKits. Puedes navegar la comunidad con /ixkits comunidad.", "You do not have permission to administer IxKits. You can browse Community with /ixkits comunidad."));
+            return true;
+        }
         if (sub.equals("cancelar") || sub.equals("cancel")) { cancelPendingInput(player); return true; }
+        if (sub.equals("comunidad") || sub.equals("community")) { openCommunityHub(player); return true; }
         if (sub.equals("idioma") || sub.equals("language")) {
             if (args.length >= 2) setLanguage(player, args[1]);
             else openLanguages(player);
@@ -636,8 +643,9 @@ public final class IxKitsPlugin extends JavaPlugin implements Listener, CommandE
                             return;
                         }
                     }
-                    p.sendMessage(PREFIX + tr("Plantilla importada como proyecto: §b", "Template imported as project: §b") + name);
-                    openProjects(p);
+                    p.sendMessage(PREFIX + tr("Plantilla importada como proyecto local: §b", "Template imported as local project: §b") + name);
+                    if (p.hasPermission("ixkits.admin")) openProjects(p);
+                    else openCatalog(p, "");
                 } catch (IOException ex) {
                     p.sendMessage(PREFIX + "§c" + ex.getMessage());
                 }
@@ -2145,7 +2153,7 @@ public final class IxKitsPlugin extends JavaPlugin implements Listener, CommandE
                 "Escribe el nombre del nuevo proyecto:", "Type a name for the new project:");
             else if (slot == 24) openTemplates(p);
             else if (slot == 29) openProjects(p);
-            else if (slot == 31) openCatalog(p, "");
+            else if (slot == 31) openCommunityHub(p);
             else if (slot == 33) openLanguages(p);
             else if (slot == 38) {
                 p.sendMessage("§bIxKits §7— §f/ixkits §8| §7Abrir estudio");
