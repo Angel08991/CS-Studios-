@@ -1078,6 +1078,9 @@ public final class IxKitsPlugin extends JavaPlugin implements Listener, CommandE
             player.sendMessage(PREFIX + tr("Edición cancelada.", "Edit cancelled."));
             if (pending.type == InputType.PROJECT_SEARCH) openProjects(player);
             else if (pending.type == InputType.CATALOG_SEARCH) openCatalog(player, "");
+            else if (pending.project != null && projectFile(pending.project).isFile()
+                && (pending.type == InputType.LORE_ADD_LINE || pending.type == InputType.LORE_EDIT_LINE || pending.type == InputType.LORE_CLEAR_CONFIRM))
+                openLoreEditor(player, pending.project, pending.page, pending.slot, 0);
             else if (pending.project != null && projectFile(pending.project).isFile()) openItemEditor(player, pending.project, pending.page, pending.slot);
             else openMain(player);
             return;
@@ -2062,8 +2065,26 @@ public final class IxKitsPlugin extends JavaPlugin implements Listener, CommandE
             e.setCancelled(true);
             return;
         }
+        int selectedProjectSlot = -1;
         for (int slot : e.getRawSlots()) {
-            if (slot < e.getView().getTopInventory().getSize() && !contains(EDIT_SLOTS, slot)) { e.setCancelled(true); return; }
+            if (slot < e.getView().getTopInventory().getSize()) {
+                if (!contains(EDIT_SLOTS, slot)) { e.setCancelled(true); return; }
+                if (selectedProjectSlot == -1) selectedProjectSlot = slot;
+                else selectedProjectSlot = -2;
+            }
+        }
+        if (selectedProjectSlot >= 0 && e.getWhoClicked() instanceof Player player) {
+            final int targetSlot = selectedProjectSlot;
+            final Inventory sourceInventory = e.getView().getTopInventory();
+            Bukkit.getScheduler().runTask(this, () -> {
+                if (player.isOnline() && player.getOpenInventory().getTopInventory() == sourceInventory) {
+                    ItemStack selected = sourceInventory.getItem(targetSlot);
+                    if (selected != null && !selected.getType().isAir()) {
+                        savePage(sourceInventory, h);
+                        openItemEditor(player, h.project, h.page, targetSlot);
+                    }
+                }
+            });
         }
     }
 
