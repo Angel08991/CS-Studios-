@@ -222,6 +222,18 @@ test("catalog API handles publish, search, ratings, favorites, downloads, and mo
   });
   assert.equal(invalidResource.status, 400, "resource payloads must be type-validated");
 
+  const invalidEnchantments = await fetch(baseUrl + "/api/resources", {
+    method: "POST",
+    headers: { "content-type": "application/json", authorization: "Bearer " + publishToken },
+    body: JSON.stringify({
+      type: "enchantments",
+      title: "Bad Enchantment Preset",
+      author: "Tester",
+      data: { "display.nested": 7 }
+    })
+  });
+  assert.equal(invalidEnchantments.status, 400, "enchantment keys must use safe identifier syntax");
+
   const deniedDelete = await fetch(baseUrl + "/api/templates/" + created.id, { method: "DELETE" });
   assert.equal(deniedDelete.status, 401);
 
