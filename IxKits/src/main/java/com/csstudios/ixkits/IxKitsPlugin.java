@@ -1567,6 +1567,7 @@ public final class IxKitsPlugin extends JavaPlugin implements Listener, CommandE
                             top.setItem(destination, moving.clone());
                             e.setCurrentItem(new ItemStack(Material.AIR));
                             saveEquipment(top, h.project);
+                            openItemEditor(p, h.project, h.page, equipmentTargetSlot(destination));
                         }
                     }
                 }
@@ -1598,6 +1599,7 @@ public final class IxKitsPlugin extends JavaPlugin implements Listener, CommandE
                     } else e.getView().setCursor(new ItemStack(Material.AIR));
                     top.setItem(slot, placed);
                     saveEquipment(top, h.project);
+                    openItemEditor(p, h.project, h.page, equipmentTargetSlot(slot));
                 }
             } else if (cursorEmpty && current != null && !current.getType().isAir() && e.isRightClick()) {
                 e.setCancelled(true);
