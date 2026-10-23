@@ -80,6 +80,25 @@ También se cambia con /ixkits idioma. Para que el cambio manual del archivo se 
 
 En la biblioteca de proyectos, clic izquierdo abre y clic derecho muestra las herramientas del proyecto.
 
+### Flujo de trabajo del editor
+
+1. Ejecuta `/ixkits` y pulsa **Crear proyecto** o abre **Mis proyectos**.
+2. En el inventario de edición, coloca un objeto en una ranura vacía con el cursor. También puedes hacer **Mayús + clic** sobre un objeto de tu inventario para colocarlo automáticamente en la primera ranura libre.
+3. Al poner un objeto en una ranura, IxKits guarda el proyecto y abre el menú **Editor de objeto**. Para volver a editar un objeto existente, haz **clic derecho** en su ranura.
+4. Desde ese menú puedes cambiar nombre, encantamientos y propiedades, abrir el **Editor visual de lore** o configurar **Habilidades especiales**. En el editor visual, el clic normal edita una línea, el clic derecho la borra, Mayús + clic la sube y Mayús + clic derecho la baja.
+5. En `/ixkits equipamiento <proyecto>`, equipa automáticamente con **Mayús + clic** desde tu inventario. Haz **clic derecho** en casco, peto, pantalones, botas o mano secundaria para abrir el mismo editor del objeto, incluidos encantamientos y lore.
+
+### Habilidades de objetos
+
+La primera habilidad implementada es **TNT al golpear**, activable por objeto desde `Editor de objeto → Habilidades especiales`. Se guarda como metadato del objeto. Al atacar con ese objeto en la mano principal, aparece una TNT junto al objetivo. El enfriamiento, la mecha y la potencia se ajustan en `plugins/IxKits/config.yml`:
+
+    abilities:
+      tnt-on-hit-cooldown-ms: 3000
+      tnt-on-hit-fuse-ticks: 40
+      tnt-on-hit-yield: 2.0
+
+La habilidad funciona dentro del servidor que tenga IxKits instalado y habilitado. La exportación a formatos de otros plugins puede no conservar metadatos personalizados de IxKits; valida cada formato antes de usar el objeto en producción.
+
 ### Importar objetos creados con otros plugins
 
 IxKits no depende de ItemEdit ni de otro editor de objetos. Para copiar a un proyecto un objeto personalizado que tengas en la mano (incluidos objetos editados con ItemEdit), usa:
