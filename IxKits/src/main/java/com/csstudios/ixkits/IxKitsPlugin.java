@@ -1190,6 +1190,63 @@ public final class IxKitsPlugin extends JavaPlugin implements Listener, CommandE
         String itemPath = storagePath(pending.page, pending.slot);
         ItemStack target = yaml.getItemStack(itemPath);
         if (target == null || target.getType().isAir()) { player.sendMessage(PREFIX + tr("No se encontró el objeto.", "Item not found.")); openEditor(player, pending.project, pending.page); return; }
+        if (pending.type == InputType.ENCHANTMENT_LEVEL) {
+            NamespacedKey enchantmentKey = pending.argument == null ? null : NamespacedKey.fromString(pending.argument);
+            Enchantment enchantment = enchantmentKey == null ? null : Registry.ENCHANTMENT.get(enchantmentKey);
+            int level;
+            try { level = Integer.parseInt(input.trim()); }
+            catch (NumberFormatException ex) {
+                player.sendMessage(PREFIX + tr("Nivel inválido. Usa un número del 1 al 32767.", "Invalid level. Use a number from 1 to 32767."));
+                promptEnchantLevel(player, pending.project, pending.page, pending.slot, pending.argument == null ? "" : pending.argument);
+                return;
+            }
+            if (enchantment == null || level < 1 || level > 32767) {
+                player.sendMessage(PREFIX + tr("No se pudo aplicar el nivel. Usa un encantamiento válido y un nivel de 1 a 32767.", "Could not apply the level. Use a valid enchantment and a level from 1 to 32767."));
+                promptEnchantLevel(player, pending.project, pending.page, pending.slot, pending.argument == null ? "" : pending.argument);
+                return;
+            }
+            target.addUnsafeEnchantment(enchantment, level);
+            projectService.backupBeforeChange(file);
+            yaml.set(itemPath, target);
+            yaml.set("format-version", 2);
+            yaml.set("updated", System.currentTimeMillis());
+            saveYaml(yaml, file);
+            player.sendMessage(PREFIX + tr("Encantamiento configurado a nivel §b", "Enchantment set to level §b") + level + "§7.");
+            openEnchantments(player, pending.project, pending.page, pending.slot, 0);
+            return;
+        }
+        if (pending.type == InputType.ABILITY_COOLDOWN) {
+            double seconds;
+            try { seconds = Double.parseDouble(input.trim().replace(',', '.')); }
+            catch (NumberFormatException ex) {
+                player.sendMessage(PREFIX + tr("Cooldown inválido. Escribe segundos, por ejemplo 2.5.", "Invalid cooldown. Type seconds, for example 2.5."));
+                promptAbilityCooldown(player, pending.project, pending.page, pending.slot, pending.argument == null ? "tnt" : pending.argument);
+                return;
+            }
+            if (!Double.isFinite(seconds) || seconds < 0 || seconds > 86400) {
+                player.sendMessage(PREFIX + tr("El cooldown debe estar entre 0 y 86400 segundos.", "Cooldown must be between 0 and 86400 seconds."));
+                promptAbilityCooldown(player, pending.project, pending.page, pending.slot, pending.argument == null ? "tnt" : pending.argument);
+                return;
+            }
+            NamespacedKey cooldownKey = abilityCooldownKey(pending.argument);
+            if (cooldownKey == null) {
+                player.sendMessage(PREFIX + tr("No se reconoció esa habilidad.", "That ability was not recognized."));
+                openAbilities(player, pending.project, pending.page, pending.slot);
+                return;
+            }
+            ItemMeta meta = target.getItemMeta();
+            long cooldownMs = Math.round(seconds * 1000.0);
+            meta.getPersistentDataContainer().set(cooldownKey, PersistentDataType.LONG, cooldownMs);
+            target.setItemMeta(meta);
+            projectService.backupBeforeChange(file);
+            yaml.set(itemPath, target);
+            yaml.set("format-version", 2);
+            yaml.set("updated", System.currentTimeMillis());
+            saveYaml(yaml, file);
+            player.sendMessage(PREFIX + tr("Cooldown guardado: §b", "Cooldown saved: §b") + formatCooldown(cooldownMs));
+            openAbilities(player, pending.project, pending.page, pending.slot);
+            return;
+        }
         if (pending.type == InputType.LORE_ADD_LINE || pending.type == InputType.LORE_EDIT_LINE
             || pending.type == InputType.LORE_CLEAR_CONFIRM) {
             ItemMeta loreMeta = target.getItemMeta();
@@ -1383,6 +1440,8 @@ public final class IxKitsPlugin extends JavaPlugin implements Listener, CommandE
             tr("§7Cada línea se edita por separado.", "§7Edit each line separately."),
             tr("§eClic para abrir", "§eClick to open")));
         inv.setItem(24, item(Material.BARRIER, tr("§cQuitar todos los encantamientos", "§cRemove all enchantments"), tr("§7Solo afecta a este objeto del proyecto.", "§7Only affects this project item."), tr("§eClic para confirmar al instante", "§eClick to apply immediately")));
+        inv.setItem(27, item(Material.ENCHANTED_BOOK, tr("§dPlantillas de encantamientos", "§dEnchantment presets"), tr("§7Aplicar una combinación guardada.", "§7Apply a saved combination."), tr("§eClic para elegir", "§eClick to choose")));
+        inv.setItem(32, item(Material.PAINTING, tr("§bPaleta de colores", "§bColor palette"), tr("§7Cambiar el estilo del nombre y el lore.", "§7Restyle the name and lore."), tr("§eClic para elegir", "§eClick to choose")));
         inv.setItem(30, item(Material.TNT, tr("§cHabilidades especiales", "§cCustom abilities"),
             tr("§7Efectos activados al usar el objeto.", "§7Effects triggered when using the item."),
             tr("§eClic para configurar", "§eClick to configure")));
@@ -1458,6 +1517,55 @@ public final class IxKitsPlugin extends JavaPlugin implements Listener, CommandE
         openLoreEditor(p, project, page, targetSlot, viewPage);
     }
 
+    private NamespacedKey abilityCooldownKey(String ability) {
+        if (ability == null) return null;
+        return switch (ability.toLowerCase(Locale.ROOT)) {
+            case "tnt" -> tntCooldownKey;
+            case "lightning" -> lightningCooldownKey;
+            case "lifesteal" -> lifeStealCooldownKey;
+            default -> null;
+        };
+    }
+
+    private long getAbilityCooldown(ItemStack stack, String ability) {
+        NamespacedKey key = abilityCooldownKey(ability);
+        String path;
+        long fallback;
+        switch (ability) {
+            case "tnt" -> { path = "abilities.tnt-on-hit-cooldown-ms"; fallback = 3000L; }
+            case "lightning" -> { path = "abilities.lightning-on-hit-cooldown-ms"; fallback = 5000L; }
+            case "lifesteal" -> { path = "abilities.lifesteal-on-hit-cooldown-ms"; fallback = 1000L; }
+            default -> { return 0L; }
+        }
+        if (stack != null && !stack.getType().isAir() && stack.hasItemMeta() && key != null) {
+            Long stored = stack.getItemMeta().getPersistentDataContainer().get(key, PersistentDataType.LONG);
+            if (stored != null) return Math.max(0L, stored);
+        }
+        return Math.max(0L, getConfig().getLong(path, fallback));
+    }
+
+    private String formatCooldown(long milliseconds) {
+        if (milliseconds == 0) return tr("Sin espera", "No cooldown");
+        if (milliseconds < 1000) return milliseconds + " ms";
+        String value = String.format(Locale.US, "%.2f", milliseconds / 1000.0).replaceAll("0+$", "").replaceAll("\\.$", "");
+        return value + " s";
+    }
+
+    private void promptAbilityCooldown(Player p, String project, int page, int targetSlot, String ability) {
+        String current = formatCooldown(getAbilityCooldown(getProjectItem(project, page, targetSlot), ability));
+        promptInput(p, InputType.ABILITY_COOLDOWN, project, page, targetSlot,
+            "Escribe el cooldown en segundos para esta habilidad (0 = sin espera, máximo 86400). Actual: " + current,
+            "Type the cooldown in seconds for this ability (0 = no wait, maximum 86400). Current: " + current,
+            ability);
+    }
+
+    private void promptEnchantLevel(Player p, String project, int page, int targetSlot, String enchantmentKey) {
+        promptInput(p, InputType.ENCHANTMENT_LEVEL, project, page, targetSlot,
+            "Escribe el nivel exacto del encantamiento (1-32767):",
+            "Type the exact enchantment level (1-32767):",
+            enchantmentKey);
+    }
+
     private void openAbilities(Player p, String project, int page, int targetSlot) {
         ItemStack target = getProjectItem(project, page, targetSlot);
         if (target == null || target.getType().isAir()) {
@@ -1473,18 +1581,23 @@ public final class IxKitsPlugin extends JavaPlugin implements Listener, CommandE
             tntEnabled ? tr("§aTNT al golpear: ACTIVADA", "§aTNT on hit: ENABLED") : tr("§cTNT al golpear: DESACTIVADA", "§cTNT on hit: DISABLED"),
             tr("§7Hace aparecer una TNT junto al enemigo.", "§7Spawns TNT beside the target."),
             tr("§7Mecha: ", "§7Fuse: ") + getConfig().getInt("abilities.tnt-on-hit-fuse-ticks", 40) + " ticks",
-            tr("§7Enfriamiento: ", "§7Cooldown: ") + getConfig().getLong("abilities.tnt-on-hit-cooldown-ms", 3000L) + " ms",
-            tr("§eClic para alternar", "§eClick to toggle")));
+            tr("§7Enfriamiento: ", "§7Cooldown: ") + formatCooldown(getAbilityCooldown(target, "tnt")),
+            tr("§eClic izquierdo: activar/desactivar", "§eLeft-click: toggle"),
+            tr("§bClic derecho: configurar cooldown", "§bRight-click: configure cooldown")));
         inv.setItem(22, item(isAbilityEnabled(target, lightningOnHitKey) ? Material.LIGHTNING_ROD : Material.COPPER_INGOT,
             isAbilityEnabled(target, lightningOnHitKey) ? tr("§aRayo al golpear: ACTIVADO", "§aLightning on hit: ENABLED") : tr("§cRayo al golpear: DESACTIVADO", "§cLightning on hit: DISABLED"),
             tr("§7Invoca un rayo sobre el objetivo.", "§7Calls lightning down on the target."),
             tr("§7Puede causar daño adicional y fuego.", "§7Can cause extra damage and fire."),
-            tr("§eClic para alternar", "§eClick to toggle")));
+            tr("§7Enfriamiento: ", "§7Cooldown: ") + formatCooldown(getAbilityCooldown(target, "lightning")),
+            tr("§eClic izquierdo: activar/desactivar", "§eLeft-click: toggle"),
+            tr("§bClic derecho: configurar cooldown", "§bRight-click: configure cooldown")));
         inv.setItem(24, item(isAbilityEnabled(target, lifeStealOnHitKey) ? Material.GHAST_TEAR : Material.ROTTEN_FLESH,
             isAbilityEnabled(target, lifeStealOnHitKey) ? tr("§aRobo de vida: ACTIVADO", "§aLifesteal: ENABLED") : tr("§cRobo de vida: DESACTIVADO", "§cLifesteal: DISABLED"),
             tr("§7Recupera parte del daño al golpear.", "§7Heals you for a portion of damage dealt."),
             tr("§7Porcentaje: ", "§7Percent: ") + (int)Math.round(getConfig().getDouble("abilities.lifesteal-on-hit-percent", 0.25) * 100) + "%",
-            tr("§eClic para alternar", "§eClick to toggle")));
+            tr("§7Enfriamiento: ", "§7Cooldown: ") + formatCooldown(getAbilityCooldown(target, "lifesteal")),
+            tr("§eClic izquierdo: activar/desactivar", "§eLeft-click: toggle"),
+            tr("§bClic derecho: configurar cooldown", "§bRight-click: configure cooldown")));
         inv.setItem(31, item(Material.BOOK, tr("§fCómo funciona", "§fHow it works"),
             tr("§7Se aplica al arma cuando está en tu", "§7Applies when the item is in your"),
             tr("§7mano principal y golpeas a un ser vivo.", "§7main hand and you hit a living entity."),
@@ -1520,7 +1633,8 @@ public final class IxKitsPlugin extends JavaPlugin implements Listener, CommandE
             lines.add("");
             lines.add(tr("§aClic izquierdo: subir nivel", "§aLeft-click: increase level"));
             lines.add(tr("§eClic derecho: bajar nivel", "§eRight-click: decrease level"));
-            lines.add(tr("§cMayús + clic: eliminar", "§cShift-click: remove"));
+            lines.add(tr("§dMayús + clic izquierdo: nivel exacto", "§dShift + left-click: exact level"));
+            lines.add(tr("§cMayús + clic derecho: eliminar", "§cShift + right-click: remove"));
             inv.setItem(slot, itemWithLore(Material.ENCHANTED_BOOK, "§b" + prettyKey(enchantment.getKey().getKey()), lines));
             holder.entryBySlot.put(slot, key);
         }
@@ -1918,9 +2032,9 @@ public final class IxKitsPlugin extends JavaPlugin implements Listener, CommandE
             }
         } else if (h.kind.equals("abilities")) {
             if (slot == 45) openItemEditor(p, h.project, h.page, h.targetSlot);
-            else if (slot == 20) toggleAbility(p, h.project, h.page, h.targetSlot, tntOnHitKey);
-            else if (slot == 22) toggleAbility(p, h.project, h.page, h.targetSlot, lightningOnHitKey);
-            else if (slot == 24) toggleAbility(p, h.project, h.page, h.targetSlot, lifeStealOnHitKey);
+            else if (slot == 20) { if (e.isRightClick()) promptAbilityCooldown(p, h.project, h.page, h.targetSlot, "tnt"); else toggleAbility(p, h.project, h.page, h.targetSlot, tntOnHitKey); }
+            else if (slot == 22) { if (e.isRightClick()) promptAbilityCooldown(p, h.project, h.page, h.targetSlot, "lightning"); else toggleAbility(p, h.project, h.page, h.targetSlot, lightningOnHitKey); }
+            else if (slot == 24) { if (e.isRightClick()) promptAbilityCooldown(p, h.project, h.page, h.targetSlot, "lifesteal"); else toggleAbility(p, h.project, h.page, h.targetSlot, lifeStealOnHitKey); }
         } else if (h.kind.equals("item-editor")) {
             if (slot == 45) {
                 if (h.targetSlot < 0) openEquipment(p, h.project, h.page);
@@ -1940,6 +2054,8 @@ public final class IxKitsPlugin extends JavaPlugin implements Listener, CommandE
                 openItemEditor(p, h.project, h.page, h.targetSlot);
             } else if (slot == 14) openSpecialProperties(p, h.project, h.page, h.targetSlot);
             else if (slot == 20) openEnchantments(p, h.project, h.page, h.targetSlot, 0);
+            else if (slot == 27) openEnchantTemplates(p, 0, h.project, h.page, h.targetSlot);
+            else if (slot == 32) openPaletteTemplates(p, 0, h.project, h.page, h.targetSlot);
             else if (slot == 30) openAbilities(p, h.project, h.page, h.targetSlot);
             else if (slot == 22) openLoreTemplates(p, 0, h.project, h.page, h.targetSlot);
             else if (slot == 11) promptInput(p, InputType.ITEM_NAME, h.project, h.page, h.targetSlot, "Escribe el nombre MiniMessage del objeto:", "Type the item's MiniMessage name:");
@@ -2090,12 +2206,16 @@ public final class IxKitsPlugin extends JavaPlugin implements Listener, CommandE
                     return;
                 }
                 int current = target.getEnchantmentLevel(enchantment);
+                if (e.isShiftClick() && !e.isRightClick()) {
+                    promptEnchantLevel(p, h.project, h.page, h.targetSlot, rawKey);
+                    return;
+                }
                 if (e.isShiftClick()) target.removeEnchantment(enchantment);
                 else if (e.isRightClick()) {
                     if (current <= 1) target.removeEnchantment(enchantment);
                     else target.addUnsafeEnchantment(enchantment, current - 1);
                 } else {
-                    int next = current <= 0 || current >= enchantment.getMaxLevel() ? 1 : current + 1;
+                    int next = current <= 0 ? 1 : Math.min(32767, current + 1);
                     target.addUnsafeEnchantment(enchantment, next);
                 }
                 y.set(itemPath, target);
@@ -2220,7 +2340,7 @@ public final class IxKitsPlugin extends JavaPlugin implements Listener, CommandE
             || !(event.getEntity() instanceof LivingEntity target)) return;
         ItemStack weapon = attacker.getInventory().getItemInMainHand();
         if (isAbilityEnabled(weapon, tntOnHitKey)) {
-            long cooldown = Math.max(0L, getConfig().getLong("abilities.tnt-on-hit-cooldown-ms", 3000L));
+            long cooldown = getAbilityCooldown(weapon, "tnt");
             if (canTriggerAbility(attacker, "tnt-on-hit", cooldown)) {
                 int fuseTicks = Math.max(1, Math.min(200, getConfig().getInt("abilities.tnt-on-hit-fuse-ticks", 40)));
                 float yield = (float) Math.max(0.0, Math.min(8.0, getConfig().getDouble("abilities.tnt-on-hit-yield", 2.0)));
@@ -2231,11 +2351,11 @@ public final class IxKitsPlugin extends JavaPlugin implements Listener, CommandE
             }
         }
         if (isAbilityEnabled(weapon, lightningOnHitKey)) {
-            long cooldown = Math.max(0L, getConfig().getLong("abilities.lightning-on-hit-cooldown-ms", 5000L));
+            long cooldown = getAbilityCooldown(weapon, "lightning");
             if (canTriggerAbility(attacker, "lightning-on-hit", cooldown)) target.getWorld().strikeLightning(target.getLocation());
         }
         if (isAbilityEnabled(weapon, lifeStealOnHitKey)) {
-            long cooldown = Math.max(0L, getConfig().getLong("abilities.lifesteal-on-hit-cooldown-ms", 1000L));
+            long cooldown = getAbilityCooldown(weapon, "lifesteal");
             if (canTriggerAbility(attacker, "lifesteal-on-hit", cooldown)) {
                 double percent = Math.max(0.0, Math.min(1.0, getConfig().getDouble("abilities.lifesteal-on-hit-percent", 0.25)));
                 var maximumHealth = attacker.getAttribute(Registry.ATTRIBUTE.get(NamespacedKey.minecraft("max_health")));
