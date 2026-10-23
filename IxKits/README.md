@@ -35,6 +35,14 @@ La compatibilidad con ItemEdit está planteada como **opcional**: IxKits no requ
 - Java 21.
 - Gradle 8.10.2 o compatible para compilar localmente.
 
+## Permisos
+
+- `ixkits.admin` (por defecto, operadores): crear y editar proyectos, usar las herramientas administrativas y publicar desde la GUI.
+- `ixkits.community.publish` (por defecto, operadores): publicar recursos comunitarios desde las bibliotecas locales y usar `/ixkits publicar` para compartir un proyecto existente sin dar acceso al editor completo.
+- Cualquier jugador puede abrir `/ixkits comunidad` para explorar kits y recursos. También puede abrir `/ixkits plantillas` y aplicar presets a su objeto en mano; solo los usuarios con permiso de publicación pueden subir recursos.
+
+Con LuckPerms, el permiso `ixkits.community.publish` se puede otorgar por separado a colaboradores de confianza, sin conceder `ixkits.admin`.
+
 ## Idiomas
 
 En plugins/IxKits/config.yml:
