@@ -18,6 +18,10 @@ import org.bukkit.configuration.ConfigurationSection;
 import org.bukkit.configuration.file.YamlConfiguration;
 import org.bukkit.enchantments.Enchantment;
 import org.bukkit.entity.Player;
+import org.bukkit.entity.LivingEntity;
+import org.bukkit.entity.TNTPrimed;
+import org.bukkit.event.entity.EntityDamageByEntityEvent;
+import org.bukkit.persistence.PersistentDataType;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.Listener;
 import org.bukkit.event.inventory.InventoryClickEvent;
@@ -65,6 +69,8 @@ public final class IxKitsPlugin extends JavaPlugin implements Listener, CommandE
     private CatalogClient catalogClient;
     private final Map<UUID, PendingInput> pendingInputs = new ConcurrentHashMap<>();
     private final Map<UUID, ItemStack> itemClipboard = new ConcurrentHashMap<>();
+    private final Map<UUID, Long> abilityCooldowns = new ConcurrentHashMap<>();
+    private NamespacedKey tntOnHitKey;
     private static final int[] EQUIP_SLOTS = {19, 21, 23, 25, 31};
     private static final List<String> EDITABLE_ATTRIBUTES = List.of("max_health", "attack_damage", "attack_speed", "armor", "armor_toughness", "knockback_resistance", "movement_speed", "luck");
     private static final String PREFIX = "§8[§bIxKits§8] §7";
@@ -83,6 +89,7 @@ public final class IxKitsPlugin extends JavaPlugin implements Listener, CommandE
         projectsDir.mkdirs(); templatesDir.mkdirs(); exportsDir.mkdirs();
         projectService = new ProjectService(this, getDataFolder());
         catalogClient = new CatalogClient(this);
+        tntOnHitKey = new NamespacedKey(this, "ability_tnt_on_hit");
         initializeTemplates();
         Objects.requireNonNull(getCommand("ixkits")).setExecutor(this);
         Bukkit.getPluginManager().registerEvents(this, this);
@@ -1126,6 +1133,41 @@ public final class IxKitsPlugin extends JavaPlugin implements Listener, CommandE
         String itemPath = storagePath(pending.page, pending.slot);
         ItemStack target = yaml.getItemStack(itemPath);
         if (target == null || target.getType().isAir()) { player.sendMessage(PREFIX + tr("No se encontró el objeto.", "Item not found.")); openEditor(player, pending.project, pending.page); return; }
+        if (pending.type == InputType.LORE_ADD_LINE || pending.type == InputType.LORE_EDIT_LINE
+            || pending.type == InputType.LORE_CLEAR_CONFIRM) {
+            ItemMeta loreMeta = target.getItemMeta();
+            List<net.kyori.adventure.text.Component> lines = loreMeta.lore() == null
+                ? new ArrayList<>() : new ArrayList<>(loreMeta.lore());
+            if (pending.type == InputType.LORE_CLEAR_CONFIRM) {
+                if (!input.equalsIgnoreCase("BORRAR") && !input.equalsIgnoreCase("CLEAR")) {
+                    player.sendMessage(PREFIX + tr("Lore conservado.", "Lore kept."));
+                    openLoreEditor(player, pending.project, pending.page, pending.slot, 0);
+                    return;
+                }
+                lines.clear();
+            } else {
+                net.kyori.adventure.text.Component line = MiniMessage.miniMessage().deserialize(input);
+                if (pending.type == InputType.LORE_ADD_LINE) lines.add(line);
+                else {
+                    if (pending.lineIndex < 0 || pending.lineIndex >= lines.size()) {
+                        player.sendMessage(PREFIX + tr("Esa línea ya no existe.", "That line no longer exists."));
+                        openLoreEditor(player, pending.project, pending.page, pending.slot, 0);
+                        return;
+                    }
+                    lines.set(pending.lineIndex, line);
+                }
+            }
+            loreMeta.lore(lines.isEmpty() ? null : lines);
+            target.setItemMeta(loreMeta);
+            projectService.backupBeforeChange(file);
+            yaml.set(itemPath, target);
+            yaml.set("format-version", 2);
+            yaml.set("updated", System.currentTimeMillis());
+            saveYaml(yaml, file);
+            player.sendMessage(PREFIX + tr("Lore actualizado.", "Lore updated."));
+            openLoreEditor(player, pending.project, pending.page, pending.slot, 0);
+            return;
+        }
         ItemMeta meta = target.getItemMeta();
         try {
             switch (pending.type) {
@@ -1279,8 +1321,14 @@ public final class IxKitsPlugin extends JavaPlugin implements Listener, CommandE
             tr("§eClic para elegir", "§eClick to choose")));
         inv.setItem(31, item(Material.PAPER, tr("§fDetalles del objeto", "§fItem details"), enchantLore.toArray(new String[0])));
         inv.setItem(11, item(Material.NAME_TAG, tr("§bEditar nombre", "§bEdit name"), tr("§7Admite MiniMessage y RGB.", "§7Supports MiniMessage and RGB."), tr("§eClic para escribir", "§eClick to type")));
-        inv.setItem(13, item(Material.WRITABLE_BOOK, tr("§bEditar lore", "§bEdit lore"), tr("§7Separa las líneas usando |.", "§7Separate lines using |."), tr("§7Admite MiniMessage y degradados.", "§7Supports MiniMessage and gradients."), tr("§eClic para escribir", "§eClick to type")));
+        inv.setItem(13, item(Material.WRITABLE_BOOK, tr("§bEditor visual de lore", "§bVisual lore editor"),
+            tr("§7Añadir, editar, borrar y ordenar líneas.", "§7Add, edit, delete and reorder lines."),
+            tr("§7Cada línea se edita por separado.", "§7Edit each line separately."),
+            tr("§eClic para abrir", "§eClick to open")));
         inv.setItem(24, item(Material.BARRIER, tr("§cQuitar todos los encantamientos", "§cRemove all enchantments"), tr("§7Solo afecta a este objeto del proyecto.", "§7Only affects this project item."), tr("§eClic para confirmar al instante", "§eClick to apply immediately")));
+        inv.setItem(30, item(Material.TNT, tr("§cHabilidades especiales", "§cCustom abilities"),
+            tr("§7Efectos activados al usar el objeto.", "§7Effects triggered when using the item."),
+            tr("§eClic para configurar", "§eClick to configure")));
         inv.setItem(29, item(Material.IRON_BLOCK, tr("§bIrrompible", "§bUnbreakable"), tr("§7Alternar la propiedad del objeto.", "§7Toggle the item's property."), tr("§eClic para cambiar", "§eClick to toggle")));
         inv.setItem(33, item(Material.ANVIL, tr("§bDurabilidad", "§bDurability"), tr("§7Clic: +10 de daño", "§7Click: +10 damage"), tr("§7Derecho: -10; Mayús: reparar", "§7Right-click: -10; Shift: repair")));
         inv.setItem(35, item(Material.CARVED_PUMPKIN, tr("§bModelo personalizado", "§bCustom model data"), tr("§7Define o borra el número de modelo.", "§7Set or clear the model number."), tr("§eClic para escribir", "§eClick to type")));
@@ -1289,6 +1337,96 @@ public final class IxKitsPlugin extends JavaPlugin implements Listener, CommandE
         inv.setItem(41, item(Material.LEATHER_CHESTPLATE, tr("§bColor de cuero", "§bLeather color"), tr("§7Para objetos de cuero.", "§7For leather items."), tr("§eEscribe #RRGGBB o R,G,B", "§eType #RRGGBB or R,G,B")));
         inv.setItem(43, item(Material.POTION, tr("§bTipo de poción", "§bPotion type"), tr("§7Para pociones y flechas con efecto.", "§7For potions and tipped arrows."), tr("§eClic para editar", "§eClick to edit")));
         inv.setItem(45, item(Material.ARROW, tr("§7Volver al proyecto", "§7Back to project")));
+        p.openInventory(inv);
+    }
+
+    private void promptLoreInput(Player p, InputType type, String project, int page, int targetSlot, int lineIndex, String spanish, String english) {
+        pendingInputs.put(p.getUniqueId(), new PendingInput(type, project, page, targetSlot, lineIndex));
+        p.closeInventory();
+        p.sendMessage(PREFIX + tr(spanish, english));
+        p.sendMessage(PREFIX + tr("§7Puedes usar MiniMessage/RGB. Escribe §c-cancelar §7para salir.",
+            "§7MiniMessage/RGB are supported. Type §c-cancel §7to exit."));
+    }
+
+    private void openLoreEditor(Player p, String project, int page, int targetSlot, int requestedPage) {
+        ItemStack target = getProjectItem(project, page, targetSlot);
+        if (target == null || target.getType().isAir()) {
+            p.sendMessage(PREFIX + tr("No se encontró el objeto para editar el lore.", "Could not find the item to edit lore."));
+            if (targetSlot < 0) openEquipment(p, project, page); else openEditor(p, project, page);
+            return;
+        }
+        List<net.kyori.adventure.text.Component> lines = target.getItemMeta().lore();
+        if (lines == null) lines = new ArrayList<>();
+        int pages = Math.max(1, (int) Math.ceil(lines.size() / (double) EDIT_SLOTS.length));
+        int currentPage = Math.max(0, Math.min(requestedPage, pages - 1));
+        Inventory inv = menu("lore-editor", project, page, targetSlot, currentPage,
+            tr("§3✦ §bIxKits §8• §0Editor de lore", "§3✦ §bIxKits §8• §0Lore editor")
+                + " §7[" + (currentPage + 1) + "/" + pages + "]");
+        border(inv);
+        MenuHolder holder = (MenuHolder) inv.getHolder();
+        net.kyori.adventure.text.serializer.legacy.LegacyComponentSerializer legacy =
+            net.kyori.adventure.text.serializer.legacy.LegacyComponentSerializer.legacySection();
+        int start = currentPage * EDIT_SLOTS.length;
+        for (int index = start; index < Math.min(lines.size(), start + EDIT_SLOTS.length); index++) {
+            int slot = EDIT_SLOTS[index - start];
+            String preview = legacy.serialize(lines.get(index));
+            if (preview.length() > 80) preview = preview.substring(0, 77) + "...";
+            inv.setItem(slot, itemWithLore(Material.PAPER,
+                "§bLínea " + (index + 1),
+                List.of("§7" + ChatColor.stripColor(preview), "",
+                    tr("§eClic: editar esta línea", "§eClick: edit this line"),
+                    tr("§cClic derecho: borrar", "§cRight-click: delete"),
+                    tr("§bMayús + clic: mover arriba", "§bShift-click: move up"),
+                    tr("§bMayús + clic derecho: mover abajo", "§bShift + right-click: move down"))));
+            holder.entryBySlot.put(slot, Integer.toString(index));
+        }
+        inv.setItem(45, item(Material.ARROW, tr("§7Volver al objeto", "§7Back to item")));
+        inv.setItem(47, item(Material.SPECTRAL_ARROW, tr("§bAnterior", "§bPrevious"), tr("§7Página anterior", "§7Previous page")));
+        inv.setItem(48, item(Material.LIME_DYE, tr("§aAñadir línea", "§aAdd line"),
+            tr("§7Escribe el contenido de la nueva línea.", "§7Type the new line's content.")));
+        inv.setItem(49, item(Material.BARRIER, tr("§cBorrar todo el lore", "§cClear all lore"),
+            tr("§7Pide confirmación por chat.", "§7Requires confirmation in chat.")));
+        inv.setItem(51, item(Material.SPECTRAL_ARROW, tr("§bSiguiente", "§bNext"), tr("§7Página siguiente", "§7Next page")));
+        inv.setItem(53, item(Material.PAPER, tr("§fLíneas: ", "§fLines: ") + lines.size(),
+            tr("§7Cada línea es independiente.", "§7Each line is independent.")));
+        p.openInventory(inv);
+    }
+
+    private void saveLoreLines(Player p, String project, int page, int targetSlot, List<net.kyori.adventure.text.Component> lines, int viewPage) {
+        ItemStack target = getProjectItem(project, page, targetSlot);
+        if (target == null || target.getType().isAir()) return;
+        ItemMeta meta = target.getItemMeta();
+        meta.lore(lines.isEmpty() ? null : new ArrayList<>(lines));
+        target.setItemMeta(meta);
+        saveProjectItem(project, page, targetSlot, target);
+        openLoreEditor(p, project, page, targetSlot, viewPage);
+    }
+
+    private void openAbilities(Player p, String project, int page, int targetSlot) {
+        ItemStack target = getProjectItem(project, page, targetSlot);
+        if (target == null || target.getType().isAir()) {
+            p.sendMessage(PREFIX + tr("No se encontró el objeto.", "Item not found."));
+            if (targetSlot < 0) openEquipment(p, project, page); else openEditor(p, project, page);
+            return;
+        }
+        Inventory inv = menu("abilities", project, page, targetSlot, 0,
+            tr("§3✦ §bIxKits §8• §0Habilidades", "§3✦ §bIxKits §8• §0Abilities"));
+        border(inv);
+        boolean tntEnabled = isTntOnHitEnabled(target);
+        inv.setItem(20, item(tntEnabled ? Material.TNT : Material.GUNPOWDER,
+            tntEnabled ? tr("§aTNT al golpear: ACTIVADA", "§aTNT on hit: ENABLED") : tr("§cTNT al golpear: DESACTIVADA", "§cTNT on hit: DISABLED"),
+            tr("§7Hace aparecer una TNT cerca del enemigo al golpear.", "§7Spawns TNT near the target when you hit them."),
+            tr("§7Enfriamiento configurable; es real en combate.", "§7Configurable cooldown; works in combat."),
+            tr("§eClic para alternar", "§eClick to toggle")));
+        inv.setItem(22, item(Material.CLOCK, tr("§fAjustes de habilidad", "§fAbility settings"),
+            tr("§7Mecha: ", "§7Fuse: ") + getConfig().getInt("abilities.tnt-on-hit-fuse-ticks", 40) + " ticks",
+            tr("§7Enfriamiento: ", "§7Cooldown: ") + getConfig().getLong("abilities.tnt-on-hit-cooldown-ms", 3000L) + " ms",
+            tr("§7Potencia: ", "§7Yield: ") + getConfig().getDouble("abilities.tnt-on-hit-yield", 2.0)));
+        inv.setItem(31, item(Material.BOOK, tr("§fCómo funciona", "§fHow it works"),
+            tr("§7Solo se activa al golpear con este objeto", "§7Triggers only when hitting with this item"),
+            tr("§7en la mano principal.", "§7in the main hand."),
+            tr("§7La habilidad se guarda en el objeto.", "§7The ability is stored on the item.")));
+        inv.setItem(45, item(Material.ARROW, tr("§7Volver al objeto", "§7Back to item")));
         p.openInventory(inv);
     }
 
@@ -1688,6 +1826,45 @@ public final class IxKitsPlugin extends JavaPlugin implements Listener, CommandE
                 if (h.project == null) applyLoreTemplateToHand(p, h.entryBySlot.get(slot));
                 else applyLoreTemplateToProject(p, h.entryBySlot.get(slot), h.project, h.page, h.targetSlot);
             }
+        } else if (h.kind.equals("lore-editor")) {
+            if (slot == 45) openItemEditor(p, h.project, h.page, h.targetSlot);
+            else if (slot == 47) openLoreEditor(p, h.project, h.page, h.targetSlot, Math.max(0, h.subPage - 1));
+            else if (slot == 48) promptLoreInput(p, InputType.LORE_ADD_LINE, h.project, h.page, h.targetSlot, -1,
+                "Escribe la nueva línea de lore (MiniMessage/RGB):", "Type the new lore line (MiniMessage/RGB):");
+            else if (slot == 49) promptLoreInput(p, InputType.LORE_CLEAR_CONFIRM, h.project, h.page, h.targetSlot, -1,
+                "Escribe BORRAR para quitar todo el lore, o -cancelar para conservarlo:", "Type CLEAR to remove all lore, or -cancel to keep it:");
+            else if (slot == 51) openLoreEditor(p, h.project, h.page, h.targetSlot, h.subPage + 1);
+            else if (h.entryBySlot.containsKey(slot)) {
+                int lineIndex = Integer.parseInt(h.entryBySlot.get(slot));
+                ItemStack target = getProjectItem(h.project, h.page, h.targetSlot);
+                if (target == null || target.getType().isAir()) { openItemEditor(p, h.project, h.page, h.targetSlot); return; }
+                List<net.kyori.adventure.text.Component> lines = target.getItemMeta().lore() == null
+                    ? new ArrayList<>() : new ArrayList<>(target.getItemMeta().lore());
+                if (lineIndex < 0 || lineIndex >= lines.size()) { openLoreEditor(p, h.project, h.page, h.targetSlot, h.subPage); return; }
+                if (e.isShiftClick()) {
+                    int moveTo = lineIndex + (e.isRightClick() ? 1 : -1);
+                    if (moveTo >= 0 && moveTo < lines.size()) Collections.swap(lines, lineIndex, moveTo);
+                    saveLoreLines(p, h.project, h.page, h.targetSlot, lines, h.subPage);
+                } else if (e.isRightClick()) {
+                    lines.remove(lineIndex);
+                    saveLoreLines(p, h.project, h.page, h.targetSlot, lines, h.subPage);
+                } else promptLoreInput(p, InputType.LORE_EDIT_LINE, h.project, h.page, h.targetSlot, lineIndex,
+                    "Edita la línea " + (lineIndex + 1) + " con MiniMessage/RGB:", "Edit line " + (lineIndex + 1) + " using MiniMessage/RGB:");
+            }
+        } else if (h.kind.equals("abilities")) {
+            if (slot == 45) openItemEditor(p, h.project, h.page, h.targetSlot);
+            else if (slot == 20) {
+                ItemStack target = getProjectItem(h.project, h.page, h.targetSlot);
+                if (target != null && !target.getType().isAir()) {
+                    ItemMeta meta = target.getItemMeta();
+                    var container = meta.getPersistentDataContainer();
+                    if (isTntOnHitEnabled(target)) container.remove(tntOnHitKey);
+                    else container.set(tntOnHitKey, PersistentDataType.BYTE, (byte) 1);
+                    target.setItemMeta(meta);
+                    saveProjectItem(h.project, h.page, h.targetSlot, target);
+                }
+                openAbilities(p, h.project, h.page, h.targetSlot);
+            }
         } else if (h.kind.equals("item-editor")) {
             if (slot == 45) {
                 if (h.targetSlot < 0) openEquipment(p, h.project, h.page);
@@ -1707,9 +1884,10 @@ public final class IxKitsPlugin extends JavaPlugin implements Listener, CommandE
                 openItemEditor(p, h.project, h.page, h.targetSlot);
             } else if (slot == 14) openSpecialProperties(p, h.project, h.page, h.targetSlot);
             else if (slot == 20) openEnchantments(p, h.project, h.page, h.targetSlot, 0);
+            else if (slot == 30) openAbilities(p, h.project, h.page, h.targetSlot);
             else if (slot == 22) openLoreTemplates(p, 0, h.project, h.page, h.targetSlot);
             else if (slot == 11) promptInput(p, InputType.ITEM_NAME, h.project, h.page, h.targetSlot, "Escribe el nombre MiniMessage del objeto:", "Type the item's MiniMessage name:");
-            else if (slot == 13) promptInput(p, InputType.ITEM_LORE, h.project, h.page, h.targetSlot, "Escribe el lore; separa cada línea con |. Usa - para borrar:", "Type the lore; separate each line with |. Use - to clear:");
+            else if (slot == 13) openLoreEditor(p, h.project, h.page, h.targetSlot, 0);
             else if (slot == 29) {
                 ItemStack target = getProjectItem(h.project, h.page, h.targetSlot);
                 if (target != null) { ItemMeta meta = target.getItemMeta(); meta.setUnbreakable(!meta.isUnbreakable()); target.setItemMeta(meta); saveProjectItem(h.project, h.page, h.targetSlot, target); }
@@ -1928,6 +2106,31 @@ public final class IxKitsPlugin extends JavaPlugin implements Listener, CommandE
         yaml.set("format-version", 2);
         yaml.set("updated", System.currentTimeMillis());
         saveYaml(yaml, file);
+    }
+
+    private boolean isTntOnHitEnabled(ItemStack stack) {
+        if (stack == null || stack.getType().isAir() || !stack.hasItemMeta()) return false;
+        Byte enabled = stack.getItemMeta().getPersistentDataContainer().get(tntOnHitKey, PersistentDataType.BYTE);
+        return enabled != null && enabled == (byte) 1;
+    }
+
+    @EventHandler
+    public void onCustomWeaponHit(EntityDamageByEntityEvent event) {
+        if (event.isCancelled() || !(event.getDamager() instanceof Player attacker)
+            || !(event.getEntity() instanceof LivingEntity target)) return;
+        ItemStack weapon = attacker.getInventory().getItemInMainHand();
+        if (!isTntOnHitEnabled(weapon)) return;
+        long now = System.currentTimeMillis();
+        long cooldown = Math.max(0L, getConfig().getLong("abilities.tnt-on-hit-cooldown-ms", 3000L));
+        Long last = abilityCooldowns.get(attacker.getUniqueId());
+        if (last != null && now - last < cooldown) return;
+        abilityCooldowns.put(attacker.getUniqueId(), now);
+        int fuseTicks = Math.max(1, Math.min(200, getConfig().getInt("abilities.tnt-on-hit-fuse-ticks", 40)));
+        float yield = (float) Math.max(0.0, Math.min(8.0, getConfig().getDouble("abilities.tnt-on-hit-yield", 2.0)));
+        TNTPrimed tnt = target.getWorld().spawn(target.getLocation().add(0.0, 0.25, 0.0), TNTPrimed.class);
+        tnt.setFuseTicks(fuseTicks);
+        tnt.setYield(yield);
+        tnt.setSource(attacker);
     }
 
     private boolean isEquipmentPlaceholder(ItemStack item) {
@@ -2257,7 +2460,7 @@ public final class IxKitsPlugin extends JavaPlugin implements Listener, CommandE
     }
 
     private enum InputType {
-        DUPLICATE_PROJECT, RENAME_PROJECT, ITEM_NAME, ITEM_LORE, MODEL_DATA, LEATHER_COLOR, CATALOG_SEARCH, PROJECT_SEARCH, CREATE_PROJECT, PUBLISH_REVISION_ID, BOOK_TITLE, BOOK_AUTHOR, BOOK_PAGES, SKULL_OWNER
+        DUPLICATE_PROJECT, RENAME_PROJECT, ITEM_NAME, ITEM_LORE, LORE_ADD_LINE, LORE_EDIT_LINE, LORE_CLEAR_CONFIRM, MODEL_DATA, LEATHER_COLOR, CATALOG_SEARCH, PROJECT_SEARCH, CREATE_PROJECT, PUBLISH_REVISION_ID, BOOK_TITLE, BOOK_AUTHOR, BOOK_PAGES, SKULL_OWNER
     }
 
     private static final class PendingInput {
@@ -2265,11 +2468,16 @@ public final class IxKitsPlugin extends JavaPlugin implements Listener, CommandE
         final String project;
         final int page;
         final int slot;
+        final int lineIndex;
         PendingInput(InputType type, String project, int page, int slot) {
+            this(type, project, page, slot, -1);
+        }
+        PendingInput(InputType type, String project, int page, int slot, int lineIndex) {
             this.type = type;
             this.project = project;
             this.page = page;
             this.slot = slot;
+            this.lineIndex = lineIndex;
         }
     }
 
