@@ -595,10 +595,10 @@ public final class IxKitsPlugin extends JavaPlugin implements Listener, CommandE
     private void openTemplates(Player p) {
         Inventory inv = menu("templates", null, 0, tr("§3✦ §bIxKits §8• §0Biblioteca", "§3✦ §bIxKits §8• §0Library"));
         border(inv);
-        inv.setItem(20, item(Material.WRITABLE_BOOK, tr("§bPlantillas de lore", "§bLore templates"), tr("§7Tres diseños profesionales incluidos.", "§7Three professional designs included."), tr("§eClic para elegir una plantilla", "§eClick to choose a template")));
-        inv.setItem(22, item(Material.PAINTING, tr("§bPaletas de colores", "§bColor palettes"), tr("§7Ocean, royal e inferno.", "§7Ocean, royal and inferno."), tr("§8/ixkits paleta aplicar <nombre>", "§8/ixkits paleta aplicar <name>")));
-        inv.setItem(24, item(Material.ENCHANTED_BOOK, tr("§bPresets de encantamientos", "§bEnchantment presets"), tr("§7Guarda y reutiliza combinaciones.", "§7Save and reuse combinations."), tr("§ePara kits: clic derecho a un objeto", "§eFor kits: right-click an item")));
-        inv.setItem(30, item(Material.ENDER_CHEST, "§dCommunity", tr("§7Catálogo online en desarrollo.", "§7Online catalog is in development."), tr("§cLas descargas aún no están activas", "§cDownloads are not available yet")));
+        inv.setItem(20, item(Material.WRITABLE_BOOK, tr("§bPlantillas de lore", "§bLore templates"), tr("§7Diseños para varias rarezas y estilos.", "§7Layouts for multiple rarities and styles."), tr("§eClic para aplicar o previsualizar", "§eClick to apply or preview")));
+        inv.setItem(22, item(Material.PAINTING, tr("§bPaletas de colores", "§bColor palettes"), tr("§7Estilos para nombres y líneas de lore.", "§7Styles for names and lore lines."), tr("§eClic para abrir la paleta", "§eClick to open palettes")));
+        inv.setItem(24, item(Material.ENCHANTED_BOOK, tr("§bPresets de encantamientos", "§bEnchantment presets"), tr("§7Combinaciones editables y reutilizables.", "§7Editable, reusable combinations."), tr("§eClic para abrir la biblioteca", "§eClick to open the library")));
+        inv.setItem(30, item(Material.ENDER_CHEST, "§dIxKits Community", tr("§7Descarga kits y comparte proyectos.", "§7Download kits and share projects."), tr("§eClic para abrir el catálogo online", "§eClick to open online catalog")));
         inv.setItem(45, item(Material.ARROW, tr("§7Volver", "§7Back"), tr("§8Menú principal", "§8Main menu")));
         p.openInventory(inv);
     }
@@ -1399,6 +1399,160 @@ public final class IxKitsPlugin extends JavaPlugin implements Listener, CommandE
         p.openInventory(inv);
     }
 
+    private void openEnchantTemplates(Player p, int requestedPage, String project, int projectPage, int targetSlot) {
+        YamlConfiguration presets = YamlConfiguration.loadConfiguration(new File(templatesDir, "enchantments.yml"));
+        List<String> keys = new ArrayList<>();
+        for (String key : presets.getKeys(false)) if (presets.isConfigurationSection(key)) keys.add(key);
+        Collections.sort(keys);
+        int pages = Math.max(1, (int) Math.ceil(keys.size() / (double) EDIT_SLOTS.length));
+        int page = Math.max(0, Math.min(requestedPage, pages - 1));
+        Inventory inv = project == null
+            ? menu("enchantment-templates", null, page, tr("§3✦ §bIxKits §8• §0Presets de encantamientos", "§3✦ §bIxKits §8• §0Enchantment presets"))
+            : menu("enchantment-templates", project, projectPage, targetSlot, page,
+                tr("§3✦ §bIxKits §8• §0Presets de encantamientos", "§3✦ §bIxKits §8• §0Enchantment presets"));
+        border(inv);
+        MenuHolder holder = (MenuHolder) inv.getHolder();
+        for (int i = page * EDIT_SLOTS.length; i < Math.min(keys.size(), (page + 1) * EDIT_SLOTS.length); i++) {
+            String key = keys.get(i);
+            ConfigurationSection section = presets.getConfigurationSection(key);
+            List<String> lore = new ArrayList<>();
+            lore.add(tr("§7Incluye:", "§7Includes:"));
+            if (section != null) for (String enchant : section.getKeys(false)) {
+                lore.add("§b• §f" + prettyKey(enchant) + " " + section.getInt(enchant, 1));
+                if (lore.size() >= 7) { lore.add("§8…"); break; }
+            }
+            lore.add("");
+            lore.add(project == null ? tr("§eClic para aplicar al objeto en mano", "§eClick to apply to held item")
+                : tr("§eClic para aplicar al objeto del kit", "§eClick to apply to kit item"));
+            int slot = EDIT_SLOTS[i - page * EDIT_SLOTS.length];
+            inv.setItem(slot, itemWithLore(Material.ENCHANTED_BOOK, "§d" + prettyKey(key), lore));
+            holder.entryBySlot.put(slot, key);
+        }
+        if (keys.isEmpty()) inv.setItem(22, item(Material.PAPER, tr("§7No hay presets guardados.", "§7No saved presets.")));
+        inv.setItem(45, item(Material.ARROW, tr("§7Volver", "§7Back")));
+        inv.setItem(47, item(Material.SPECTRAL_ARROW, tr("§bAnterior", "§bPrevious")));
+        inv.setItem(51, item(Material.SPECTRAL_ARROW, tr("§bSiguiente", "§bNext")));
+        p.openInventory(inv);
+    }
+
+    private void applyEnchantPreset(Player p, String presetName, String project, int projectPage, int targetSlot) {
+        YamlConfiguration presets = YamlConfiguration.loadConfiguration(new File(templatesDir, "enchantments.yml"));
+        ConfigurationSection section = presets.getConfigurationSection(presetName);
+        if (section == null) {
+            p.sendMessage(PREFIX + tr("Ese preset de encantamientos no existe.", "That enchantment preset does not exist."));
+            if (project != null) openEnchantTemplates(p, 0, project, projectPage, targetSlot);
+            return;
+        }
+        ItemStack target = project == null ? p.getInventory().getItemInMainHand()
+            : getProjectItem(project, projectPage, targetSlot);
+        if (target == null || target.getType().isAir()) {
+            p.sendMessage(PREFIX + tr("Selecciona primero un objeto.", "Select an item first."));
+            return;
+        }
+        for (String rawKey : section.getKeys(false)) {
+            NamespacedKey key = rawKey.contains(":") ? NamespacedKey.fromString(rawKey) : NamespacedKey.minecraft(rawKey.toLowerCase(Locale.ROOT));
+            Enchantment enchantment = key == null ? null : Registry.ENCHANTMENT.get(key);
+            if (enchantment != null) target.addUnsafeEnchantment(enchantment, Math.max(1, Math.min(32767, section.getInt(rawKey, 1))));
+        }
+        if (project != null) saveProjectItem(project, projectPage, targetSlot, target);
+        p.sendMessage(PREFIX + tr("Preset aplicado: §d", "Preset applied: §d") + prettyKey(presetName));
+        if (project != null) openItemEditor(p, project, projectPage, targetSlot);
+        else openEnchantTemplates(p, 0, null, 0, -1);
+    }
+
+    private void openPaletteTemplates(Player p, int requestedPage, String project, int projectPage, int targetSlot) {
+        YamlConfiguration palettes = YamlConfiguration.loadConfiguration(new File(templatesDir, "palettes.yml"));
+        List<String> keys = new ArrayList<>();
+        for (String key : palettes.getKeys(false)) if (palettes.getString(key + ".color") != null) keys.add(key);
+        Collections.sort(keys);
+        int pages = Math.max(1, (int) Math.ceil(keys.size() / (double) EDIT_SLOTS.length));
+        int page = Math.max(0, Math.min(requestedPage, pages - 1));
+        Inventory inv = project == null
+            ? menu("palette-templates", null, page, tr("§3✦ §bIxKits §8• §0Paletas de color", "§3✦ §bIxKits §8• §0Color palettes"))
+            : menu("palette-templates", project, projectPage, targetSlot, page,
+                tr("§3✦ §bIxKits §8• §0Paletas de color", "§3✦ §bIxKits §8• §0Color palettes"));
+        border(inv);
+        MenuHolder holder = (MenuHolder) inv.getHolder();
+        for (int i = page * EDIT_SLOTS.length; i < Math.min(keys.size(), (page + 1) * EDIT_SLOTS.length); i++) {
+            String key = keys.get(i);
+            String color = palettes.getString(key + ".color", "&b");
+            String accent = palettes.getString(key + ".accent", color);
+            Material icon = paletteIcon(key, color);
+            int slot = EDIT_SLOTS[i - page * EDIT_SLOTS.length];
+            inv.setItem(slot, item(icon, "§f" + palettes.getString(key + ".display", prettyKey(key)),
+                tr("§7Color principal: ", "§7Primary color: ") + color,
+                tr("§7Acento: ", "§7Accent: ") + accent, "",
+                project == null ? tr("§eClic para aplicar al objeto en mano", "§eClick to apply to held item")
+                    : tr("§eClic para aplicar al objeto del kit", "§eClick to apply to kit item")));
+            holder.entryBySlot.put(slot, key);
+        }
+        if (keys.isEmpty()) inv.setItem(22, item(Material.PAPER, tr("§7No hay paletas guardadas.", "§7No saved palettes.")));
+        inv.setItem(45, item(Material.ARROW, tr("§7Volver", "§7Back")));
+        inv.setItem(47, item(Material.SPECTRAL_ARROW, tr("§bAnterior", "§bPrevious")));
+        inv.setItem(51, item(Material.SPECTRAL_ARROW, tr("§bSiguiente", "§bNext")));
+        p.openInventory(inv);
+    }
+
+    private Material paletteIcon(String name, String color) {
+        String key = (name + " " + color).toLowerCase(Locale.ROOT);
+        if (key.contains("gold") || key.contains("sun") || key.contains("yellow") || key.contains("&6")) return Material.YELLOW_STAINED_GLASS_PANE;
+        if (key.contains("inferno") || key.contains("rose") || key.contains("red") || key.contains("&c")) return Material.RED_STAINED_GLASS_PANE;
+        if (key.contains("emerald") || key.contains("nature") || key.contains("green") || key.contains("&a")) return Material.LIME_STAINED_GLASS_PANE;
+        if (key.contains("royal") || key.contains("void") || key.contains("amethyst") || key.contains("&5")) return Material.PURPLE_STAINED_GLASS_PANE;
+        if (key.contains("frost") || key.contains("white") || key.contains("&f")) return Material.WHITE_STAINED_GLASS_PANE;
+        if (key.contains("shadow") || key.contains("black") || key.contains("&0")) return Material.BLACK_STAINED_GLASS_PANE;
+        if (key.contains("ocean") || key.contains("blue") || key.contains("&9")) return Material.BLUE_STAINED_GLASS_PANE;
+        return Material.CYAN_STAINED_GLASS_PANE;
+    }
+
+    private String paletteLegacyColor(String color) {
+        String value = color == null ? "&b" : color.trim();
+        if (value.startsWith("&#") && value.length() == 8) value = value.substring(1);
+        if (value.matches("#[0-9a-fA-F]{6}")) {
+            StringBuilder out = new StringBuilder("§x");
+            for (char ch : value.substring(1).toCharArray()) out.append('§').append(ch);
+            return out.toString();
+        }
+        return ChatColor.translateAlternateColorCodes('&', value);
+    }
+
+    private void applyPaletteToItem(ItemStack target, YamlConfiguration palettes, String key) {
+        String color = palettes.getString(key + ".color");
+        if (color == null || target == null || target.getType().isAir()) return;
+        String legacyColor = paletteLegacyColor(color);
+        ItemMeta meta = target.getItemMeta();
+        if (meta == null) return;
+        String name = meta.hasDisplayName() ? meta.getDisplayName() : prettyKey(target.getType().name());
+        meta.setDisplayName(legacyColor + ChatColor.stripColor(name));
+        if (meta.lore() != null) {
+            var legacy = net.kyori.adventure.text.serializer.legacy.LegacyComponentSerializer.legacySection();
+            List<String> lore = meta.lore().stream()
+                .map(line -> legacyColor + ChatColor.stripColor(legacy.serialize(line)))
+                .toList();
+            meta.setLore(lore);
+        }
+        target.setItemMeta(meta);
+    }
+
+    private void applyPalettePreset(Player p, String key, String project, int projectPage, int targetSlot) {
+        YamlConfiguration palettes = YamlConfiguration.loadConfiguration(new File(templatesDir, "palettes.yml"));
+        if (!palettes.contains(key + ".color")) {
+            p.sendMessage(PREFIX + tr("Esa paleta no existe.", "That palette does not exist."));
+            return;
+        }
+        ItemStack target = project == null ? p.getInventory().getItemInMainHand()
+            : getProjectItem(project, projectPage, targetSlot);
+        if (target == null || target.getType().isAir()) {
+            p.sendMessage(PREFIX + tr("Selecciona primero un objeto.", "Select an item first."));
+            return;
+        }
+        applyPaletteToItem(target, palettes, key);
+        if (project != null) saveProjectItem(project, projectPage, targetSlot, target);
+        p.sendMessage(PREFIX + tr("Paleta aplicada: §b", "Palette applied: §b") + palettes.getString(key + ".display", prettyKey(key)));
+        if (project != null) openItemEditor(p, project, projectPage, targetSlot);
+        else openPaletteTemplates(p, 0, null, 0, -1);
+    }
+
     private void openItemEditor(Player p, String project, int page, int targetSlot) {
         YamlConfiguration y = YamlConfiguration.loadConfiguration(projectFile(project));
         ItemStack target = y.getItemStack(storagePath(page, targetSlot));
@@ -1486,13 +1640,20 @@ public final class IxKitsPlugin extends JavaPlugin implements Listener, CommandE
             int slot = EDIT_SLOTS[index - start];
             String preview = legacy.serialize(lines.get(index));
             if (preview.length() > 80) preview = preview.substring(0, 77) + "...";
-            inv.setItem(slot, itemWithLore(Material.PAPER,
-                "§bLínea " + (index + 1),
-                List.of("§7" + ChatColor.stripColor(preview), "",
-                    tr("§eClic: editar esta línea", "§eClick: edit this line"),
-                    tr("§cClic derecho: borrar", "§cRight-click: delete"),
-                    tr("§bMayús + clic: mover arriba", "§bShift-click: move up"),
-                    tr("§bMayús + clic derecho: mover abajo", "§bShift + right-click: move down"))));
+            ItemStack lineItem = new ItemStack(Material.PAPER);
+            ItemMeta lineMeta = lineItem.getItemMeta();
+            lineMeta.displayName(net.kyori.adventure.text.Component.text("§bLínea " + (index + 1)));
+            List<net.kyori.adventure.text.Component> previewLore = new ArrayList<>();
+            previewLore.add(net.kyori.adventure.text.Component.text("§7Vista previa: ").append(lines.get(index)));
+            previewLore.add(net.kyori.adventure.text.Component.empty());
+            previewLore.add(net.kyori.adventure.text.Component.text(tr("§eClic: editar esta línea", "§eClick: edit this line")));
+            previewLore.add(net.kyori.adventure.text.Component.text(tr("§cClic derecho: borrar", "§cRight-click: delete")));
+            previewLore.add(net.kyori.adventure.text.Component.text(tr("§bMayús + clic: mover arriba", "§bShift-click: move up")));
+            previewLore.add(net.kyori.adventure.text.Component.text(tr("§bMayús + clic derecho: mover abajo", "§bShift + right-click: move down")));
+            previewLore.add(net.kyori.adventure.text.Component.text(tr("§dClic central: duplicar", "§dMiddle-click: duplicate")));
+            lineMeta.lore(previewLore);
+            lineItem.setItemMeta(lineMeta);
+            inv.setItem(slot, lineItem);
             holder.entryBySlot.put(slot, Integer.toString(index));
         }
         inv.setItem(45, item(Material.ARROW, tr("§7Volver al objeto", "§7Back to item")));
@@ -1991,9 +2152,25 @@ public final class IxKitsPlugin extends JavaPlugin implements Listener, CommandE
         } else if (h.kind.equals("templates")) {
             if (slot == 45) openMain(p);
             else if (slot == 20) openLoreTemplates(p, 0);
-            else if (slot == 22) p.sendMessage(PREFIX + tr("Paletas: ocean, royal, inferno. Usa /ixkits paleta aplicar <nombre> sosteniendo un objeto.", "Palettes: ocean, royal, inferno. Hold an item and use /ixkits paleta aplicar <name>."));
-            else if (slot == 24) p.sendMessage(PREFIX + tr("Para editar encantamientos de un kit: abre un proyecto y haz clic derecho sobre un objeto.", "To edit a kit's enchantments: open a project and right-click an item."));
-            else if (slot == 30) p.sendMessage(PREFIX + tr("El catálogo online todavía no está conectado.", "The online catalog is not connected yet."));
+            else if (slot == 22) openPaletteTemplates(p, 0, null, 0, -1);
+            else if (slot == 24) openEnchantTemplates(p, 0, null, 0, -1);
+            else if (slot == 30) openCatalog(p, "");
+        } else if (h.kind.equals("enchantment-templates")) {
+            int listPage = h.project == null ? h.page : h.subPage;
+            if (slot == 45) {
+                if (h.project == null) openTemplates(p);
+                else openItemEditor(p, h.project, h.page, h.targetSlot);
+            } else if (slot == 47) openEnchantTemplates(p, Math.max(0, listPage - 1), h.project, h.page, h.targetSlot);
+            else if (slot == 51) openEnchantTemplates(p, listPage + 1, h.project, h.page, h.targetSlot);
+            else if (h.entryBySlot.containsKey(slot)) applyEnchantPreset(p, h.entryBySlot.get(slot), h.project, h.page, h.targetSlot);
+        } else if (h.kind.equals("palette-templates")) {
+            int listPage = h.project == null ? h.page : h.subPage;
+            if (slot == 45) {
+                if (h.project == null) openTemplates(p);
+                else openItemEditor(p, h.project, h.page, h.targetSlot);
+            } else if (slot == 47) openPaletteTemplates(p, Math.max(0, listPage - 1), h.project, h.page, h.targetSlot);
+            else if (slot == 51) openPaletteTemplates(p, listPage + 1, h.project, h.page, h.targetSlot);
+            else if (h.entryBySlot.containsKey(slot)) applyPalettePreset(p, h.entryBySlot.get(slot), h.project, h.page, h.targetSlot);
         } else if (h.kind.equals("lore-templates")) {
             int listPage = h.project == null ? h.page : h.subPage;
             if (slot == 45) {
@@ -2020,7 +2197,10 @@ public final class IxKitsPlugin extends JavaPlugin implements Listener, CommandE
                 List<net.kyori.adventure.text.Component> lines = target.getItemMeta().lore() == null
                     ? new ArrayList<>() : new ArrayList<>(target.getItemMeta().lore());
                 if (lineIndex < 0 || lineIndex >= lines.size()) { openLoreEditor(p, h.project, h.page, h.targetSlot, h.subPage); return; }
-                if (e.isShiftClick()) {
+                if (e.getClick() == org.bukkit.event.inventory.ClickType.MIDDLE) {
+                    lines.add(lineIndex + 1, lines.get(lineIndex));
+                    saveLoreLines(p, h.project, h.page, h.targetSlot, lines, h.subPage);
+                } else if (e.isShiftClick()) {
                     int moveTo = lineIndex + (e.isRightClick() ? 1 : -1);
                     if (moveTo >= 0 && moveTo < lines.size()) Collections.swap(lines, lineIndex, moveTo);
                     saveLoreLines(p, h.project, h.page, h.targetSlot, lines, h.subPage);
