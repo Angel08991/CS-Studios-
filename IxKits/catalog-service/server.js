@@ -116,8 +116,11 @@ function isValidResource(type, data) {
   if (!data || typeof data !== "object" || Array.isArray(data)) return false;
   if (Buffer.byteLength(JSON.stringify(data), "utf8") > MAX_RESOURCE_BYTES) return false;
   if (type === "lore") {
-    return Array.isArray(data.lore) && data.lore.length >= 1 && data.lore.length <= 40
-      && data.lore.every(line => typeof line === "string" && line.length <= 300 && !line.includes("\0"));
+    const validLines = lines => Array.isArray(lines) && lines.length >= 1 && lines.length <= 40
+      && lines.every(line => typeof line === "string" && line.length <= 300 && !line.includes("\0"));
+    return validLines(data.lore) && (data.lore_en === undefined || validLines(data.lore_en))
+      && (data.display === undefined || (typeof data.display === "string" && data.display.length <= 100))
+      && (data.display_en === undefined || (typeof data.display_en === "string" && data.display_en.length <= 100));
   }
   if (type === "palette") {
     const validColor = value => typeof value === "string" && value.length > 0 && value.length <= 20
