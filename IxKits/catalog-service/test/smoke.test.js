@@ -179,7 +179,12 @@ test("catalog API handles publish, search, ratings, favorites, downloads, and mo
     title: "Cosmic Lore",
     author: "CS Studios test",
     description: "Community lore fixture",
-    data: { lore: ["&d✦ &lCOSMIC ITEM", "&7Made among the stars", "", "&b➤ &fA test lore"] }
+    data: {
+      display: "&d✦ &lObjeto Cósmico",
+      display_en: "&d✦ &lCosmic Item",
+      lore: ["&d✦ &lOBJETO CÓSMICO", "&7Nacido entre estrellas", "", "&b➤ &fUn lore de prueba"],
+      lore_en: ["&d✦ &lCOSMIC ITEM", "&7Made among the stars", "", "&b➤ &fA test lore"]
+    }
   };
   const deniedResource = await fetch(baseUrl + "/api/resources", {
     method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(lorePayload)
@@ -203,7 +208,11 @@ test("catalog API handles publish, search, ratings, favorites, downloads, and mo
 
   const resourceDownload = await fetch(baseUrl + "/api/resources/" + resourceCreated.id + "/download").then(response => response.json());
   assert.equal(resourceDownload.data.lore.length, 4);
-  assert.equal(resourceDownload.data.lore[0], "&d✦ &lCOSMIC ITEM");
+  assert.equal(resourceDownload.data.lore[0], "&d✦ &lOBJETO CÓSMICO");
+  assert.equal(resourceDownload.data.lore_en.length, 4);
+  assert.equal(resourceDownload.data.lore_en[0], "&d✦ &lCOSMIC ITEM");
+  assert.equal(resourceDownload.data.display, "&d✦ &lObjeto Cósmico");
+  assert.equal(resourceDownload.data.display_en, "&d✦ &lCosmic Item");
   assert.equal(resourceDownload.downloads, 1);
 
   const invalidResource = await fetch(baseUrl + "/api/resources", {
