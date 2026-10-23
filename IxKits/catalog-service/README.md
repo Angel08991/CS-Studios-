@@ -14,7 +14,6 @@ Set environment variables before starting:
 - IXKITS_PUBLISH_TOKEN: required Bearer token for publishing templates
 - IXKITS_ADMIN_TOKEN: required Bearer token for removing templates
 - IXKITS_INTERACTION_TOKEN: required Bearer token for submitting ratings and favorites
-- IXKITS_INTERACTION_TOKEN: required Bearer token for submitting ratings and favorites
 - IXKITS_DATA_DIR: persistent directory for catalog.json; mount a persistent disk here in production
 - IXKITS_CORS_ORIGIN: optional allowed browser origin; default * is convenient for a development API
 
@@ -32,8 +31,15 @@ Do not commit real tokens. Use separate random secrets for publish, admin, and i
 - POST /api/templates/:id/rate — interaction Bearer token; JSON: reviewerId, value (1–5)
 - POST /api/templates/:id/favorite — interaction Bearer token; JSON: userId; toggles favorite
 - DELETE /api/templates/:id — Bearer admin token
+- GET /api/resources?type=lore|palette|enchantments&query=&page=1&limit=20 — list shared resources without returning their full payloads
+- GET /api/resources/:id — retrieve resource metadata and data
+- GET /api/resources/:id/download — retrieve resource data and increment its download counter
+- POST /api/resources — Bearer publish token. JSON fields: type, title, author, description, data. Supported types are lore, palette and enchantments.
+- DELETE /api/resources/:id — Bearer admin token
 
-The project payload is stored as inert text and returned as inert text; this server does not load YAML, execute commands, or run uploaded content. Revisions preserve previous YAML payloads and changelogs for up to 30 older versions per template. The game plugin's importer must still validate the downloaded project before use.
+Community resource validation limits resource payloads to 24 KB; lore resources have 1–40 text lines, palettes accept legacy color codes or RGB hex, and enchantment presets contain 1–32 namespaced enchantments with integer levels from 1 to 32767. Public listing responses omit the data payload; the download route returns the data needed by IxKits to install the resource locally.
+
+The project payload is stored as inert text and returned as inert text; this server does not load YAML, execute commands, or run uploaded content. Revisions preserve previous YAML payloads and changelogs for up to 30 older versions per template. The game plugin's importer must still validate the downloaded project before use. Community resources are stored as typed JSON data, not executable scripts; the plugin validates data again before writing local template files.
 
 ## Security and deployment notes
 
