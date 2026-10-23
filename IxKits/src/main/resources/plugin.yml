@@ -6,9 +6,8 @@ author: CS Studios
 description: Editor visual para crear, personalizar y exportar kits.
 commands:
   ixkits:
-    description: Abre el editor profesional de IxKits
+    description: Abre IxKits o navega la comunidad
     usage: /ixkits
-    permission: ixkits.admin
 permissions:
   ixkits.admin:
     description: Permite crear y administrar proyectos de IxKits
