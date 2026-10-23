@@ -9,12 +9,12 @@ IxKits es un plugin administrativo para diseñar, personalizar, organizar, valid
 La compilación de CI se ejecuta contra Paper API 1.21.11. La GUI debe probarse también en un servidor Paper 1.21.11 real antes de producción.
 
 - GUI de estudio con bordes y editor de inventario en dos páginas.
-- Editor de encantamientos: clic izquierdo sube el nivel; clic derecho lo baja; Mayús + clic elimina ese encantamiento.
+- Editor de encantamientos: clic izquierdo sube el nivel, clic derecho lo baja, Mayús + clic izquierdo permite escribir un nivel exacto (1–32767) y Mayús + clic derecho elimina el encantamiento. Incluye presets con niveles personalizados.
 - Editor de pociones para escoger el tipo base y añadir/quitar efectos personalizados o subir su nivel desde una GUI.
 - Menú de propiedades especiales para libros escritos (título, autor y páginas MiniMessage), patrones y colores de estandartes, trims de armadura, propietario de cabezas y fuegos artificiales (potencia, tipo/color de efecto y eliminación de efectos).
 - Papelera recuperable en la GUI del navegador de proyectos, con acciones para deshacer y rehacer.
 - Portapapeles de objetos para duplicar una copia exacta desde un proyecto a otra ranura vacía.
-- Tres plantillas de lore bilingües: PvP limpio, Legendario y Minero.
+- Biblioteca de plantillas de lore bilingües con estilos PvP, Legendario, Minero, Demoníaco, Cósmico, Escarcha y Esmeralda, más paletas RGB y presets de encantamientos adicionales.
 - Editor de nombre y lore con MiniMessage; separa las líneas de lore usando el separador vertical.
 - Alternar irrompible, cambiar durabilidad, custom model data, flags, color de armadura de cuero y modificadores propios de atributos.
 - Editor de equipamiento separado para casco, peto, pantalones, botas y mano secundaria.
@@ -22,7 +22,10 @@ La compilación de CI se ejecuta contra Paper API 1.21.11. La GUI debe probarse 
 - Backups locales rotativos; importación y exportación del formato nativo.
 - Adaptador de EssentialsX en formato legible con avisos por posible pérdida de metadatos.
 - Selector de idioma en español e inglés.
-- Cliente opcional y servicio REST independiente para el catálogo comunitario.
+- Community Hub público para navegar kits/proyectos, lores, paletas RGB y presets de encantamientos; permite descargar recursos y guardarlos de forma segura en las bibliotecas locales.
+- Publicación comunitaria de kits con categoría y descripción elegidas desde la GUI; los recursos locales se comparten haciendo clic derecho sobre una plantilla de lore, una paleta o un preset.
+- Cooldown individual por objeto y habilidad: clic derecho sobre TNT, rayo o robo de vida abre el editor de segundos (0–86400); clic izquierdo sigue activando/desactivando la habilidad.
+- Cancelación de entradas de chat con la palabra clicable **Cancelar** o escribiendo cancelar (también se reconoce -cancelar).
 
 La compatibilidad con ItemEdit está planteada como **opcional**: IxKits no requiere tener instalado /ie. Los objetos avanzados importados de otro plugin deben probarse, ya que el formato de intercambio puede no representar todas sus propiedades.
 
@@ -70,7 +73,8 @@ También se cambia con /ixkits idioma. Para que el cambio manual del archivo se 
 | /ixkits encantamientos guardar <nombre> | Guardar encantamientos del objeto en mano |
 | /ixkits encantamientos aplicar <nombre> | Aplicar un preset |
 | /ixkits recargar | Recargar config.yml y plantillas |
-| /ixkits catalogo [búsqueda] | Explorar el catálogo configurado |
+| /ixkits comunidad | Abrir Community Hub; disponible para todos los jugadores |
+| /ixkits catalogo [búsqueda] | Explorar los kits del catálogo online |
 | /ixkits publicar <proyecto> <categoría> [descripción] | Publicar un proyecto con el token configurado |
 | /ixkits descargar <id> | Descargar una plantilla del catálogo |
 | /ixkits valorar <id> <1-5> | Valorar una plantilla |
@@ -85,7 +89,7 @@ En la biblioteca de proyectos, clic izquierdo abre y clic derecho muestra las he
 1. Ejecuta `/ixkits` y pulsa **Crear proyecto** o abre **Mis proyectos**.
 2. En el inventario de edición, coloca un objeto en una ranura vacía con el cursor. También puedes hacer **Mayús + clic** sobre un objeto de tu inventario para colocarlo automáticamente en la primera ranura libre.
 3. Al poner un objeto en una ranura, IxKits guarda el proyecto y abre el menú **Editor de objeto**. Para volver a editar un objeto existente, haz **clic derecho** en su ranura.
-4. Desde ese menú puedes cambiar nombre, encantamientos y propiedades, abrir el **Editor visual de lore** o configurar **Habilidades especiales**. En el editor visual, el clic normal edita una línea, el clic derecho la borra, Mayús + clic la sube y Mayús + clic derecho la baja.
+4. Desde ese menú puedes cambiar nombre, encantamientos y propiedades, abrir el **Editor visual de lore** o configurar **Habilidades especiales**. En el editor de lore, clic normal edita una línea, clic derecho la borra, Mayús + clic la sube, Mayús + clic derecho la baja y clic central duplica la línea. La vista previa conserva sus colores y formato.
 5. En `/ixkits equipamiento <proyecto>`, equipa con **Mayús + clic** desde tu inventario para colocar una pieza compatible. Tanto al colocar una pieza manualmente como con Mayús + clic se abre el mismo editor del objeto automáticamente. También puedes hacer **clic derecho** en una pieza ya puesta para volver a editarla, incluidos encantamientos, lore y habilidades.
 
 ### Habilidades de objetos
@@ -95,6 +99,10 @@ Desde `Editor de objeto → Habilidades especiales` puedes activar individualmen
 - **TNT al golpear:** aparece una TNT junto al objetivo. Puedes configurar mecha, potencia y enfriamiento.
 - **Rayo al golpear:** invoca un rayo sobre el objetivo, con su daño y efecto de fuego normales.
 - **Robo de vida:** recupera un porcentaje del daño del golpe, con enfriamiento configurable.
+
+Para cambiar el cooldown de una habilidad específica, abre Habilidades especiales y haz clic derecho sobre ella. Escribe los segundos en el chat: 0 significa sin espera y el máximo permitido por el editor es 86400 segundos. Este valor se guarda en el objeto y reemplaza el valor global solo para esa habilidad/objeto. El clic izquierdo activa o desactiva la habilidad. En el editor de encantamientos, usa Mayús + clic izquierdo para indicar el nivel exacto (1–32767), incluso superior al máximo normal del juego; usa niveles altos solo si encajan con el balance de tu servidor.
+
+Al solicitar texto, pulsa Cancelar en el mensaje del chat o escribe cancelar. Ambas formas abandonan esa entrada sin guardar el cambio pendiente.
 
 Ajustes en `plugins/IxKits/config.yml`:
 
@@ -122,9 +130,9 @@ Copia los archivos a plugins/IxKits/imports/ antes de usar /ixkits importar. La 
 
 La exportación a EssentialsX está en plugins/IxKits/exports/. Comprueba el resultado antes de incorporarlo a tu kits.yml: el formato legible no puede representar todos los metadatos avanzados. Los kits de EssentialsX guardados como NBT/base64 no se convierten con el importador básico; usa el serializador de EssentialsX para esos archivos.
 
-## Catálogo online opcional
+## Catálogo online y recursos comunitarios
 
-El servicio está en IxKits/catalog-service/, usa Node.js 20+ y no necesita dependencias npm externas.
+El servicio está en IxKits/catalog-service/, usa Node.js 20+ y no necesita dependencias npm externas. Además de kits completos, admite recursos tipados: lore, palette y enchantments. Dentro del plugin, abre Community Hub con /ixkits comunidad. Las bibliotecas locales permiten aplicar un recurso con clic izquierdo o publicarlo con clic derecho. Los recursos descargados se validan y guardan en plugins/IxKits/templates/; no se ejecutan scripts del catálogo.
 
 1. Para Render, importa el repositorio y selecciona el Blueprint raíz render.yaml. Este blueprint usa un plan Starter y un disco persistente; revisa el coste en Render antes de confirmar. Alternativamente, despliega la carpeta como servicio Node en otro host con almacenamiento persistente.
 2. El blueprint genera IXKITS_PUBLISH_TOKEN, IXKITS_ADMIN_TOKEN e IXKITS_INTERACTION_TOKEN como secretos independientes. Si despliegas manualmente, crea los tres con valores aleatorios diferentes.
@@ -140,7 +148,7 @@ El servicio está en IxKits/catalog-service/, usa Node.js 20+ y no necesita depe
       minecraft-version: "1.21.11"
       default-license: "all-rights-reserved"
 
-Después del despliegue, copia IXKITS_PUBLISH_TOKEN al campo catalog.publish-token e IXKITS_INTERACTION_TOKEN al campo catalog.interaction-token de plugins/IxKits/config.yml. No pongas el token de administración en el plugin ni publiques ninguno de los secretos en un repositorio o chat. Las valoraciones y favoritos requieren el token de interacción; la moderación usa el token administrativo solo en la API.
+Después del despliegue, copia IXKITS_PUBLISH_TOKEN al campo catalog.publish-token e IXKITS_INTERACTION_TOKEN al campo catalog.interaction-token de plugins/IxKits/config.yml. Las publicaciones de kits usan el asistente de Herramientas del proyecto para elegir categoría y descripción; los lores, paletas y presets se comparten con clic derecho desde sus bibliotecas locales. No pongas el token de administración en el plugin ni publiques ninguno de los secretos en un repositorio o chat. Las valoraciones y favoritos requieren el token de interacción; la moderación usa el token administrativo solo en la API.
 
 El token de interacción evita que cualquier visitante anónimo escriba valoraciones o favoritos directamente. Aun así, los identificadores los proporciona el servidor que posee ese secreto; para una comunidad pública grande conviene añadir cuentas verificadas, moderación y controles adicionales. La plantilla se guarda como texto y el servicio no ejecuta comandos ni código de los archivos subidos; aun así, el plugin valida antes de importar.
 
