@@ -119,7 +119,7 @@ public final class IxKitsPlugin extends JavaPlugin implements Listener, CommandE
             return true;
         }
         String sub = args[0].toLowerCase(Locale.ROOT);
-        boolean communityCommand = Set.of("comunidad", "community", "catalogo", "catálogo", "buscar", "descargar", "valorar", "favorito", "versiones", "versions", "plantillas").contains(sub)
+        boolean communityCommand = Set.of("comunidad", "community", "catalogo", "catálogo", "buscar", "descargar", "valorar", "favorito", "versiones", "versions", "plantillas", "cancelar", "cancel").contains(sub)
             || (sub.equals("lore") && args.length >= 3 && args[1].equalsIgnoreCase("aplicar"))
             || (sub.equals("paleta") && args.length >= 3 && args[1].equalsIgnoreCase("aplicar"))
             || (sub.equals("encantamientos") && args.length >= 3 && args[1].equalsIgnoreCase("aplicar"));
