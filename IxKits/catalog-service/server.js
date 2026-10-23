@@ -15,6 +15,7 @@ const ADMIN_TOKEN = process.env.IXKITS_ADMIN_TOKEN || "";
 const INTERACTION_TOKEN = process.env.IXKITS_INTERACTION_TOKEN || "";
 const MAX_BODY_BYTES = 700 * 1024;
 const MAX_PROJECT_BYTES = 500 * 1024;
+const MAX_RESOURCE_BYTES = 24 * 1024;
 const PAGE_SIZE_MAX = 50;
 const rateBuckets = new Map();
 
@@ -105,6 +106,30 @@ function isValidProjectYaml(projectYaml) {
   return true;
 }
 
+function publicResource(resource) {
+  const { data, ...publicData } = resource;
+  return publicData;
+}
+
+function isValidResource(type, data) {
+  if (!["lore", "palette", "enchantments"].includes(type)) return false;
+  if (!data || typeof data !== "object" || Array.isArray(data)) return false;
+  if (Buffer.byteLength(JSON.stringify(data), "utf8") > MAX_RESOURCE_BYTES) return false;
+  if (type === "lore") {
+    return Array.isArray(data.lore) && data.lore.length >= 1 && data.lore.length <= 40
+      && data.lore.every(line => typeof line === "string" && line.length <= 300 && !line.includes("\0"));
+  }
+  if (type === "palette") {
+    const validColor = value => typeof value === "string" && value.length > 0 && value.length <= 20
+      && (/^&[0-9a-fk-or]$/i.test(value) || /^#[0-9a-f]{6}$/i.test(value) || /^&#[0-9a-f]{6}$/i.test(value));
+    return validColor(data.color) && (data.accent === undefined || validColor(data.accent));
+  }
+  const entries = Object.entries(data);
+  return entries.length >= 1 && entries.length <= 32
+    && entries.every(([key, value]) => /^[a-z0-9_.:-]{1,80}$/i.test(key)
+      && Number.isInteger(value) && value >= 1 && value <= 32767);
+}
+
 function slug(value) {
   return text(value, 100).toLowerCase().replace(/[^a-z0-9_-]+/g, "-").replace(/[-_]{2,}/g, "-").replace(/^[-_.]+|[-_.]+$/g, "").slice(0, 80);
 }
@@ -120,10 +145,12 @@ async function loadDb() {
         if (!parsed || !Array.isArray(parsed.templates)) {
           throw new Error("Catalog database has an invalid structure.");
         }
+        if (parsed.resources === undefined) parsed.resources = [];
+        if (!Array.isArray(parsed.resources)) throw new Error("Catalog resource database has an invalid structure.");
         return parsed;
       } catch (error) {
         if (error.code === "ENOENT") {
-          const fresh = { schemaVersion: 1, templates: [] };
+          const fresh = { schemaVersion: 1, templates: [], resources: [] };
           await saveDb(fresh);
           return fresh;
         }
@@ -187,11 +214,68 @@ async function handler(req, res) {
   if (req.method === "GET" && url.pathname === "/health") {
     return send(res, 200, { ok: true, service: "ixkits-catalog", version: "0.1.0", time: new Date().toISOString() });
   }
-  if (parts[0] !== "api" || parts[1] !== "templates") {
+  if (parts[0] !== "api" || !["templates", "resources"].includes(parts[1])) {
     return send(res, 404, { error: "Route not found." });
   }
 
   const db = await loadDb();
+
+  if (parts[1] === "resources") {
+    if (req.method === "GET" && parts.length === 2) {
+      const type = text(url.searchParams.get("type"), 20).toLowerCase();
+      const query = text(url.searchParams.get("query"), 100).toLowerCase();
+      const page = Math.max(1, Number.parseInt(url.searchParams.get("page") || "1", 10) || 1);
+      const limit = Math.min(PAGE_SIZE_MAX, Math.max(1, Number.parseInt(url.searchParams.get("limit") || "20", 10) || 20));
+      let matches = db.resources.filter(item => item.status === "published");
+      if (type) matches = matches.filter(item => item.type === type);
+      if (query) matches = matches.filter(item => [item.title, item.author, item.description, item.type].some(value => String(value || "").toLowerCase().includes(query)));
+      matches.sort((a, b) => String(b.publishedAt).localeCompare(String(a.publishedAt)));
+      const start = (page - 1) * limit;
+      return send(res, 200, { items: matches.slice(start, start + limit).map(publicResource), page, limit, total: matches.length });
+    }
+    if (req.method === "POST" && parts.length === 2) {
+      if (!configuredTokenRequired(req, res, PUBLISH_TOKEN, "Community resource publishing")) return;
+      const body = await readBody(req);
+      const type = text(body.type, 20).toLowerCase();
+      const title = text(body.title, 100);
+      const author = text(body.author, 80);
+      const description = text(body.description, 300);
+      if (!title || !author || !isValidResource(type, body.data)) {
+        return send(res, 400, { error: "Required fields: supported type (lore, palette, enchantments), title, author, and valid resource data." });
+      }
+      const now = new Date().toISOString();
+      const created = {
+        id: slug(title) + "-" + crypto.randomBytes(4).toString("hex"),
+        type, title, author, description, status: "published", publishedAt: now, updatedAt: now,
+        downloads: 0, data: body.data
+      };
+      db.resources.push(created);
+      await persist(db);
+      return send(res, 201, publicResource(created));
+    }
+    const resourceId = parts[2];
+    const resource = resourceId ? db.resources.find(item => item.id === resourceId && item.status === "published") : null;
+    if (req.method === "GET" && parts.length === 3) {
+      if (!resource) return send(res, 404, { error: "Community resource not found." });
+      return send(res, 200, { ...publicResource(resource), data: resource.data });
+    }
+    if (req.method === "GET" && parts.length === 4 && parts[3] === "download") {
+      if (!resource) return send(res, 404, { error: "Community resource not found." });
+      resource.downloads = (Number(resource.downloads) || 0) + 1;
+      await persist(db);
+      return send(res, 200, { ...publicResource(resource), data: resource.data });
+    }
+    if (req.method === "DELETE" && parts.length === 3) {
+      if (!configuredTokenRequired(req, res, ADMIN_TOKEN, "Community resource moderation")) return;
+      const target = db.resources.find(item => item.id === resourceId);
+      if (!target) return send(res, 404, { error: "Community resource not found." });
+      target.status = "removed";
+      target.removedAt = new Date().toISOString();
+      await persist(db);
+      return send(res, 200, { ok: true, id: resourceId });
+    }
+    return send(res, 405, { error: "Method not allowed." });
+  }
 
   if (req.method === "GET" && parts.length === 2) {
     const query = text(url.searchParams.get("query"), 100).toLowerCase();
