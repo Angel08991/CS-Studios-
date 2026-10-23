@@ -361,6 +361,212 @@ public final class IxKitsPlugin extends JavaPlugin implements Listener, CommandE
         return true;
     }
 
+    private void openCommunityHub(Player p) {
+        Inventory inv = menu("community-hub", null, 0,
+            tr("§3✦ §bIxKits §8• §0Community Hub", "§3✦ §bIxKits §8• §0Community Hub"));
+        border(inv);
+        inv.setItem(4, item(Material.NETHER_STAR, "§d§lIXKITS COMMUNITY",
+            tr("§7Comparte creaciones con otros servidores.", "§7Share creations with other servers."),
+            tr("§7Descarga kits, lores, colores y presets.", "§7Download kits, lore, colors and presets."),
+            "§8CS Studios"));
+        inv.setItem(20, item(Material.ENDER_CHEST, tr("§dKits y proyectos", "§dKits and projects"),
+            tr("§7Explora kits publicados por la comunidad.", "§7Browse kits published by the community."),
+            tr("§eClic para explorar", "§eClick to browse")));
+        inv.setItem(22, item(Material.WRITABLE_BOOK, tr("§bLores de la comunidad", "§bCommunity lore"),
+            tr("§7Descarga estilos de descripción para objetos.", "§7Download item description styles."),
+            tr("§eClic para explorar", "§eClick to browse")));
+        inv.setItem(24, item(Material.ENCHANTED_BOOK, tr("§dPresets de encantamientos", "§dEnchantment presets"),
+            tr("§7Combinaciones listas para reutilizar.", "§7Reusable enchantment combinations."),
+            tr("§eClic para explorar", "§eClick to browse")));
+        inv.setItem(30, item(Material.PAINTING, tr("§bPaletas de colores", "§bColor palettes"),
+            tr("§7Estilos de color creados por la comunidad.", "§7Color styles made by the community."),
+            tr("§eClic para explorar", "§eClick to browse")));
+        inv.setItem(32, item(Material.WRITABLE_BOOK, tr("§aCompartir tus recursos", "§aShare your resources"),
+            tr("§7En las bibliotecas locales, haz clic derecho", "§7In local libraries, right-click"),
+            tr("§7sobre un lore, paleta o preset para publicarlo.", "§7a lore, palette or preset to publish it."),
+            tr("§7Para subir un kit: herramientas del proyecto.", "§7To upload a kit: project tools.")));
+        inv.setItem(45, item(Material.ARROW, tr("§7Volver", "§7Back"), tr("§8Menú principal", "§8Main menu")));
+        p.openInventory(inv);
+    }
+
+    private void openCommunityResources(Player p, String type, int page) {
+        if (!catalogClient.isEnabled()) {
+            p.sendMessage(PREFIX + tr("La Community no está configurada. Define catalog.enabled y catalog.base-url en config.yml.", "Community is not configured. Set catalog.enabled and catalog.base-url in config.yml."));
+            return;
+        }
+        int safePage = Math.max(1, page);
+        p.sendMessage(PREFIX + tr("Cargando recursos de la comunidad…", "Loading community resources…"));
+        catalogClient.searchResources(type, "", safePage, EDIT_SLOTS.length).whenComplete((resources, error) ->
+            Bukkit.getScheduler().runTask(this, () -> {
+                if (error != null) {
+                    p.sendMessage(PREFIX + tr("No se pudieron cargar los recursos: ", "Could not load resources: ") + rootMessage(error));
+                    return;
+                }
+                String typeLabel = switch (type) {
+                    case "lore" -> tr("Lores", "Lore");
+                    case "palette" -> tr("Paletas", "Palettes");
+                    case "enchantments" -> tr("Presets de encantamientos", "Enchantment presets");
+                    default -> "Community";
+                };
+                Inventory inv = menu("community-resources", type, safePage,
+                    tr("§3✦ §bIxKits §8• §0" + typeLabel, "§3✦ §bIxKits §8• §0" + typeLabel) + " §7[" + safePage + "]");
+                border(inv);
+                MenuHolder holder = (MenuHolder) inv.getHolder();
+                if (resources.isEmpty()) inv.setItem(22, item(Material.PAPER,
+                    tr("§7Todavía no hay recursos publicados.", "§7No community resources have been published yet."),
+                    tr("§7Puedes compartir uno desde la biblioteca local.", "§7You can share one from the local library.")));
+                int index = 0;
+                for (CatalogClient.CommunityResource resource : resources) {
+                    if (index >= EDIT_SLOTS.length) break;
+                    int slot = EDIT_SLOTS[index++];
+                    Material icon = switch (resource.type()) {
+                        case "lore" -> Material.WRITABLE_BOOK;
+                        case "palette" -> Material.PAINTING;
+                        case "enchantments" -> Material.ENCHANTED_BOOK;
+                        default -> Material.BOOK;
+                    };
+                    inv.setItem(slot, item(icon, "§d" + resource.title(),
+                        "§7" + tr("Autor: ", "Author: ") + resource.author(),
+                        "§7" + tr("Tipo: ", "Type: ") + resource.type(),
+                        "§7" + tr("Descargas: ", "Downloads: ") + resource.downloads(),
+                        resource.description().isBlank() ? "§8IxKits Community" : "§8" + resource.description(),
+                        "", tr("§eClic para descargar e instalar", "§eClick to download and install")));
+                    holder.entryBySlot.put(slot, resource.id());
+                }
+                inv.setItem(45, item(Material.ARROW, tr("§7Volver", "§7Back"), tr("§8Community Hub", "§8Community Hub")));
+                inv.setItem(47, item(Material.SPECTRAL_ARROW, tr("§bAnterior", "§bPrevious")));
+                inv.setItem(49, item(Material.BOOK, tr("§fCómo compartir", "§fHow to share"),
+                    tr("§7Clic derecho en un recurso local.", "§7Right-click a local resource.")));
+                inv.setItem(51, item(Material.SPECTRAL_ARROW, tr("§bSiguiente", "§bNext")));
+                p.openInventory(inv);
+            }));
+    }
+
+    private void downloadCommunityResource(Player p, String type, String id, int page) {
+        catalogClient.downloadResource(id).whenComplete((resource, error) ->
+            Bukkit.getScheduler().runTask(this, () -> {
+                if (error != null) {
+                    p.sendMessage(PREFIX + tr("Descarga fallida: ", "Download failed: ") + rootMessage(error));
+                    return;
+                }
+                if (!type.equals(resource.type())) {
+                    p.sendMessage(PREFIX + tr("El catálogo devolvió un tipo de recurso inesperado.", "The catalog returned an unexpected resource type."));
+                    return;
+                }
+                String key = slug(resource.title());
+                if (key.isBlank()) key = "community-resource";
+                File templateFile = new File(templatesDir, switch (type) {
+                    case "lore" -> "lore.yml";
+                    case "palette" -> "palettes.yml";
+                    case "enchantments" -> "enchantments.yml";
+                    default -> "unsupported.yml";
+                });
+                YamlConfiguration yaml = YamlConfiguration.loadConfiguration(templateFile);
+                if (yaml.contains(key)) key = (key.length() > 45 ? key.substring(0, 45) : key) + "-" + slug(id.substring(Math.max(0, id.length() - 6)));
+                Map<String, Object> data = resource.data();
+                if ("lore".equals(type)) {
+                    Object raw = data.get("lore");
+                    if (!(raw instanceof List<?> rows) || rows.isEmpty() || rows.size() > 40
+                        || rows.stream().anyMatch(line -> !(line instanceof String value) || value.length() > 300)) {
+                        p.sendMessage(PREFIX + tr("Este lore no pasó la validación local.", "This lore failed local validation."));
+                        return;
+                    }
+                    List<String> loreLines = rows.stream().map(String.class::cast).toList();
+                    yaml.set(key + ".display", resource.title());
+                    yaml.set(key + ".display_en", resource.title());
+                    yaml.set(key + ".lore", loreLines);
+                    yaml.set(key + ".lore_en", loreLines);
+                } else if ("palette".equals(type)) {
+                    Object rawColor = data.get("color");
+                    Object rawAccent = data.get("accent");
+                    if (!(rawColor instanceof String color) || !isValidPaletteColor(color)
+                        || (rawAccent != null && (!(rawAccent instanceof String accent) || !isValidPaletteColor((String) rawAccent)))) {
+                        p.sendMessage(PREFIX + tr("Esta paleta no pasó la validación local.", "This palette failed local validation."));
+                        return;
+                    }
+                    yaml.set(key + ".display", resource.title());
+                    yaml.set(key + ".color", rawColor);
+                    if (rawAccent instanceof String accent) yaml.set(key + ".accent", accent);
+                } else if ("enchantments".equals(type)) {
+                    if (data.isEmpty() || data.size() > 32) {
+                        p.sendMessage(PREFIX + tr("Este preset no pasó la validación local.", "This preset failed local validation."));
+                        return;
+                    }
+                    for (Map.Entry<String, Object> entry : data.entrySet()) {
+                        if (!(entry.getValue() instanceof Number level) || level.intValue() < 1 || level.intValue() > 32767) {
+                            p.sendMessage(PREFIX + tr("Este preset contiene niveles no válidos.", "This preset contains invalid levels."));
+                            return;
+                        }
+                    }
+                    yaml.set(key + ".display", resource.title());
+                    for (Map.Entry<String, Object> entry : data.entrySet()) yaml.set(key + "." + entry.getKey(), ((Number) entry.getValue()).intValue());
+                } else {
+                    p.sendMessage(PREFIX + tr("Tipo de recurso no compatible.", "Unsupported resource type."));
+                    return;
+                }
+                saveYaml(yaml, templateFile);
+                p.sendMessage(PREFIX + tr("Recurso instalado en la biblioteca local: §d", "Resource installed in local library: §d") + resource.title());
+                openCommunityResources(p, type, page);
+            }));
+    }
+
+    private boolean isValidPaletteColor(String value) {
+        return value != null && (value.matches("&[0-9a-fk-or]") || value.matches("#[0-9a-fA-F]{6}") || value.matches("&#[0-9a-fA-F]{6}"));
+    }
+
+    private void publishLocalResource(Player p, String type, String key, String title) {
+        if (!catalogClient.isEnabled()) {
+            p.sendMessage(PREFIX + tr("La Community no está configurada. Define catalog.enabled y catalog.base-url en config.yml.", "Community is not configured. Set catalog.enabled and catalog.base-url in config.yml."));
+            return;
+        }
+        Map<String, Object> data = new LinkedHashMap<>();
+        File templateFile = new File(templatesDir, switch (type) {
+            case "lore" -> "lore.yml";
+            case "palette" -> "palettes.yml";
+            case "enchantments" -> "enchantments.yml";
+            default -> "unsupported.yml";
+        });
+        YamlConfiguration yaml = YamlConfiguration.loadConfiguration(templateFile);
+        String display = title == null || title.isBlank() ? prettyKey(key) : title;
+        String description = tr("Compartido desde IxKits por ", "Shared from IxKits by ") + p.getName();
+        if ("lore".equals(type)) {
+            List<String> lines = yaml.getStringList(key + (isEnglish() ? ".lore_en" : ".lore"));
+            if (lines.isEmpty()) lines = yaml.getStringList(key + ".lore");
+            if (lines.isEmpty()) { p.sendMessage(PREFIX + tr("Esta plantilla no contiene lore.", "This template contains no lore.")); return; }
+            data.put("lore", lines);
+            display = yaml.getString(key + (isEnglish() ? ".display_en" : ".display"), yaml.getString(key + ".display", display));
+        } else if ("palette".equals(type)) {
+            String color = yaml.getString(key + ".color");
+            String accent = yaml.getString(key + ".accent", color);
+            if (!isValidPaletteColor(color) || !isValidPaletteColor(accent)) {
+                p.sendMessage(PREFIX + tr("La paleta tiene un color no válido.", "The palette contains an invalid color."));
+                return;
+            }
+            data.put("color", color);
+            data.put("accent", accent);
+            display = yaml.getString(key + ".display", display);
+        } else if ("enchantments".equals(type)) {
+            ConfigurationSection section = yaml.getConfigurationSection(key);
+            if (section == null || section.getKeys(false).isEmpty()) {
+                p.sendMessage(PREFIX + tr("Este preset no tiene encantamientos.", "This preset has no enchantments."));
+                return;
+            }
+            for (String enchant : section.getKeys(false)) {
+                int level = section.getInt(enchant, 0);
+                if (level < 1 || level > 32767) continue;
+                data.put(enchant, level);
+            }
+            if (data.isEmpty()) { p.sendMessage(PREFIX + tr("No hay niveles válidos para publicar.", "No valid levels to publish.")); return; }
+        } else {
+            p.sendMessage(PREFIX + tr("Tipo de recurso no compatible.", "Unsupported resource type."));
+            return;
+        }
+        catalogClient.publishResource(type, display, p.getName(), description, data).whenComplete((published, error) ->
+            Bukkit.getScheduler().runTask(this, () -> p.sendMessage(PREFIX + (error == null
+                ? tr("Recurso publicado en IxKits Community con ID §d", "Resource published to IxKits Community with ID §d") + published.id()
+                : tr("No se pudo publicar el recurso: ", "Could not publish resource: ") + rootMessage(error)))));
+    }
+
     private void openCatalog(Player p, String query) {
         openCatalog(p, query, 1);
     }
