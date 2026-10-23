@@ -516,6 +516,10 @@ public final class IxKitsPlugin extends JavaPlugin implements Listener, CommandE
                         return;
                     }
                     for (Map.Entry<String, Object> entry : data.entrySet()) {
+                        if (!entry.getKey().matches("(?i)^(?:[a-z0-9_-]+:)?[a-z0-9_-]{1,80}$")) {
+                            p.sendMessage(PREFIX + tr("Este preset contiene una clave de encantamiento no válida.", "This preset contains an invalid enchantment key."));
+                            return;
+                        }
                         if (!(entry.getValue() instanceof Number level) || level.intValue() < 1 || level.intValue() > 32767) {
                             p.sendMessage(PREFIX + tr("Este preset contiene niveles no válidos.", "This preset contains invalid levels."));
                             return;
