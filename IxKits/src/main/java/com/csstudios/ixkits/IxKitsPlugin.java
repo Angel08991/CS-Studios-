@@ -2889,12 +2889,8 @@ public final class IxKitsPlugin extends JavaPlugin implements Listener, CommandE
         YamlConfiguration y = YamlConfiguration.loadConfiguration(new File(templatesDir, "palettes.yml"));
         String color = y.getString(name + ".color");
         if (color == null) { p.sendMessage(PREFIX + tr("No existe esa paleta.", "That palette does not exist.")); return; }
-        ItemMeta meta = item.getItemMeta();
-        String display = meta.hasDisplayName() ? meta.getDisplayName() : item.getType().name();
-        meta.setDisplayName(ChatColor.translateAlternateColorCodes('&', color + display.replaceAll("§[0-9a-fk-or]", "")));
-        if (meta.hasLore()) meta.setLore(color(meta.getLore()).stream().map(line -> ChatColor.translateAlternateColorCodes('&', color + ChatColor.stripColor(line))).toList());
-        item.setItemMeta(meta);
-        p.sendMessage(PREFIX + tr("Paleta aplicada: §b", "Palette applied: §b") + name);
+        applyPaletteToItem(item, y, name);
+        p.sendMessage(PREFIX + tr("Paleta aplicada: §b", "Palette applied: §b") + y.getString(name + ".display", name));
     }
 
     private void handleEnchantments(Player p, String action, String name) {
