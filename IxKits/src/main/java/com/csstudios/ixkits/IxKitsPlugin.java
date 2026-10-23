@@ -119,8 +119,12 @@ public final class IxKitsPlugin extends JavaPlugin implements Listener, CommandE
             return true;
         }
         String sub = args[0].toLowerCase(Locale.ROOT);
-        boolean communityCommand = Set.of("comunidad", "community", "catalogo", "catálogo", "buscar", "descargar", "valorar", "favorito", "versiones", "versions").contains(sub);
-        if (!player.hasPermission("ixkits.admin") && !communityCommand) {
+        boolean communityCommand = Set.of("comunidad", "community", "catalogo", "catálogo", "buscar", "descargar", "valorar", "favorito", "versiones", "versions", "plantillas").contains(sub)
+            || (sub.equals("lore") && args.length >= 3 && args[1].equalsIgnoreCase("aplicar"))
+            || (sub.equals("paleta") && args.length >= 3 && args[1].equalsIgnoreCase("aplicar"))
+            || (sub.equals("encantamientos") && args.length >= 3 && args[1].equalsIgnoreCase("aplicar"));
+        boolean communityPublisher = sub.equals("publicar") && player.hasPermission("ixkits.community.publish");
+        if (!player.hasPermission("ixkits.admin") && !communityCommand && !communityPublisher) {
             player.sendMessage(PREFIX + tr("No tienes permiso para administrar IxKits. Puedes navegar la comunidad con /ixkits comunidad.", "You do not have permission to administer IxKits. You can browse Community with /ixkits comunidad."));
             return true;
         }
@@ -2411,7 +2415,10 @@ public final class IxKitsPlugin extends JavaPlugin implements Listener, CommandE
             else if (slot == 49) p.sendMessage(PREFIX + tr("En las bibliotecas locales, haz clic derecho en un recurso para publicarlo.", "In local libraries, right-click a resource to publish it."));
             else if (h.entryBySlot.containsKey(slot)) downloadCommunityResource(p, h.project, h.entryBySlot.get(slot), h.page);
         } else if (h.kind.equals("templates")) {
-            if (slot == 45) openMain(p);
+            if (slot == 45) {
+                if (p.hasPermission("ixkits.admin")) openMain(p);
+                else p.closeInventory();
+            }
             else if (slot == 20) openLoreTemplates(p, 0);
             else if (slot == 22) openPaletteTemplates(p, 0, null, 0, -1);
             else if (slot == 24) openEnchantTemplates(p, 0, null, 0, -1);
@@ -2424,8 +2431,11 @@ public final class IxKitsPlugin extends JavaPlugin implements Listener, CommandE
             } else if (slot == 47) openEnchantTemplates(p, Math.max(0, listPage - 1), h.project, h.page, h.targetSlot);
             else if (slot == 51) openEnchantTemplates(p, listPage + 1, h.project, h.page, h.targetSlot);
             else if (h.entryBySlot.containsKey(slot)) {
-                if (e.isRightClick()) publishLocalResource(p, "enchantments", h.entryBySlot.get(slot), null);
-                else applyEnchantPreset(p, h.entryBySlot.get(slot), h.project, h.page, h.targetSlot);
+                if (e.isRightClick()) {
+                    if (p.hasPermission("ixkits.admin") || p.hasPermission("ixkits.community.publish"))
+                        publishLocalResource(p, "enchantments", h.entryBySlot.get(slot), null);
+                    else p.sendMessage(PREFIX + tr("Necesitas ixkits.community.publish para publicar recursos.", "You need ixkits.community.publish to publish resources."));
+                } else applyEnchantPreset(p, h.entryBySlot.get(slot), h.project, h.page, h.targetSlot);
             }
         } else if (h.kind.equals("palette-templates")) {
             int listPage = h.project == null ? h.page : h.subPage;
@@ -2435,8 +2445,11 @@ public final class IxKitsPlugin extends JavaPlugin implements Listener, CommandE
             } else if (slot == 47) openPaletteTemplates(p, Math.max(0, listPage - 1), h.project, h.page, h.targetSlot);
             else if (slot == 51) openPaletteTemplates(p, listPage + 1, h.project, h.page, h.targetSlot);
             else if (h.entryBySlot.containsKey(slot)) {
-                if (e.isRightClick()) publishLocalResource(p, "palette", h.entryBySlot.get(slot), null);
-                else applyPalettePreset(p, h.entryBySlot.get(slot), h.project, h.page, h.targetSlot);
+                if (e.isRightClick()) {
+                    if (p.hasPermission("ixkits.admin") || p.hasPermission("ixkits.community.publish"))
+                        publishLocalResource(p, "palette", h.entryBySlot.get(slot), null);
+                    else p.sendMessage(PREFIX + tr("Necesitas ixkits.community.publish para publicar recursos.", "You need ixkits.community.publish to publish resources."));
+                } else applyPalettePreset(p, h.entryBySlot.get(slot), h.project, h.page, h.targetSlot);
             }
         } else if (h.kind.equals("lore-templates")) {
             int listPage = h.project == null ? h.page : h.subPage;
@@ -2446,8 +2459,11 @@ public final class IxKitsPlugin extends JavaPlugin implements Listener, CommandE
             } else if (slot == 47) openLoreTemplates(p, Math.max(0, listPage - 1), h.project, h.page, h.targetSlot);
             else if (slot == 51) openLoreTemplates(p, listPage + 1, h.project, h.page, h.targetSlot);
             else if (h.entryBySlot.containsKey(slot)) {
-                if (e.isRightClick()) publishLocalResource(p, "lore", h.entryBySlot.get(slot), null);
-                else if (h.project == null) applyLoreTemplateToHand(p, h.entryBySlot.get(slot));
+                if (e.isRightClick()) {
+                    if (p.hasPermission("ixkits.admin") || p.hasPermission("ixkits.community.publish"))
+                        publishLocalResource(p, "lore", h.entryBySlot.get(slot), null);
+                    else p.sendMessage(PREFIX + tr("Necesitas ixkits.community.publish para publicar recursos.", "You need ixkits.community.publish to publish resources."));
+                } else if (h.project == null) applyLoreTemplateToHand(p, h.entryBySlot.get(slot));
                 else applyLoreTemplateToProject(p, h.entryBySlot.get(slot), h.project, h.page, h.targetSlot);
             }
         } else if (h.kind.equals("lore-editor")) {
