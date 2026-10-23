@@ -86,7 +86,7 @@ En la biblioteca de proyectos, clic izquierdo abre y clic derecho muestra las he
 2. En el inventario de edición, coloca un objeto en una ranura vacía con el cursor. También puedes hacer **Mayús + clic** sobre un objeto de tu inventario para colocarlo automáticamente en la primera ranura libre.
 3. Al poner un objeto en una ranura, IxKits guarda el proyecto y abre el menú **Editor de objeto**. Para volver a editar un objeto existente, haz **clic derecho** en su ranura.
 4. Desde ese menú puedes cambiar nombre, encantamientos y propiedades, abrir el **Editor visual de lore** o configurar **Habilidades especiales**. En el editor visual, el clic normal edita una línea, el clic derecho la borra, Mayús + clic la sube y Mayús + clic derecho la baja.
-5. En `/ixkits equipamiento <proyecto>`, equipa automáticamente con **Mayús + clic** desde tu inventario. Haz **clic derecho** en casco, peto, pantalones, botas o mano secundaria para abrir el mismo editor del objeto, incluidos encantamientos y lore.
+5. En `/ixkits equipamiento <proyecto>`, equipa con **Mayús + clic** desde tu inventario para colocar una pieza compatible. Tanto al colocar una pieza manualmente como con Mayús + clic se abre el mismo editor del objeto automáticamente. También puedes hacer **clic derecho** en una pieza ya puesta para volver a editarla, incluidos encantamientos, lore y habilidades.
 
 ### Habilidades de objetos
 
