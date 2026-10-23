@@ -736,8 +736,8 @@ public final class IxKitsPlugin extends JavaPlugin implements Listener, CommandE
             tr("§7Importar, validar y exportar proyectos.", "§7Import, validate and export projects."),
             tr("§eClic para elegir un proyecto", "§eClick to choose a project")));
         inv.setItem(31, item(Material.ENDER_CHEST, "§d§lIxKits Community",
-            tr("§7Buscar y descargar kits compartidos.", "§7Search and download shared kits."),
-            tr("§8Requiere configurar la API online", "§8Requires the online API")));
+            tr("§7Kits, lores, paletas y encantamientos.", "§7Kits, lore, palettes and enchantments."),
+            tr("§eClic para explorar la comunidad", "§eClick to explore Community")));
         inv.setItem(33, item(Material.WRITABLE_BOOK, tr("§eIdioma / Language", "§eLanguage / Idioma"),
             tr("§7Actual: " + (isEnglish() ? "English" : "Español"), "§7Current: " + (isEnglish() ? "English" : "Spanish")),
             tr("§eClic para cambiar", "§eClick to change")));
@@ -866,7 +866,7 @@ public final class IxKitsPlugin extends JavaPlugin implements Listener, CommandE
         inv.setItem(24, item(Material.TNT, tr("§cEliminar", "§cDelete"), tr("§7Mover a la papelera recuperable.", "§7Move it to recoverable trash."), tr("§eSolicita confirmación", "§eRequires confirmation")));
         inv.setItem(30, item(Material.WRITABLE_BOOK, tr("§bValidar proyecto", "§bValidate project"), tr("§7Comprobar objetos y formato.", "§7Check items and project format.")));
         inv.setItem(32, item(Material.PAPER, tr("§aExportar EssentialsX", "§aExport to EssentialsX"), tr("§7Crea un kits.yml compatible.", "§7Create a compatible kits.yml."), tr("§cPuede perder metadatos avanzados", "§cAdvanced metadata may be lost")));
-        inv.setItem(34, item(Material.ENDER_CHEST, tr("§dPublicar en Community", "§dPublish to Community"), tr("§7Publica una plantilla nueva.", "§7Publish a new template."), tr("§8Requiere token de publicación.", "§8Requires a publish token.")));
+        inv.setItem(34, item(Material.ENDER_CHEST, tr("§dPublicar en Community", "§dPublish to Community"), tr("§7Comparte el kit con otros servidores.", "§7Share this kit with other servers."), tr("§eClic para elegir categoría y descripción", "§eClick to choose category and description"), tr("§8Requiere la Community online configurada.", "§8Requires online Community configuration.")));
         inv.setItem(38, item(Material.ENDER_CHEST, tr("§bActualizar publicación", "§bUpdate publication"), tr("§7Subir nueva versión de esta plantilla.", "§7Upload a new version of this template."), tr("§eClic y escribe el ID en el chat.", "§eClick and type the template ID in chat.")));
         inv.setItem(40, item(Material.CLOCK, tr("§eDeshacer último cambio", "§eUndo last change"), tr("§7Restaurar una copia anterior.", "§7Restore a previous backup.")));
         inv.setItem(49, item(Material.WRITABLE_BOOK, tr("§dExportar IxKits", "§dExport IxKits"), tr("§7Conserva los objetos serializados.", "§7Preserves serialized items.")));
@@ -1320,6 +1320,9 @@ public final class IxKitsPlugin extends JavaPlugin implements Listener, CommandE
         else if (pending.project != null && projectFile(pending.project).isFile()
             && (pending.type == InputType.LORE_ADD_LINE || pending.type == InputType.LORE_EDIT_LINE || pending.type == InputType.LORE_CLEAR_CONFIRM))
             openLoreEditor(player, pending.project, pending.page, pending.slot, 0);
+        else if (pending.project != null && projectFile(pending.project).isFile()
+            && (pending.type == InputType.PUBLISH_PROJECT_CATEGORY || pending.type == InputType.PUBLISH_PROJECT_DESCRIPTION))
+            openProjectActions(player, pending.project);
         else if (pending.project != null && projectFile(pending.project).isFile() && pending.type == InputType.ABILITY_COOLDOWN)
             openAbilities(player, pending.project, pending.page, pending.slot);
         else if (pending.project != null && projectFile(pending.project).isFile() && pending.type == InputType.ENCHANTMENT_LEVEL)
@@ -1350,6 +1353,25 @@ public final class IxKitsPlugin extends JavaPlugin implements Listener, CommandE
     private void applyPendingInput(Player player, PendingInput pending, String input) {
         if (isCancelInput(input)) {
             returnFromCancelledInput(player, pending);
+            return;
+        }
+        if (pending.type == InputType.PUBLISH_PROJECT_CATEGORY) {
+            String category = slug(input.trim());
+            if (category.isBlank()) {
+                player.sendMessage(PREFIX + tr("Categoría no válida. Prueba pvp, survival, rpg o utility.", "Invalid category. Try pvp, survival, rpg or utility."));
+                promptInput(player, InputType.PUBLISH_PROJECT_CATEGORY, pending.project, 0, -1,
+                    "Escribe una categoría para el kit:", "Type a category for this kit:");
+                return;
+            }
+            promptInput(player, InputType.PUBLISH_PROJECT_DESCRIPTION, pending.project, 0, -1,
+                "Escribe una descripción breve para la comunidad:", "Type a short description for the community:", category);
+            return;
+        }
+        if (pending.type == InputType.PUBLISH_PROJECT_DESCRIPTION) {
+            String description = input.trim();
+            if (description.isBlank()) description = "Compartido con IxKits por " + player.getName();
+            if (description.length() > 500) description = description.substring(0, 500);
+            publishProject(player, pending.project, pending.argument == null ? "misc" : pending.argument, description);
             return;
         }
         if (pending.type == InputType.CATALOG_SEARCH) {
@@ -2207,7 +2229,9 @@ public final class IxKitsPlugin extends JavaPlugin implements Listener, CommandE
                     else p.sendMessage(PREFIX + tr("No hay una acción para rehacer.", "There is no action to redo."));
                 } catch (IOException ex) { p.sendMessage(PREFIX + "§c" + ex.getMessage()); }
                 openProjectActions(p, h.project);
-            } else if (slot == 34) publishProject(p, h.project, "misc", "Created with IxKits by CS Studios");
+            } else if (slot == 34) promptInput(p, InputType.PUBLISH_PROJECT_CATEGORY, h.project, 0, -1,
+                "Escribe la categoría del kit (pvp, survival, rpg, utility, etc.):",
+                "Type the kit category (pvp, survival, rpg, utility, etc.):");
             else if (slot == 38) promptInput(p, InputType.PUBLISH_REVISION_ID, h.project, 0, -1, "Escribe el ID de la plantilla publicada:", "Type the ID of the published template:");
             else if (slot == 49) { exportProject(p, h.project); openProjectActions(p, h.project); }
         } else if (h.kind.equals("trash")) {
@@ -3168,7 +3192,7 @@ public final class IxKitsPlugin extends JavaPlugin implements Listener, CommandE
     }
 
     private enum InputType {
-        DUPLICATE_PROJECT, RENAME_PROJECT, ITEM_NAME, ITEM_LORE, LORE_ADD_LINE, LORE_EDIT_LINE, LORE_CLEAR_CONFIRM, MODEL_DATA, LEATHER_COLOR, CATALOG_SEARCH, PROJECT_SEARCH, CREATE_PROJECT, PUBLISH_REVISION_ID, BOOK_TITLE, BOOK_AUTHOR, BOOK_PAGES, SKULL_OWNER, ENCHANTMENT_LEVEL, ABILITY_COOLDOWN
+        DUPLICATE_PROJECT, RENAME_PROJECT, ITEM_NAME, ITEM_LORE, LORE_ADD_LINE, LORE_EDIT_LINE, LORE_CLEAR_CONFIRM, MODEL_DATA, LEATHER_COLOR, CATALOG_SEARCH, PROJECT_SEARCH, CREATE_PROJECT, PUBLISH_REVISION_ID, PUBLISH_PROJECT_CATEGORY, PUBLISH_PROJECT_DESCRIPTION, BOOK_TITLE, BOOK_AUTHOR, BOOK_PAGES, SKULL_OWNER, ENCHANTMENT_LEVEL, ABILITY_COOLDOWN
     }
 
     private static final class PendingInput {
