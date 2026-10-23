@@ -1592,8 +1592,9 @@ public final class IxKitsPlugin extends JavaPlugin implements Listener, CommandE
             for (String line : configured.stream().limit(4).toList()) preview.add(ChatColor.translateAlternateColorCodes('&', line));
             preview.add("");
             preview.add(project == null
-                ? tr("§eClic para aplicar al objeto en mano", "§eClick to apply to item in hand")
-                : tr("§eClic para aplicar al objeto del kit", "§eClick to apply to kit item"));
+                ? tr("§eClic izquierdo: aplicar al objeto en mano", "§eLeft-click: apply to held item")
+                : tr("§eClic izquierdo: aplicar al objeto del kit", "§eLeft-click: apply to kit item"));
+            preview.add(tr("§dClic derecho: publicar en Community", "§dRight-click: publish to Community"));
             inv.setItem(slot, itemWithLore(Material.WRITABLE_BOOK, ChatColor.translateAlternateColorCodes('&', display), preview));
             holder.entryBySlot.put(slot, key);
         }
@@ -2355,12 +2356,25 @@ public final class IxKitsPlugin extends JavaPlugin implements Listener, CommandE
                     openProjects(p);
                 } catch (IOException ex) { p.sendMessage(PREFIX + "§c" + ex.getMessage()); }
             }
+        } else if (h.kind.equals("community-hub")) {
+            if (slot == 45) openMain(p);
+            else if (slot == 20) openCatalog(p, "");
+            else if (slot == 22) openCommunityResources(p, "lore", 1);
+            else if (slot == 24) openCommunityResources(p, "enchantments", 1);
+            else if (slot == 30) openCommunityResources(p, "palette", 1);
+            else if (slot == 32) p.sendMessage(PREFIX + tr("Para publicar, haz clic derecho sobre una plantilla local de lore, paleta o encantamientos. Para un kit, abre Herramientas del proyecto → Publicar en Community.", "To publish, right-click a local lore, palette or enchantment preset. To publish a kit, open Project Tools → Publish to Community."));
+        } else if (h.kind.equals("community-resources")) {
+            if (slot == 45) openCommunityHub(p);
+            else if (slot == 47) openCommunityResources(p, h.project, Math.max(1, h.page - 1));
+            else if (slot == 51) openCommunityResources(p, h.project, h.page + 1);
+            else if (slot == 49) p.sendMessage(PREFIX + tr("En las bibliotecas locales, haz clic derecho en un recurso para publicarlo.", "In local libraries, right-click a resource to publish it."));
+            else if (h.entryBySlot.containsKey(slot)) downloadCommunityResource(p, h.project, h.entryBySlot.get(slot), h.page);
         } else if (h.kind.equals("templates")) {
             if (slot == 45) openMain(p);
             else if (slot == 20) openLoreTemplates(p, 0);
             else if (slot == 22) openPaletteTemplates(p, 0, null, 0, -1);
             else if (slot == 24) openEnchantTemplates(p, 0, null, 0, -1);
-            else if (slot == 30) openCatalog(p, "");
+            else if (slot == 30) openCommunityHub(p);
         } else if (h.kind.equals("enchantment-templates")) {
             int listPage = h.project == null ? h.page : h.subPage;
             if (slot == 45) {
@@ -2368,7 +2382,10 @@ public final class IxKitsPlugin extends JavaPlugin implements Listener, CommandE
                 else openItemEditor(p, h.project, h.page, h.targetSlot);
             } else if (slot == 47) openEnchantTemplates(p, Math.max(0, listPage - 1), h.project, h.page, h.targetSlot);
             else if (slot == 51) openEnchantTemplates(p, listPage + 1, h.project, h.page, h.targetSlot);
-            else if (h.entryBySlot.containsKey(slot)) applyEnchantPreset(p, h.entryBySlot.get(slot), h.project, h.page, h.targetSlot);
+            else if (h.entryBySlot.containsKey(slot)) {
+                if (e.isRightClick()) publishLocalResource(p, "enchantments", h.entryBySlot.get(slot), null);
+                else applyEnchantPreset(p, h.entryBySlot.get(slot), h.project, h.page, h.targetSlot);
+            }
         } else if (h.kind.equals("palette-templates")) {
             int listPage = h.project == null ? h.page : h.subPage;
             if (slot == 45) {
@@ -2376,7 +2393,10 @@ public final class IxKitsPlugin extends JavaPlugin implements Listener, CommandE
                 else openItemEditor(p, h.project, h.page, h.targetSlot);
             } else if (slot == 47) openPaletteTemplates(p, Math.max(0, listPage - 1), h.project, h.page, h.targetSlot);
             else if (slot == 51) openPaletteTemplates(p, listPage + 1, h.project, h.page, h.targetSlot);
-            else if (h.entryBySlot.containsKey(slot)) applyPalettePreset(p, h.entryBySlot.get(slot), h.project, h.page, h.targetSlot);
+            else if (h.entryBySlot.containsKey(slot)) {
+                if (e.isRightClick()) publishLocalResource(p, "palette", h.entryBySlot.get(slot), null);
+                else applyPalettePreset(p, h.entryBySlot.get(slot), h.project, h.page, h.targetSlot);
+            }
         } else if (h.kind.equals("lore-templates")) {
             int listPage = h.project == null ? h.page : h.subPage;
             if (slot == 45) {
@@ -2385,7 +2405,8 @@ public final class IxKitsPlugin extends JavaPlugin implements Listener, CommandE
             } else if (slot == 47) openLoreTemplates(p, Math.max(0, listPage - 1), h.project, h.page, h.targetSlot);
             else if (slot == 51) openLoreTemplates(p, listPage + 1, h.project, h.page, h.targetSlot);
             else if (h.entryBySlot.containsKey(slot)) {
-                if (h.project == null) applyLoreTemplateToHand(p, h.entryBySlot.get(slot));
+                if (e.isRightClick()) publishLocalResource(p, "lore", h.entryBySlot.get(slot), null);
+                else if (h.project == null) applyLoreTemplateToHand(p, h.entryBySlot.get(slot));
                 else applyLoreTemplateToProject(p, h.entryBySlot.get(slot), h.project, h.page, h.targetSlot);
             }
         } else if (h.kind.equals("lore-editor")) {
