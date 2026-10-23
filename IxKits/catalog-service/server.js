@@ -129,7 +129,7 @@ function isValidResource(type, data) {
   }
   const entries = Object.entries(data);
   return entries.length >= 1 && entries.length <= 32
-    && entries.every(([key, value]) => /^[a-z0-9_.:-]{1,80}$/i.test(key)
+    && entries.every(([key, value]) => /^(?:[a-z0-9_-]+:)?[a-z0-9_-]{1,80}$/i.test(key)
       && Number.isInteger(value) && value >= 1 && value <= 32767);
 }
 
