@@ -483,10 +483,22 @@ public final class IxKitsPlugin extends JavaPlugin implements Listener, CommandE
                         return;
                     }
                     List<String> loreLines = rows.stream().map(String.class::cast).toList();
-                    yaml.set(key + ".display", resource.title());
-                    yaml.set(key + ".display_en", resource.title());
+                    Object rawEnglish = data.get("lore_en");
+                    List<String> englishLines = loreLines;
+                    if (rawEnglish != null) {
+                        if (!(rawEnglish instanceof List<?> englishRows) || englishRows.isEmpty() || englishRows.size() > 40
+                            || englishRows.stream().anyMatch(line -> !(line instanceof String value) || value.length() > 300)) {
+                            p.sendMessage(PREFIX + tr("El lore en inglés no pasó la validación local.", "The English lore failed local validation."));
+                            return;
+                        }
+                        englishLines = englishRows.stream().map(String.class::cast).toList();
+                    }
+                    Object displayEs = data.get("display");
+                    Object displayEn = data.get("display_en");
+                    yaml.set(key + ".display", displayEs instanceof String value && !value.isBlank() ? value : resource.title());
+                    yaml.set(key + ".display_en", displayEn instanceof String value && !value.isBlank() ? value : resource.title());
                     yaml.set(key + ".lore", loreLines);
-                    yaml.set(key + ".lore_en", loreLines);
+                    yaml.set(key + ".lore_en", englishLines);
                 } else if ("palette".equals(type)) {
                     Object rawColor = data.get("color");
                     Object rawAccent = data.get("accent");
@@ -541,11 +553,18 @@ public final class IxKitsPlugin extends JavaPlugin implements Listener, CommandE
         String display = title == null || title.isBlank() ? prettyKey(key) : title;
         String description = tr("Compartido desde IxKits por ", "Shared from IxKits by ") + p.getName();
         if ("lore".equals(type)) {
-            List<String> lines = yaml.getStringList(key + (isEnglish() ? ".lore_en" : ".lore"));
-            if (lines.isEmpty()) lines = yaml.getStringList(key + ".lore");
+            List<String> lines = yaml.getStringList(key + ".lore");
+            List<String> englishLines = yaml.getStringList(key + ".lore_en");
+            if (lines.isEmpty()) lines = englishLines;
+            if (englishLines.isEmpty()) englishLines = lines;
             if (lines.isEmpty()) { p.sendMessage(PREFIX + tr("Esta plantilla no contiene lore.", "This template contains no lore.")); return; }
             data.put("lore", lines);
-            display = yaml.getString(key + (isEnglish() ? ".display_en" : ".display"), yaml.getString(key + ".display", display));
+            if (!englishLines.isEmpty()) data.put("lore_en", englishLines);
+            String displayEs = yaml.getString(key + ".display", display);
+            String displayEn = yaml.getString(key + ".display_en", displayEs);
+            data.put("display", displayEs);
+            data.put("display_en", displayEn);
+            display = isEnglish() ? displayEn : displayEs;
         } else if ("palette".equals(type)) {
             String color = yaml.getString(key + ".color");
             String accent = yaml.getString(key + ".accent", color);
