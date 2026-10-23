@@ -108,6 +108,53 @@ public final class CatalogClient {
             });
     }
 
+    public CompletableFuture<List<CommunityResource>> searchResources(String type, String query, int page, int limit) {
+        String path = "/api/resources?type=" + encode(type == null ? "" : type)
+            + "&page=" + Math.max(1, page) + "&limit=" + Math.max(1, Math.min(50, limit));
+        if (query != null && !query.isBlank()) path += "&query=" + encode(query);
+        return get(path).thenApply(body -> {
+            Map<String, Object> root = asMap(Json.parse(body));
+            List<CommunityResource> result = new ArrayList<>();
+            Object rawItems = root.get("items");
+            if (rawItems instanceof List<?> items) for (Object raw : items) {
+                Map<String, Object> item = asMap(raw);
+                result.add(new CommunityResource(string(item, "id"), string(item, "type"),
+                    string(item, "title"), string(item, "author"), string(item, "description"),
+                    number(item.get("downloads")).longValue()));
+            }
+            return result;
+        });
+    }
+
+    public CompletableFuture<DownloadedResource> downloadResource(String id) {
+        return get("/api/resources/" + encodePath(id) + "/download").thenApply(body -> {
+            Map<String, Object> root = asMap(Json.parse(body));
+            Map<String, Object> data = asMap(root.get("data"));
+            if (data.isEmpty()) throw new IllegalStateException("Community resource response contained no data.");
+            return new DownloadedResource(string(root, "id"), string(root, "type"),
+                string(root, "title"), data);
+        });
+    }
+
+    public CompletableFuture<CommunityResource> publishResource(String type, String title, String author,
+            String description, Map<String, Object> data) {
+        String token = plugin.getConfig().getString("catalog.publish-token", "").trim();
+        if (token.isBlank()) return CompletableFuture.failedFuture(
+            new IllegalStateException("catalog.publish-token is empty in config.yml."));
+        Map<String, Object> payload = new LinkedHashMap<>();
+        payload.put("type", type);
+        payload.put("title", title);
+        payload.put("author", author);
+        payload.put("description", description);
+        payload.put("data", data);
+        return request("POST", "/api/resources", Json.stringify(payload), token).thenApply(body -> {
+            Map<String, Object> item = asMap(Json.parse(body));
+            return new CommunityResource(string(item, "id"), string(item, "type"),
+                string(item, "title"), string(item, "author"), string(item, "description"),
+                number(item.get("downloads")).longValue());
+        });
+    }
+
     public CompletableFuture<List<Map<String, Object>>> versions(String templateId) {
         return get("/api/templates/" + encodePath(templateId) + "/versions").thenApply(body -> {
             Map<String, Object> root = asMap(Json.parse(body));
@@ -192,6 +239,8 @@ public final class CatalogClient {
     public record TemplateSummary(String id, String title, String author, String category, String mcVersion,
                                  String description, long downloads, double averageRating, int ratingCount, int revision) {}
     public record DownloadedTemplate(String id, String title, String projectYaml) {}
+    public record CommunityResource(String id, String type, String title, String author, String description, long downloads) {}
+    public record DownloadedResource(String id, String type, String title, Map<String, Object> data) {}
 
     /** Tiny dependency-free JSON codec for the API's object/array/string/number payloads. */
     private static final class Json {
