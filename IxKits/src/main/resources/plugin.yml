@@ -10,5 +10,8 @@ commands:
     usage: /ixkits
 permissions:
   ixkits.admin:
-    description: Permite crear y administrar proyectos de IxKits
+    description: Permite crear, editar y administrar proyectos de IxKits
+    default: op
+  ixkits.community.publish:
+    description: Permite publicar kits, lores, paletas y presets en IxKits Community sin acceso completo de administración
     default: op
