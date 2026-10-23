@@ -482,15 +482,39 @@ public final class IxKitsPlugin extends JavaPlugin implements Listener, CommandE
     }
 
     private void openMain(Player p) {
-        Inventory inv = menu("main", null, 0, tr("§3✦ §bIxKits §3• §8Estudio", "§3✦ §bIxKits §3• §8Studio"));
+        Inventory inv = menu("main", null, 0, tr("§3✦ §bIxKits §8• §0Kit Creation Studio", "§3✦ §bIxKits §8• §0Kit Creation Studio"));
         border(inv);
-        inv.setItem(20, item(Material.CHEST, tr("§bMis proyectos", "§bMy projects"), tr("§7Crear, abrir y editar kits.", "§7Create, open and edit kits."), tr("§8Proyectos locales", "§8Local projects")));
-        inv.setItem(22, item(Material.BOOKSHELF, tr("§bBiblioteca de plantillas", "§bTemplate library"), tr("§7Lore, paletas y encantamientos.", "§7Lore, palettes and enchantments."), tr("§8Plantillas incluidas", "§8Built-in templates")));
-        inv.setItem(24, item(Material.WRITABLE_BOOK, tr("§bExportadores", "§bExport tools"), tr("§7Generar archivos editables.", "§7Generate editable files."), tr("§8Selecciona un proyecto", "§8Choose a project")));
-        inv.setItem(30, item(Material.ENDER_CHEST, "§dIxKits Community", tr("§7Buscar y descargar plantillas.", "§7Search and download templates."), tr("§8Requiere catalog.enabled y base-url", "§8Requires catalog.enabled and base-url")));
-        inv.setItem(32, item(Material.COMPASS, tr("§fAyuda y comandos", "§fHelp and commands"), tr("§7/ixkits crear <nombre>", "§7/ixkits crear <name>"), "§7/ixkits idioma"));
-        inv.setItem(28, item(Material.IRON_CHESTPLATE, tr("§bHerramientas del proyecto", "§bProject tools"), tr("§7Copias, validación e importación.", "§7Backups, validation and import."), tr("§eAbre Mis proyectos", "§eOpen My projects")));
-        inv.setItem(40, item(Material.WRITABLE_BOOK, tr("§eIdioma / Language", "§eLanguage / Idioma"), tr("§7Actual: " + (isEnglish() ? "English" : "Español"), "§7Current: " + (isEnglish() ? "English" : "Spanish")), tr("§eClic para cambiar", "§eClick to change")));
+        File[] files = projectsDir.listFiles((directory, name) -> name.endsWith(".yml"));
+        int projectCount = files == null ? 0 : files.length;
+        inv.setItem(4, itemWithLore(Material.NETHER_STAR, "§b§lCS STUDIOS §8• §fIxKits",
+            List.of("§7Kit Creation Studio", "§8Crea · personaliza · comparte", "",
+                tr("§7Proyectos guardados: §b", "§7Saved projects: §b") + projectCount,
+                "§8Desarrollado por CS Studios")));
+        inv.setItem(20, item(Material.CHEST, tr("§b§lMis proyectos", "§b§lMy projects"),
+            tr("§7Abrir, buscar, duplicar y organizar kits.", "§7Open, search, duplicate and organize kits."),
+            tr("§eClic para abrir la biblioteca", "§eClick to open project library")));
+        inv.setItem(22, item(Material.LIME_CONCRETE, tr("§a§lCrear proyecto", "§a§lCreate project"),
+            tr("§7Empieza un kit desde cero.", "§7Start a kit from scratch."),
+            tr("§eClic y escribe el nombre", "§eClick and type a name")));
+        inv.setItem(24, item(Material.BOOKSHELF, tr("§bBiblioteca de plantillas", "§bTemplate library"),
+            tr("§7Lore, colores y presets de encantamientos.", "§7Lore, colors and enchantment presets."),
+            tr("§eClic para explorar", "§eClick to browse")));
+        inv.setItem(29, item(Material.IRON_CHESTPLATE, tr("§bHerramientas e intercambio", "§bTools & imports/exports"),
+            tr("§7Importar, validar y exportar proyectos.", "§7Import, validate and export projects."),
+            tr("§eClic para elegir un proyecto", "§eClick to choose a project")));
+        inv.setItem(31, item(Material.ENDER_CHEST, "§d§lIxKits Community",
+            tr("§7Buscar y descargar kits compartidos.", "§7Search and download shared kits."),
+            tr("§8Requiere configurar la API online", "§8Requires the online API")));
+        inv.setItem(33, item(Material.WRITABLE_BOOK, tr("§eIdioma / Language", "§eLanguage / Idioma"),
+            tr("§7Actual: " + (isEnglish() ? "English" : "Español"), "§7Current: " + (isEnglish() ? "English" : "Spanish")),
+            tr("§eClic para cambiar", "§eClick to change")));
+        inv.setItem(38, item(Material.COMPASS, tr("§fAyuda rápida", "§fQuick help"),
+            "§7/ixkits crear <nombre>", "§7/ixkits editar <proyecto>",
+            "§7/ixkits importar-mano <proyecto> <página> <ranura>"));
+        inv.setItem(40, item(Material.PAPER, "§f§lIxKits §7v0.1.0",
+            tr("§7Editor administrativo de kits", "§7Administrative kit editor"),
+            "§8Creado por CS Studios",
+            "§bhttps://discord.gg/CnHSjMYDhr"));
         p.openInventory(inv);
     }
 
@@ -644,7 +668,7 @@ public final class IxKitsPlugin extends JavaPlugin implements Listener, CommandE
         inv.setItem(23, gearSlot(yaml.getItemStack("equipment.leggings"), Material.LEATHER_LEGGINGS, tr("Pantalones", "Leggings")));
         inv.setItem(25, gearSlot(yaml.getItemStack("equipment.boots"), Material.LEATHER_BOOTS, tr("Botas", "Boots")));
         inv.setItem(31, gearSlot(yaml.getItemStack("equipment.offhand"), Material.SHIELD, tr("Mano secundaria", "Offhand")));
-        inv.setItem(40, item(Material.PAPER, tr("§fCómo usarlo", "§fHow to use"), tr("§7Mueve objetos del inventario", "§7Move items from your inventory"), tr("§7a las cinco ranuras disponibles.", "§7into the five available slots."), tr("§7Se guarda al cerrar.", "§7Saved when closed.")));
+        inv.setItem(40, item(Material.PAPER, tr("§fCómo usarlo", "§fHow to use"), tr("§7Mayús + clic equipa automáticamente.", "§7Shift-click equips automatically."), tr("§7Clic derecho en una pieza para editarla.", "§7Right-click a piece to edit it."), tr("§7Se guarda al cambiar de menú.", "§7Saved when changing menus.")));
         inv.setItem(45, item(Material.ARROW, tr("§7Volver al proyecto", "§7Back to project")));
         p.openInventory(inv);
     }
@@ -931,7 +955,7 @@ public final class IxKitsPlugin extends JavaPlugin implements Listener, CommandE
 
     private void openFlags(Player p, String project, int page, int targetSlot) {
         YamlConfiguration yaml = YamlConfiguration.loadConfiguration(projectFile(project));
-        ItemStack target = yaml.getItemStack("pages." + page + "." + targetSlot);
+        ItemStack target = yaml.getItemStack(storagePath(page, targetSlot));
         if (target == null || target.getType().isAir()) { openEditor(p, project, page); return; }
         Inventory inv = menu("flags", project, page, targetSlot, 0, tr("§3✦ §bIxKits §8• §0Visibilidad", "§3✦ §bIxKits §8• §0Item flags"));
         border(inv);
@@ -957,7 +981,7 @@ public final class IxKitsPlugin extends JavaPlugin implements Listener, CommandE
 
     private void openAttributes(Player p, String project, int page, int targetSlot) {
         YamlConfiguration yaml = YamlConfiguration.loadConfiguration(projectFile(project));
-        ItemStack target = yaml.getItemStack("pages." + page + "." + targetSlot);
+        ItemStack target = yaml.getItemStack(storagePath(page, targetSlot));
         if (target == null || target.getType().isAir()) { openEditor(p, project, page); return; }
         Inventory inv = menu("attributes", project, page, targetSlot, 0, tr("§3✦ §bIxKits §8• §0Atributos", "§3✦ §bIxKits §8• §0Attributes"));
         border(inv);
@@ -998,7 +1022,7 @@ public final class IxKitsPlugin extends JavaPlugin implements Listener, CommandE
     private void adjustAttribute(Player p, MenuHolder holder, String key, boolean decrease, boolean remove) {
         File file = projectFile(holder.project);
         YamlConfiguration yaml = YamlConfiguration.loadConfiguration(file);
-        String path = "pages." + holder.page + "." + holder.targetSlot;
+        String path = storagePath(holder.page, holder.targetSlot);
         ItemStack target = yaml.getItemStack(path);
         if (target == null || target.getType().isAir()) { openEditor(p, holder.project, holder.page); return; }
         Attribute attribute = Registry.ATTRIBUTE.get(NamespacedKey.minecraft(key));
@@ -1099,7 +1123,7 @@ public final class IxKitsPlugin extends JavaPlugin implements Listener, CommandE
         }
         File file = projectFile(pending.project);
         YamlConfiguration yaml = YamlConfiguration.loadConfiguration(file);
-        String itemPath = "pages." + pending.page + "." + pending.slot;
+        String itemPath = storagePath(pending.page, pending.slot);
         ItemStack target = yaml.getItemStack(itemPath);
         if (target == null || target.getType().isAir()) { player.sendMessage(PREFIX + tr("No se encontró el objeto.", "Item not found.")); openEditor(player, pending.project, pending.page); return; }
         ItemMeta meta = target.getItemMeta();
@@ -1221,7 +1245,7 @@ public final class IxKitsPlugin extends JavaPlugin implements Listener, CommandE
 
     private void openItemEditor(Player p, String project, int page, int targetSlot) {
         YamlConfiguration y = YamlConfiguration.loadConfiguration(projectFile(project));
-        ItemStack target = y.getItemStack("pages." + page + "." + targetSlot);
+        ItemStack target = y.getItemStack(storagePath(page, targetSlot));
         if (target == null || target.getType().isAir()) {
             p.sendMessage(PREFIX + tr("Ese espacio no contiene ningún objeto.", "That slot does not contain an item."));
             openEditor(p, project, page);
@@ -1270,7 +1294,7 @@ public final class IxKitsPlugin extends JavaPlugin implements Listener, CommandE
 
     private void openEnchantments(Player p, String project, int projectPage, int targetSlot, int enchantPage) {
         YamlConfiguration y = YamlConfiguration.loadConfiguration(projectFile(project));
-        ItemStack target = y.getItemStack("pages." + projectPage + "." + targetSlot);
+        ItemStack target = y.getItemStack(storagePath(projectPage, targetSlot));
         if (target == null || target.getType().isAir()) {
             p.sendMessage(PREFIX + tr("No se encontró el objeto del proyecto.", "Could not find the project item."));
             openEditor(p, project, projectPage);
@@ -1311,23 +1335,55 @@ public final class IxKitsPlugin extends JavaPlugin implements Listener, CommandE
         if (!(e.getWhoClicked() instanceof Player p) || !(e.getView().getTopInventory().getHolder() instanceof MenuHolder h)) return;
         int slot = e.getRawSlot();
         if (h.kind.equals("editor")) {
-            if (slot >= e.getView().getTopInventory().getSize()) {
-                if (e.isShiftClick()) e.setCancelled(true);
+            Inventory top = e.getView().getTopInventory();
+            if (slot >= top.getSize()) {
+                if (e.isShiftClick()) {
+                    ItemStack moving = e.getCurrentItem();
+                    if (moving != null && !moving.getType().isAir()) {
+                        int destination = -1;
+                        for (int editable : EDIT_SLOTS) {
+                            ItemStack present = top.getItem(editable);
+                            if (present == null || present.getType().isAir()) { destination = editable; break; }
+                        }
+                        e.setCancelled(true);
+                        if (destination < 0) p.sendMessage(PREFIX + tr("No hay ranuras vacías en esta página.", "There are no empty slots on this page."));
+                        else {
+                            top.setItem(destination, moving.clone());
+                            e.setCurrentItem(new ItemStack(Material.AIR));
+                            savePage(top, h);
+                            openItemEditor(p, h.project, h.page, destination);
+                        }
+                    }
+                }
                 return;
             }
             if (slot >= 0 && contains(EDIT_SLOTS, slot)) {
                 ItemStack clicked = e.getCurrentItem();
-                if (e.isRightClick() && clicked != null && !clicked.getType().isAir()) {
+                ItemStack cursor = e.getCursor();
+                boolean cursorEmpty = cursor == null || cursor.getType().isAir();
+                if (e.isRightClick() && clicked != null && !clicked.getType().isAir() && cursorEmpty) {
                     e.setCancelled(true);
-                    savePage(e.getView().getTopInventory(), h);
+                    savePage(top, h);
                     openItemEditor(p, h.project, h.page, slot);
-                } else if ((clicked == null || clicked.getType().isAir()) && !e.isRightClick()
-                    && (e.getCursor() == null || e.getCursor().getType().isAir()) && itemClipboard.containsKey(p.getUniqueId())) {
+                } else if ((clicked == null || clicked.getType().isAir()) && !cursorEmpty) {
+                    e.setCancelled(true);
+                    ItemStack placed = cursor.clone();
+                    if (e.isRightClick()) {
+                        placed.setAmount(1);
+                        if (cursor.getAmount() <= 1) e.getView().setCursor(new ItemStack(Material.AIR));
+                        else { cursor.setAmount(cursor.getAmount() - 1); e.getView().setCursor(cursor); }
+                    } else e.getView().setCursor(new ItemStack(Material.AIR));
+                    top.setItem(slot, placed);
+                    savePage(top, h);
+                    openItemEditor(p, h.project, h.page, slot);
+                } else if ((clicked == null || clicked.getType().isAir()) && cursorEmpty && !e.isRightClick()
+                    && itemClipboard.containsKey(p.getUniqueId())) {
                     e.setCancelled(true);
                     ItemStack copy = itemClipboard.get(p.getUniqueId());
                     if (copy != null) {
-                        e.getView().getTopInventory().setItem(slot, copy.clone());
-                        savePage(e.getView().getTopInventory(), h);
+                        top.setItem(slot, copy.clone());
+                        savePage(top, h);
+                        openItemEditor(p, h.project, h.page, slot);
                         p.sendMessage(PREFIX + tr("Objeto pegado desde el portapapeles de IxKits.", "Item pasted from the IxKits clipboard."));
                     }
                 }
@@ -1344,42 +1400,76 @@ public final class IxKitsPlugin extends JavaPlugin implements Listener, CommandE
         }
 
         if (h.kind.equals("equipment")) {
-            if (slot >= e.getView().getTopInventory().getSize()) {
-                if (e.isShiftClick()) e.setCancelled(true);
+            Inventory top = e.getView().getTopInventory();
+            if (slot >= top.getSize()) {
+                if (e.isShiftClick()) {
+                    ItemStack moving = e.getCurrentItem();
+                    if (moving != null && !moving.getType().isAir()) {
+                        int preferred = preferredEquipmentSlot(moving.getType());
+                        int destination = preferred >= 0 && isEmptyEquipmentSlot(top.getItem(preferred)) ? preferred : -1;
+                        if (destination < 0 && preferred < 0 && isEmptyEquipmentSlot(top.getItem(31))) destination = 31;
+                        e.setCancelled(true);
+                        if (destination < 0) p.sendMessage(PREFIX + tr("No hay una ranura de equipamiento compatible y vacía.", "No compatible empty equipment slot is available."));
+                        else {
+                            top.setItem(destination, moving.clone());
+                            e.setCurrentItem(new ItemStack(Material.AIR));
+                            saveEquipment(top, h.project);
+                        }
+                    }
+                }
                 return;
             }
             if (slot == 45) {
                 e.setCancelled(true);
-                saveEquipment(e.getView().getTopInventory(), h.project);
+                saveEquipment(top, h.project);
                 openEditor(p, h.project, h.page);
                 return;
             }
             if (slot == 40) {
                 e.setCancelled(true);
-                p.sendMessage(PREFIX + tr("Coloca objetos en las cinco ranuras centrales. Usa el botón Volver al proyecto para guardar y regresar.", "Place items in the five central slots. Use Back to project to save and return."));
+                p.sendMessage(PREFIX + tr("Clic izquierdo para mover objetos; Mayús + clic desde tu inventario los coloca automáticamente; clic derecho sobre una pieza para editarla.", "Left-click to move items; Shift-click from your inventory equips automatically; right-click a piece to edit it."));
                 return;
             }
             if (!contains(EQUIP_SLOTS, slot)) { e.setCancelled(true); return; }
             ItemStack current = e.getCurrentItem();
             ItemStack cursor = e.getCursor();
+            boolean cursorEmpty = cursor == null || cursor.getType().isAir();
             if (isEquipmentPlaceholder(current)) {
                 e.setCancelled(true);
-                if (cursor != null && !cursor.getType().isAir()) {
-                    e.getView().getTopInventory().setItem(slot, cursor.clone());
-                    e.getView().setCursor(new ItemStack(Material.AIR));
+                if (!cursorEmpty) {
+                    ItemStack placed = cursor.clone();
+                    if (e.isRightClick()) {
+                        placed.setAmount(1);
+                        if (cursor.getAmount() <= 1) e.getView().setCursor(new ItemStack(Material.AIR));
+                        else { cursor.setAmount(cursor.getAmount() - 1); e.getView().setCursor(cursor); }
+                    } else e.getView().setCursor(new ItemStack(Material.AIR));
+                    top.setItem(slot, placed);
+                    saveEquipment(top, h.project);
                 }
+            } else if (cursorEmpty && current != null && !current.getType().isAir() && e.isRightClick()) {
+                e.setCancelled(true);
+                saveEquipment(top, h.project);
+                openItemEditor(p, h.project, h.page, equipmentTargetSlot(slot));
             }
             return;
         }
         e.setCancelled(true);
         if (h.kind.equals("main")) {
             if (slot == 20) openProjects(p);
-            else if (slot == 22) openTemplates(p);
-            else if (slot == 24) { p.sendMessage(PREFIX + tr("Abre Mis proyectos y pulsa Exportar.", "Open My projects and choose Export.")); openProjects(p); }
-            else if (slot == 30) openCatalog(p, "");
-            else if (slot == 28) openProjects(p);
-            else if (slot == 32) {
-                p.sendMessage(tr("§bIxKits §7— /ixkits crear <nombre> · /ixkits proyectos · /ixkits idioma", "§bIxKits §7— /ixkits crear <name> · /ixkits proyectos · /ixkits idioma"));
+            else if (slot == 22) promptInput(p, InputType.CREATE_PROJECT, null, 0, -1,
+                "Escribe el nombre del nuevo proyecto:", "Type a name for the new project:");
+            else if (slot == 24) openTemplates(p);
+            else if (slot == 29) openProjects(p);
+            else if (slot == 31) openCatalog(p, "");
+            else if (slot == 33) openLanguages(p);
+            else if (slot == 38) {
+                p.sendMessage("§bIxKits §7— §f/ixkits §8| §7Abrir estudio");
+                p.sendMessage("§f/ixkits crear <nombre> §8| §7Crear proyecto");
+                p.sendMessage("§f/ixkits proyectos §8| §7Biblioteca y búsqueda");
+                p.sendMessage("§f/ixkits editar <proyecto> §8| §7Abrir editor");
+                p.sendMessage("§f/ixkits equipamiento <proyecto> §8| §7Editar armadura");
+                p.sendMessage("§f/ixkits exportar <proyecto> §8| §7Exportar");
+                p.sendMessage("§f/ixkits idioma §8| §7Cambiar idioma");
             } else if (slot == 40) openLanguages(p);
         } else if (h.kind.equals("language")) {
             if (slot == 45) openMain(p);
@@ -1469,7 +1559,7 @@ public final class IxKitsPlugin extends JavaPlugin implements Listener, CommandE
             } else if (h.entryBySlot.containsKey(slot)) {
                 File file = projectFile(h.project);
                 YamlConfiguration yaml = YamlConfiguration.loadConfiguration(file);
-                String itemPath = "pages." + h.page + "." + h.targetSlot;
+                String itemPath = storagePath(h.page, h.targetSlot);
                 ItemStack target = yaml.getItemStack(itemPath);
                 if (target != null && target.getItemMeta() instanceof BannerMeta bannerMeta) {
                     PatternType type = Registry.BANNER_PATTERN.get(NamespacedKey.fromString(h.entryBySlot.get(slot)));
@@ -1509,7 +1599,7 @@ public final class IxKitsPlugin extends JavaPlugin implements Listener, CommandE
             } else if (h.entryBySlot.containsKey(slot)) {
                 File file = projectFile(h.project);
                 YamlConfiguration yaml = YamlConfiguration.loadConfiguration(file);
-                String itemPath = "pages." + h.page + "." + h.targetSlot;
+                String itemPath = storagePath(h.page, h.targetSlot);
                 ItemStack target = yaml.getItemStack(itemPath);
                 if (target != null && target.getItemMeta() instanceof ArmorMeta armorMeta) {
                     if (e.isShiftClick()) armorMeta.setTrim(null);
@@ -1599,7 +1689,10 @@ public final class IxKitsPlugin extends JavaPlugin implements Listener, CommandE
                 else applyLoreTemplateToProject(p, h.entryBySlot.get(slot), h.project, h.page, h.targetSlot);
             }
         } else if (h.kind.equals("item-editor")) {
-            if (slot == 45) openEditor(p, h.project, h.page);
+            if (slot == 45) {
+                if (h.targetSlot < 0) openEquipment(p, h.project, h.page);
+                else openEditor(p, h.project, h.page);
+            }
             else if (slot == 15) {
                 ItemStack source = getProjectItem(h.project, h.page, h.targetSlot);
                 if (source != null && !source.getType().isAir()) {
@@ -1642,10 +1735,10 @@ public final class IxKitsPlugin extends JavaPlugin implements Listener, CommandE
             } else if (slot == 43) openPotionTypes(p, h.project, h.page, h.targetSlot, 0);
             else if (slot == 24) {
                 YamlConfiguration y = YamlConfiguration.loadConfiguration(projectFile(h.project));
-                ItemStack target = y.getItemStack("pages." + h.page + "." + h.targetSlot);
+                ItemStack target = y.getItemStack(storagePath(h.page, h.targetSlot));
                 if (target != null) {
                     for (Enchantment enchantment : new ArrayList<>(target.getEnchantments().keySet())) target.removeEnchantment(enchantment);
-                    y.set("pages." + h.page + "." + h.targetSlot, target);
+                    y.set(storagePath(h.page, h.targetSlot), target);
                     saveYaml(y, projectFile(h.project));
                     p.sendMessage(PREFIX + tr("Se quitaron todos los encantamientos del objeto.", "All enchantments were removed from the item."));
                 }
@@ -1659,7 +1752,7 @@ public final class IxKitsPlugin extends JavaPlugin implements Listener, CommandE
             else if (h.entryBySlot.containsKey(slot)) {
                 File file = projectFile(h.project);
                 YamlConfiguration yaml = YamlConfiguration.loadConfiguration(file);
-                String itemPath = "pages." + h.page + "." + h.targetSlot;
+                String itemPath = storagePath(h.page, h.targetSlot);
                 ItemStack target = yaml.getItemStack(itemPath);
                 if (target != null && target.getItemMeta() instanceof PotionMeta potionMeta) {
                     PotionType type = PotionType.valueOf(h.entryBySlot.get(slot));
@@ -1680,7 +1773,7 @@ public final class IxKitsPlugin extends JavaPlugin implements Listener, CommandE
             else if (h.entryBySlot.containsKey(slot)) {
                 File file = projectFile(h.project);
                 YamlConfiguration yaml = YamlConfiguration.loadConfiguration(file);
-                String itemPath = "pages." + h.page + "." + h.targetSlot;
+                String itemPath = storagePath(h.page, h.targetSlot);
                 ItemStack target = yaml.getItemStack(itemPath);
                 if (target != null && target.getItemMeta() instanceof PotionMeta potionMeta) {
                     NamespacedKey effectKey = NamespacedKey.fromString(h.entryBySlot.get(slot));
@@ -1712,7 +1805,7 @@ public final class IxKitsPlugin extends JavaPlugin implements Listener, CommandE
             else if (h.entryBySlot.containsKey(slot)) {
                 File file = projectFile(h.project);
                 YamlConfiguration yaml = YamlConfiguration.loadConfiguration(file);
-                String itemPath = "pages." + h.page + "." + h.targetSlot;
+                String itemPath = storagePath(h.page, h.targetSlot);
                 ItemStack target = yaml.getItemStack(itemPath);
                 if (target != null && !target.getType().isAir()) {
                     ItemFlag flag = ItemFlag.valueOf(h.entryBySlot.get(slot));
@@ -1738,10 +1831,10 @@ public final class IxKitsPlugin extends JavaPlugin implements Listener, CommandE
             else if (slot == 53) openEditor(p, h.project, h.page);
             else if (slot == 49) {
                 YamlConfiguration y = YamlConfiguration.loadConfiguration(projectFile(h.project));
-                ItemStack target = y.getItemStack("pages." + h.page + "." + h.targetSlot);
+                ItemStack target = y.getItemStack(storagePath(h.page, h.targetSlot));
                 if (target != null) {
                     for (Enchantment enchantment : new ArrayList<>(target.getEnchantments().keySet())) target.removeEnchantment(enchantment);
-                    y.set("pages." + h.page + "." + h.targetSlot, target);
+                    y.set(storagePath(h.page, h.targetSlot), target);
                     saveYaml(y, projectFile(h.project));
                     p.sendMessage(PREFIX + tr("Se quitaron todos los encantamientos del objeto.", "All enchantments were removed from the item."));
                 }
@@ -1755,7 +1848,7 @@ public final class IxKitsPlugin extends JavaPlugin implements Listener, CommandE
                     return;
                 }
                 YamlConfiguration y = YamlConfiguration.loadConfiguration(projectFile(h.project));
-                String itemPath = "pages." + h.page + "." + h.targetSlot;
+                String itemPath = storagePath(h.page, h.targetSlot);
                 ItemStack target = y.getItemStack(itemPath);
                 if (target == null || target.getType().isAir()) {
                     p.sendMessage(PREFIX + tr("El objeto del proyecto ya no existe.", "The project item no longer exists."));
@@ -1842,15 +1935,41 @@ public final class IxKitsPlugin extends JavaPlugin implements Listener, CommandE
             && item.hasItemMeta() && Objects.equals(item.getItemMeta().getDisplayName(), "§8IxKits empty slot");
     }
 
+    private String storagePath(int page, int targetSlot) {
+        if (targetSlot < 0) {
+            int index = -targetSlot - 1;
+            if (index >= 0 && index < EQUIPMENT_KEYS.length) return "equipment." + EQUIPMENT_KEYS[index];
+        }
+        return "pages." + page + "." + targetSlot;
+    }
+
+    private int equipmentTargetSlot(int inventorySlot) {
+        for (int i = 0; i < EQUIP_SLOTS.length; i++) if (EQUIP_SLOTS[i] == inventorySlot) return -(i + 1);
+        return 0;
+    }
+
+    private int preferredEquipmentSlot(Material material) {
+        String name = material.name();
+        if (name.endsWith("_HELMET") || material == Material.CARVED_PUMPKIN) return 19;
+        if (name.endsWith("_CHESTPLATE") || material == Material.ELYTRA) return 21;
+        if (name.endsWith("_LEGGINGS")) return 23;
+        if (name.endsWith("_BOOTS")) return 25;
+        return -1;
+    }
+
+    private boolean isEmptyEquipmentSlot(ItemStack item) {
+        return item == null || item.getType().isAir() || isEquipmentPlaceholder(item);
+    }
+
     private ItemStack getProjectItem(String project, int page, int slot) {
-        return YamlConfiguration.loadConfiguration(projectFile(project)).getItemStack("pages." + page + "." + slot);
+        return YamlConfiguration.loadConfiguration(projectFile(project)).getItemStack(storagePath(page, slot));
     }
 
     private void saveProjectItem(String project, int page, int slot, ItemStack item) {
         File file = projectFile(project);
         projectService.backupBeforeChange(file);
         YamlConfiguration yaml = YamlConfiguration.loadConfiguration(file);
-        yaml.set("pages." + page + "." + slot, item);
+        yaml.set(storagePath(page, slot), item);
         yaml.set("format-version", 2);
         yaml.set("updated", System.currentTimeMillis());
         saveYaml(yaml, file);
@@ -1979,7 +2098,7 @@ public final class IxKitsPlugin extends JavaPlugin implements Listener, CommandE
     private void applyLoreTemplateToProject(Player p, String key, String project, int projectPage, int targetSlot) {
         File file = projectFile(project);
         YamlConfiguration yaml = YamlConfiguration.loadConfiguration(file);
-        String itemPath = "pages." + projectPage + "." + targetSlot;
+        String itemPath = storagePath(projectPage, targetSlot);
         ItemStack target = yaml.getItemStack(itemPath);
         if (target == null || target.getType().isAir()) {
             p.sendMessage(PREFIX + tr("No se encontró el objeto del proyecto.", "Could not find the project item."));
