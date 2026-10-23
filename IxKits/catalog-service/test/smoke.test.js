@@ -34,6 +34,8 @@ async function freePort() {
 test("catalog source contains upload limits and safe token comparison", () => {
   assert.match(serverSource, /MAX_PROJECT_BYTES = 500 \* 1024/);
   assert.match(serverSource, /MAX_BODY_BYTES = 700 \* 1024/);
+  assert.match(serverSource, /MAX_RESOURCE_BYTES = 24 \* 1024/);
+  assert.match(serverSource, /isValidResource/);
   assert.match(serverSource, /timingSafeEqual/);
   assert.match(serverSource, /configuredTokenRequired/);
   assert.match(serverSource, /IXKITS_PUBLISH_TOKEN/);
@@ -171,6 +173,45 @@ test("catalog API handles publish, search, ratings, favorites, downloads, and mo
   assert.equal(downloaded.projectYaml, revisedYaml);
   assert.equal(downloaded.revision, 2);
   assert.equal(downloaded.format, "ixkits-yaml");
+
+  const lorePayload = {
+    type: "lore",
+    title: "Cosmic Lore",
+    author: "CS Studios test",
+    description: "Community lore fixture",
+    data: { lore: ["&d✦ &lCOSMIC ITEM", "&7Made among the stars", "", "&b➤ &fA test lore"] }
+  };
+  const deniedResource = await fetch(baseUrl + "/api/resources", {
+    method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(lorePayload)
+  });
+  assert.equal(deniedResource.status, 401, "community resource publishing must require the publish token");
+
+  const resourcePublish = await fetch(baseUrl + "/api/resources", {
+    method: "POST",
+    headers: { "content-type": "application/json", authorization: "Bearer " + publishToken },
+    body: JSON.stringify(lorePayload)
+  });
+  assert.equal(resourcePublish.status, 201);
+  const resourceCreated = await resourcePublish.json();
+  assert.equal(resourceCreated.type, "lore");
+  assert.equal(resourceCreated.title, lorePayload.title);
+  assert.equal("data" in resourceCreated, false, "resource summaries must not expose resource data");
+
+  const resourceSearch = await fetch(baseUrl + "/api/resources?type=lore&query=cosmic&limit=10").then(response => response.json());
+  assert.equal(resourceSearch.total, 1);
+  assert.equal(resourceSearch.items[0].id, resourceCreated.id);
+
+  const resourceDownload = await fetch(baseUrl + "/api/resources/" + resourceCreated.id + "/download").then(response => response.json());
+  assert.equal(resourceDownload.data.lore.length, 4);
+  assert.equal(resourceDownload.data.lore[0], "&d✦ &lCOSMIC ITEM");
+  assert.equal(resourceDownload.downloads, 1);
+
+  const invalidResource = await fetch(baseUrl + "/api/resources", {
+    method: "POST",
+    headers: { "content-type": "application/json", authorization: "Bearer " + publishToken },
+    body: JSON.stringify({ type: "palette", title: "Bad Palette", author: "Tester", data: { color: "not-a-color" } })
+  });
+  assert.equal(invalidResource.status, 400, "resource payloads must be type-validated");
 
   const deniedDelete = await fetch(baseUrl + "/api/templates/" + created.id, { method: "DELETE" });
   assert.equal(deniedDelete.status, 401);
