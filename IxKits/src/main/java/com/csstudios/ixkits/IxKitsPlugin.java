@@ -69,8 +69,10 @@ public final class IxKitsPlugin extends JavaPlugin implements Listener, CommandE
     private CatalogClient catalogClient;
     private final Map<UUID, PendingInput> pendingInputs = new ConcurrentHashMap<>();
     private final Map<UUID, ItemStack> itemClipboard = new ConcurrentHashMap<>();
-    private final Map<UUID, Long> abilityCooldowns = new ConcurrentHashMap<>();
+    private final Map<String, Long> abilityCooldowns = new ConcurrentHashMap<>();
     private NamespacedKey tntOnHitKey;
+    private NamespacedKey lightningOnHitKey;
+    private NamespacedKey lifeStealOnHitKey;
     private static final int[] EQUIP_SLOTS = {19, 21, 23, 25, 31};
     private static final String[] EQUIPMENT_KEYS = {"helmet", "chestplate", "leggings", "boots", "offhand"};
     private static final List<String> EDITABLE_ATTRIBUTES = List.of("max_health", "attack_damage", "attack_speed", "armor", "armor_toughness", "knockback_resistance", "movement_speed", "luck");
@@ -91,6 +93,8 @@ public final class IxKitsPlugin extends JavaPlugin implements Listener, CommandE
         projectService = new ProjectService(this, getDataFolder());
         catalogClient = new CatalogClient(this);
         tntOnHitKey = new NamespacedKey(this, "ability_tnt_on_hit");
+        lightningOnHitKey = new NamespacedKey(this, "ability_lightning_on_hit");
+        lifeStealOnHitKey = new NamespacedKey(this, "ability_lifesteal_on_hit");
         initializeTemplates();
         Objects.requireNonNull(getCommand("ixkits")).setExecutor(this);
         Bukkit.getPluginManager().registerEvents(this, this);
@@ -1419,17 +1423,24 @@ public final class IxKitsPlugin extends JavaPlugin implements Listener, CommandE
         boolean tntEnabled = isTntOnHitEnabled(target);
         inv.setItem(20, item(tntEnabled ? Material.TNT : Material.GUNPOWDER,
             tntEnabled ? tr("§aTNT al golpear: ACTIVADA", "§aTNT on hit: ENABLED") : tr("§cTNT al golpear: DESACTIVADA", "§cTNT on hit: DISABLED"),
-            tr("§7Hace aparecer una TNT cerca del enemigo al golpear.", "§7Spawns TNT near the target when you hit them."),
-            tr("§7Enfriamiento configurable; es real en combate.", "§7Configurable cooldown; works in combat."),
-            tr("§eClic para alternar", "§eClick to toggle")));
-        inv.setItem(22, item(Material.CLOCK, tr("§fAjustes de habilidad", "§fAbility settings"),
+            tr("§7Hace aparecer una TNT junto al enemigo.", "§7Spawns TNT beside the target."),
             tr("§7Mecha: ", "§7Fuse: ") + getConfig().getInt("abilities.tnt-on-hit-fuse-ticks", 40) + " ticks",
             tr("§7Enfriamiento: ", "§7Cooldown: ") + getConfig().getLong("abilities.tnt-on-hit-cooldown-ms", 3000L) + " ms",
-            tr("§7Potencia: ", "§7Yield: ") + getConfig().getDouble("abilities.tnt-on-hit-yield", 2.0)));
+            tr("§eClic para alternar", "§eClick to toggle")));
+        inv.setItem(22, item(isAbilityEnabled(target, lightningOnHitKey) ? Material.LIGHTNING_ROD : Material.COPPER_INGOT,
+            isAbilityEnabled(target, lightningOnHitKey) ? tr("§aRayo al golpear: ACTIVADO", "§aLightning on hit: ENABLED") : tr("§cRayo al golpear: DESACTIVADO", "§cLightning on hit: DISABLED"),
+            tr("§7Invoca un rayo sobre el objetivo.", "§7Calls lightning down on the target."),
+            tr("§7Puede causar daño adicional y fuego.", "§7Can cause extra damage and fire."),
+            tr("§eClic para alternar", "§eClick to toggle")));
+        inv.setItem(24, item(isAbilityEnabled(target, lifeStealOnHitKey) ? Material.GHAST_TEAR : Material.ROTTEN_FLESH,
+            isAbilityEnabled(target, lifeStealOnHitKey) ? tr("§aRobo de vida: ACTIVADO", "§aLifesteal: ENABLED") : tr("§cRobo de vida: DESACTIVADO", "§cLifesteal: DISABLED"),
+            tr("§7Recupera parte del daño al golpear.", "§7Heals you for a portion of damage dealt."),
+            tr("§7Porcentaje: ", "§7Percent: ") + (int)Math.round(getConfig().getDouble("abilities.lifesteal-on-hit-percent", 0.25) * 100) + "%",
+            tr("§eClic para alternar", "§eClick to toggle")));
         inv.setItem(31, item(Material.BOOK, tr("§fCómo funciona", "§fHow it works"),
-            tr("§7Solo se activa al golpear con este objeto", "§7Triggers only when hitting with this item"),
-            tr("§7en la mano principal.", "§7in the main hand."),
-            tr("§7La habilidad se guarda en el objeto.", "§7The ability is stored on the item.")));
+            tr("§7Se aplica al arma cuando está en tu", "§7Applies when the item is in your"),
+            tr("§7mano principal y golpeas a un ser vivo.", "§7main hand and you hit a living entity."),
+            tr("§7Cada habilidad tiene su enfriamiento.", "§7Each ability has its own cooldown.")));
         inv.setItem(45, item(Material.ARROW, tr("§7Volver al objeto", "§7Back to item")));
         p.openInventory(inv);
     }
@@ -1857,18 +1868,9 @@ public final class IxKitsPlugin extends JavaPlugin implements Listener, CommandE
             }
         } else if (h.kind.equals("abilities")) {
             if (slot == 45) openItemEditor(p, h.project, h.page, h.targetSlot);
-            else if (slot == 20) {
-                ItemStack target = getProjectItem(h.project, h.page, h.targetSlot);
-                if (target != null && !target.getType().isAir()) {
-                    ItemMeta meta = target.getItemMeta();
-                    var container = meta.getPersistentDataContainer();
-                    if (isTntOnHitEnabled(target)) container.remove(tntOnHitKey);
-                    else container.set(tntOnHitKey, PersistentDataType.BYTE, (byte) 1);
-                    target.setItemMeta(meta);
-                    saveProjectItem(h.project, h.page, h.targetSlot, target);
-                }
-                openAbilities(p, h.project, h.page, h.targetSlot);
-            }
+            else if (slot == 20) toggleAbility(p, h.project, h.page, h.targetSlot, tntOnHitKey);
+            else if (slot == 22) toggleAbility(p, h.project, h.page, h.targetSlot, lightningOnHitKey);
+            else if (slot == 24) toggleAbility(p, h.project, h.page, h.targetSlot, lifeStealOnHitKey);
         } else if (h.kind.equals("item-editor")) {
             if (slot == 45) {
                 if (h.targetSlot < 0) openEquipment(p, h.project, h.page);
@@ -2130,10 +2132,36 @@ public final class IxKitsPlugin extends JavaPlugin implements Listener, CommandE
         saveYaml(yaml, file);
     }
 
-    private boolean isTntOnHitEnabled(ItemStack stack) {
-        if (stack == null || stack.getType().isAir() || !stack.hasItemMeta()) return false;
-        Byte enabled = stack.getItemMeta().getPersistentDataContainer().get(tntOnHitKey, PersistentDataType.BYTE);
+    private boolean isAbilityEnabled(ItemStack stack, NamespacedKey key) {
+        if (stack == null || stack.getType().isAir() || !stack.hasItemMeta() || key == null) return false;
+        Byte enabled = stack.getItemMeta().getPersistentDataContainer().get(key, PersistentDataType.BYTE);
         return enabled != null && enabled == (byte) 1;
+    }
+
+    private boolean isTntOnHitEnabled(ItemStack stack) {
+        return isAbilityEnabled(stack, tntOnHitKey);
+    }
+
+    private boolean canTriggerAbility(Player player, String ability, long cooldownMs) {
+        long now = System.currentTimeMillis();
+        String cooldownKey = player.getUniqueId() + ":" + ability;
+        Long last = abilityCooldowns.get(cooldownKey);
+        if (last != null && now - last < cooldownMs) return false;
+        abilityCooldowns.put(cooldownKey, now);
+        return true;
+    }
+
+    private void toggleAbility(Player p, String project, int page, int targetSlot, NamespacedKey key) {
+        ItemStack target = getProjectItem(project, page, targetSlot);
+        if (target != null && !target.getType().isAir()) {
+            ItemMeta meta = target.getItemMeta();
+            var container = meta.getPersistentDataContainer();
+            if (isAbilityEnabled(target, key)) container.remove(key);
+            else container.set(key, PersistentDataType.BYTE, (byte) 1);
+            target.setItemMeta(meta);
+            saveProjectItem(project, page, targetSlot, target);
+        }
+        openAbilities(p, project, page, targetSlot);
     }
 
     @EventHandler
@@ -2141,18 +2169,32 @@ public final class IxKitsPlugin extends JavaPlugin implements Listener, CommandE
         if (event.isCancelled() || !(event.getDamager() instanceof Player attacker)
             || !(event.getEntity() instanceof LivingEntity target)) return;
         ItemStack weapon = attacker.getInventory().getItemInMainHand();
-        if (!isTntOnHitEnabled(weapon)) return;
-        long now = System.currentTimeMillis();
-        long cooldown = Math.max(0L, getConfig().getLong("abilities.tnt-on-hit-cooldown-ms", 3000L));
-        Long last = abilityCooldowns.get(attacker.getUniqueId());
-        if (last != null && now - last < cooldown) return;
-        abilityCooldowns.put(attacker.getUniqueId(), now);
-        int fuseTicks = Math.max(1, Math.min(200, getConfig().getInt("abilities.tnt-on-hit-fuse-ticks", 40)));
-        float yield = (float) Math.max(0.0, Math.min(8.0, getConfig().getDouble("abilities.tnt-on-hit-yield", 2.0)));
-        TNTPrimed tnt = target.getWorld().spawn(target.getLocation().add(0.0, 0.25, 0.0), TNTPrimed.class);
-        tnt.setFuseTicks(fuseTicks);
-        tnt.setYield(yield);
-        tnt.setSource(attacker);
+        if (isAbilityEnabled(weapon, tntOnHitKey)) {
+            long cooldown = Math.max(0L, getConfig().getLong("abilities.tnt-on-hit-cooldown-ms", 3000L));
+            if (canTriggerAbility(attacker, "tnt-on-hit", cooldown)) {
+                int fuseTicks = Math.max(1, Math.min(200, getConfig().getInt("abilities.tnt-on-hit-fuse-ticks", 40)));
+                float yield = (float) Math.max(0.0, Math.min(8.0, getConfig().getDouble("abilities.tnt-on-hit-yield", 2.0)));
+                TNTPrimed tnt = target.getWorld().spawn(target.getLocation().add(0.0, 0.25, 0.0), TNTPrimed.class);
+                tnt.setFuseTicks(fuseTicks);
+                tnt.setYield(yield);
+                tnt.setSource(attacker);
+            }
+        }
+        if (isAbilityEnabled(weapon, lightningOnHitKey)) {
+            long cooldown = Math.max(0L, getConfig().getLong("abilities.lightning-on-hit-cooldown-ms", 5000L));
+            if (canTriggerAbility(attacker, "lightning-on-hit", cooldown)) target.getWorld().strikeLightning(target.getLocation());
+        }
+        if (isAbilityEnabled(weapon, lifeStealOnHitKey)) {
+            long cooldown = Math.max(0L, getConfig().getLong("abilities.lifesteal-on-hit-cooldown-ms", 1000L));
+            if (canTriggerAbility(attacker, "lifesteal-on-hit", cooldown)) {
+                double percent = Math.max(0.0, Math.min(1.0, getConfig().getDouble("abilities.lifesteal-on-hit-percent", 0.25)));
+                var maximumHealth = attacker.getAttribute(Registry.ATTRIBUTE.get(NamespacedKey.minecraft("max_health")));
+                double maximum = maximumHealth == null ? 20.0 : maximumHealth.getValue();
+                double healing = event.getFinalDamage() * percent;
+                attacker.setHealth(Math.min(maximum, attacker.getHealth() + healing));
+                attacker.sendActionBar(Component.text("+" + String.format(Locale.US, "%.1f", healing) + " ♥"));
+            }
+        }
     }
 
     private boolean isEquipmentPlaceholder(ItemStack item) {
