@@ -2364,7 +2364,7 @@ public final class IxKitsPlugin extends JavaPlugin implements Listener, CommandE
                 openFireworkEditor(p, h.project, h.page, h.targetSlot, typeName + "|" + colorName);
             }
         } else if (h.kind.equals("catalog")) {
-            if (slot == 45) openMain(p);
+            if (slot == 45) openCommunityHub(p);
             else if (slot == 47) {
                 if (h.page > 1) openCatalog(p, h.query, h.page - 1);
                 else promptInput(p, InputType.CATALOG_SEARCH, null, h.page, -1, "Escribe un texto para buscar plantillas:", "Type a search query for templates:");
@@ -2389,7 +2389,10 @@ public final class IxKitsPlugin extends JavaPlugin implements Listener, CommandE
                 } catch (IOException ex) { p.sendMessage(PREFIX + "§c" + ex.getMessage()); }
             }
         } else if (h.kind.equals("community-hub")) {
-            if (slot == 45) openMain(p);
+            if (slot == 45) {
+                if (p.hasPermission("ixkits.admin")) openMain(p);
+                else p.closeInventory();
+            }
             else if (slot == 20) openCatalog(p, "");
             else if (slot == 22) openCommunityResources(p, "lore", 1);
             else if (slot == 24) openCommunityResources(p, "enchantments", 1);
