@@ -21,3 +21,6 @@ abilities:
   tnt-on-hit-cooldown-ms: 3000
   tnt-on-hit-fuse-ticks: 40
   tnt-on-hit-yield: 2.0
+  lightning-on-hit-cooldown-ms: 5000
+  lifesteal-on-hit-cooldown-ms: 1000
+  lifesteal-on-hit-percent: 0.25
