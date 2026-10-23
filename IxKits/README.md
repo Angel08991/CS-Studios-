@@ -90,14 +90,23 @@ En la biblioteca de proyectos, clic izquierdo abre y clic derecho muestra las he
 
 ### Habilidades de objetos
 
-La primera habilidad implementada es **TNT al golpear**, activable por objeto desde `Editor de objeto → Habilidades especiales`. Se guarda como metadato del objeto. Al atacar con ese objeto en la mano principal, aparece una TNT junto al objetivo. El enfriamiento, la mecha y la potencia se ajustan en `plugins/IxKits/config.yml`:
+Desde `Editor de objeto → Habilidades especiales` puedes activar individualmente estas habilidades en el objeto seleccionado. Se guardan como metadatos del objeto y se activan al golpear con él en la mano principal:
+
+- **TNT al golpear:** aparece una TNT junto al objetivo. Puedes configurar mecha, potencia y enfriamiento.
+- **Rayo al golpear:** invoca un rayo sobre el objetivo, con su daño y efecto de fuego normales.
+- **Robo de vida:** recupera un porcentaje del daño del golpe, con enfriamiento configurable.
+
+Ajustes en `plugins/IxKits/config.yml`:
 
     abilities:
       tnt-on-hit-cooldown-ms: 3000
       tnt-on-hit-fuse-ticks: 40
       tnt-on-hit-yield: 2.0
+      lightning-on-hit-cooldown-ms: 5000
+      lifesteal-on-hit-cooldown-ms: 1000
+      lifesteal-on-hit-percent: 0.25
 
-La habilidad funciona dentro del servidor que tenga IxKits instalado y habilitado. La exportación a formatos de otros plugins puede no conservar metadatos personalizados de IxKits; valida cada formato antes de usar el objeto en producción.
+Las habilidades se ejecutan en el servidor que tiene IxKits instalado y habilitado. Algunas exportaciones a formatos de otros plugins no conservan metadatos personalizados de IxKits; valida el resultado antes de poner esos objetos en producción.
 
 ### Importar objetos creados con otros plugins
 
