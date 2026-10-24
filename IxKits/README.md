@@ -14,8 +14,9 @@ La compilación de CI se ejecuta contra Paper API 1.21.11. La GUI debe probarse 
 - Menú de propiedades especiales para libros escritos (título, autor y páginas MiniMessage), patrones y colores de estandartes, trims de armadura, propietario de cabezas y fuegos artificiales (potencia, tipo/color de efecto y eliminación de efectos).
 - Papelera recuperable en la GUI del navegador de proyectos, con acciones para deshacer y rehacer.
 - Portapapeles de objetos para duplicar una copia exacta desde un proyecto a otra ranura vacía.
-- Biblioteca de plantillas de lore bilingües con estilos PvP, Legendario, Minero, Demoníaco, Cósmico, Escarcha y Esmeralda, más paletas RGB y presets de encantamientos adicionales.
-- Editor de nombre y lore con MiniMessage; separa las líneas de lore usando el separador vertical.
+- Biblioteca bilingüe de plantillas originales para armas y objetos: Vanguardia PvP, Segador de almas, Colmillo glacial, Marca del Nether, Tirador élite, Insignia del gladiador y Flor venenosa, además de estilos previos, paletas RGB y presets de encantamientos.
+- Las plantillas pueden añadir automáticamente las líneas reales de encantamientos y habilidades especiales del objeto usando `{enchantments}` y `{abilities}`; `{item}` inserta el nombre del tipo de objeto.
+- Editor de nombre y lore con MiniMessage; separa las líneas de lore usando el separador vertical. Las GUI muestran controles más explicativos, vistas previas mejoradas y una firma visual de CS Studios.
 - Alternar irrompible, cambiar durabilidad, custom model data, flags, color de armadura de cuero y modificadores propios de atributos.
 - Editor de equipamiento separado para casco, peto, pantalones, botas y mano secundaria.
 - Biblioteca de proyectos con paginación y búsqueda: crear desde la GUI, abrir, duplicar, renombrar, eliminar moviendo a papelera, validar y restaurar una copia anterior.
@@ -105,10 +106,30 @@ En la biblioteca de proyectos, clic izquierdo abre y clic derecho muestra las he
 Desde `Editor de objeto → Habilidades especiales` puedes activar individualmente estas habilidades en el objeto seleccionado. Se guardan como metadatos del objeto y se activan al golpear con él en la mano principal:
 
 - **TNT al golpear:** aparece una TNT junto al objetivo. Puedes configurar mecha, potencia y enfriamiento.
-- **Rayo al golpear:** invoca un rayo sobre el objetivo, con su daño y efecto de fuego normales.
-- **Robo de vida:** recupera un porcentaje del daño del golpe, con enfriamiento configurable.
+- **Rayo al golpear:** invoca un rayo sobre el objetivo, con sus efectos normales.
+- **Robo de vida:** recupera un porcentaje del daño del golpe.
+- **Veneno:** aplica el efecto de veneno al objetivo.
+- **Escarcha:** aplica lentitud al objetivo.
+- **Llama:** prende fuego al objetivo.
+- **Impacto reforzado:** lanza al objetivo hacia atrás con una fuerza configurable.
 
-Para cambiar el cooldown de una habilidad específica, abre Habilidades especiales y haz clic derecho sobre ella. Escribe los segundos en el chat: 0 significa sin espera y el máximo permitido por el editor es 86400 segundos. Este valor se guarda en el objeto y reemplaza el valor global solo para esa habilidad/objeto. El clic izquierdo activa o desactiva la habilidad. En el editor de encantamientos, usa Mayús + clic izquierdo para indicar el nivel exacto (1–32767), incluso superior al máximo normal del juego; usa niveles altos solo si encajan con el balance de tu servidor.
+Cada habilidad tiene enfriamiento independiente por objeto. Haz clic izquierdo en una habilidad para activarla o desactivarla y clic derecho para cambiar el cooldown. Los efectos solo se activan cuando el objeto está en la mano principal y golpeas a una entidad viva. Los valores iniciales (duración, amplificador, fuerza y cooldown) se pueden modificar en `plugins/IxKits/config.yml`.
+
+#### Lore dinámico de encantamientos y habilidades
+
+En una plantilla de lore, coloca estos marcadores **cada uno en su propia línea**:
+
+- `{enchantments}`: genera una línea RGB por encantamiento real del objeto; por ejemplo, `Filo X` se mostrará como `Filo X`.
+- `{abilities}`: genera una línea por cada habilidad de IxKits activada en ese objeto.
+- `{item}`: inserta un nombre legible del tipo del objeto.
+
+Ejemplo de estilo configurable en `config.yml`:
+
+    lore:
+      enchantment-line-format: "<#FBBF24>⚔ <#D1D5DB>{name} <#FDE68A>{level}"
+      ability-line-format: "<#F87171>✦ <#FECACA>{name} <#9CA3AF>({cooldown})"
+
+Puedes personalizar los colores y símbolos de estas líneas con MiniMessage/RGB. El contenido generado se guarda como parte del lore cuando aplicas la plantilla; si luego cambias encantamientos o habilidades, vuelve a aplicar la plantilla para actualizar las líneas generadas. En el editor de encantamientos, Mayús + clic izquierdo permite indicar el nivel exacto (1–32767), incluso superior al máximo normal del juego; usa niveles altos solo si encajan con el balance de tu servidor.
 
 Al solicitar texto, pulsa Cancelar en el mensaje del chat o escribe cancelar. Ambas formas abandonan esa entrada sin guardar el cambio pendiente.
 
@@ -121,6 +142,17 @@ Ajustes en `plugins/IxKits/config.yml`:
       lightning-on-hit-cooldown-ms: 5000
       lifesteal-on-hit-cooldown-ms: 1000
       lifesteal-on-hit-percent: 0.25
+      poison-on-hit-cooldown-ms: 4500
+      poison-on-hit-duration-ticks: 60
+      poison-on-hit-amplifier: 0
+      frost-on-hit-cooldown-ms: 3000
+      frost-on-hit-duration-ticks: 40
+      frost-on-hit-amplifier: 1
+      flame-on-hit-cooldown-ms: 3500
+      flame-on-hit-duration-ticks: 80
+      knockback-on-hit-cooldown-ms: 2500
+      knockback-on-hit-strength: 1.25
+      knockback-on-hit-y: 0.35
 
 Las habilidades se ejecutan en el servidor que tiene IxKits instalado y habilitado. Algunas exportaciones a formatos de otros plugins no conservan metadatos personalizados de IxKits; valida el resultado antes de poner esos objetos en producción.
 
@@ -139,6 +171,8 @@ Copia los archivos a plugins/IxKits/imports/ antes de usar /ixkits importar. La 
 La exportación a EssentialsX está en plugins/IxKits/exports/. Comprueba el resultado antes de incorporarlo a tu kits.yml: el formato legible no puede representar todos los metadatos avanzados. Los kits de EssentialsX guardados como NBT/base64 no se convierten con el importador básico; usa el serializador de EssentialsX para esos archivos.
 
 ## Catálogo online y recursos comunitarios
+
+**Importante:** IxKits Community viene desactivado. Instalar el JAR solo habilita el menú local; para usar el catálogo compartido online, primero hay que desplegar su API.
 
 El servicio está en IxKits/catalog-service/, usa Node.js 20+ y no necesita dependencias npm externas. Además de kits completos, admite recursos tipados: lore, palette y enchantments. Dentro del plugin, abre Community Hub con /ixkits comunidad. Las bibliotecas locales permiten aplicar un recurso con clic izquierdo o publicarlo con clic derecho. Los recursos descargados se validan y guardan en plugins/IxKits/templates/; no se ejecutan scripts del catálogo.
 
