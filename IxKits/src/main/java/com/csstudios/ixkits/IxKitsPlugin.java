@@ -1875,15 +1875,19 @@ public final class IxKitsPlugin extends JavaPlugin implements Listener, CommandE
     }
 
     private Material paletteIcon(String name, String color) {
+        // Dyes are visually distinct item icons and do not blend into the glass-pane frame.
         String key = (name + " " + color).toLowerCase(Locale.ROOT);
-        if (key.contains("gold") || key.contains("sun") || key.contains("yellow") || key.contains("&6")) return Material.YELLOW_STAINED_GLASS_PANE;
-        if (key.contains("inferno") || key.contains("rose") || key.contains("red") || key.contains("&c")) return Material.RED_STAINED_GLASS_PANE;
-        if (key.contains("emerald") || key.contains("nature") || key.contains("green") || key.contains("&a")) return Material.LIME_STAINED_GLASS_PANE;
-        if (key.contains("royal") || key.contains("void") || key.contains("amethyst") || key.contains("&5")) return Material.PURPLE_STAINED_GLASS_PANE;
-        if (key.contains("frost") || key.contains("white") || key.contains("&f")) return Material.WHITE_STAINED_GLASS_PANE;
-        if (key.contains("shadow") || key.contains("black") || key.contains("&0")) return Material.BLACK_STAINED_GLASS_PANE;
-        if (key.contains("ocean") || key.contains("blue") || key.contains("&9")) return Material.BLUE_STAINED_GLASS_PANE;
-        return Material.CYAN_STAINED_GLASS_PANE;
+        if (key.contains("gold") || key.contains("sun") || key.contains("yellow") || key.contains("&6")) return Material.YELLOW_DYE;
+        if (key.contains("inferno") || key.contains("sunset") || key.contains("orange")) return Material.ORANGE_DYE;
+        if (key.contains("rose") || key.contains("pink")) return Material.PINK_DYE;
+        if (key.contains("ruby") || key.contains("red") || key.contains("&c")) return Material.RED_DYE;
+        if (key.contains("emerald") || key.contains("nature") || key.contains("green") || key.contains("&a")) return Material.LIME_DYE;
+        if (key.contains("royal") || key.contains("void") || key.contains("amethyst") || key.contains("&5")) return Material.PURPLE_DYE;
+        if (key.contains("frost") || key.contains("ice") || key.contains("white") || key.contains("&f")) return Material.WHITE_DYE;
+        if (key.contains("shadow") || key.contains("black") || key.contains("&0")) return Material.BLACK_DYE;
+        if (key.contains("ocean") || key.contains("blue") || key.contains("&9")) return Material.BLUE_DYE;
+        if (key.contains("sand") || key.contains("brown")) return Material.BROWN_DYE;
+        return Material.CYAN_DYE;
     }
 
     private String paletteLegacyColor(String color) {
