@@ -16,7 +16,7 @@ catalog:
   minecraft-version: "1.21.11"
   default-license: "all-rights-reserved"
 
-# Item abilities. TNT-on-hit settings apply to items where the ability is enabled in the GUI.
+# Item abilities. Every power is activated per item in the Special Abilities GUI.
 abilities:
   tnt-on-hit-cooldown-ms: 3000
   tnt-on-hit-fuse-ticks: 40
@@ -24,3 +24,22 @@ abilities:
   lightning-on-hit-cooldown-ms: 5000
   lifesteal-on-hit-cooldown-ms: 1000
   lifesteal-on-hit-percent: 0.25
+  poison-on-hit-cooldown-ms: 4500
+  poison-on-hit-duration-ticks: 60
+  poison-on-hit-amplifier: 0
+  frost-on-hit-cooldown-ms: 3000
+  frost-on-hit-duration-ticks: 40
+  frost-on-hit-amplifier: 1
+  flame-on-hit-cooldown-ms: 3500
+  flame-on-hit-duration-ticks: 80
+  knockback-on-hit-cooldown-ms: 2500
+  knockback-on-hit-strength: 1.25
+  knockback-on-hit-y: 0.35
+
+# MiniMessage format strings used by dynamic lore placeholders.
+# Put {enchantments} or {abilities} alone on a lore template line to expand it.
+# Supported enchantment placeholders: {name}, {level}, {key}.
+# Supported ability placeholders: {name}, {cooldown}, {key}.
+lore:
+  enchantment-line-format: "<#FBBF24>⚔ <#D1D5DB>{name} <#FDE68A>{level}"
+  ability-line-format: "<#F87171>✦ <#FECACA>{name} <#9CA3AF>({cooldown})"
