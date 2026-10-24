@@ -73,13 +73,21 @@ public final class IxKitsPlugin extends JavaPlugin implements Listener, CommandE
     private NamespacedKey tntOnHitKey;
     private NamespacedKey lightningOnHitKey;
     private NamespacedKey lifeStealOnHitKey;
+    private NamespacedKey poisonOnHitKey;
+    private NamespacedKey frostOnHitKey;
+    private NamespacedKey flameOnHitKey;
+    private NamespacedKey knockbackOnHitKey;
     private NamespacedKey tntCooldownKey;
     private NamespacedKey lightningCooldownKey;
     private NamespacedKey lifeStealCooldownKey;
+    private NamespacedKey poisonCooldownKey;
+    private NamespacedKey frostCooldownKey;
+    private NamespacedKey flameCooldownKey;
+    private NamespacedKey knockbackCooldownKey;
     private static final int[] EQUIP_SLOTS = {19, 21, 23, 25, 31};
     private static final String[] EQUIPMENT_KEYS = {"helmet", "chestplate", "leggings", "boots", "offhand"};
     private static final List<String> EDITABLE_ATTRIBUTES = List.of("max_health", "attack_damage", "attack_speed", "armor", "armor_toughness", "knockback_resistance", "movement_speed", "luck");
-    private static final String PREFIX = "§8[§bIxKits§8] §7";
+    private static final String PREFIX = "§8[§3✦ §bIxKits§8] §7";
     private static final int[] EDIT_SLOTS = {
         10,11,12,13,14,15,16, 19,20,21,22,23,24,25,
         28,29,30,31,32,33,34, 37,38,39,40,41,42,43
@@ -98,9 +106,17 @@ public final class IxKitsPlugin extends JavaPlugin implements Listener, CommandE
         tntOnHitKey = new NamespacedKey(this, "ability_tnt_on_hit");
         lightningOnHitKey = new NamespacedKey(this, "ability_lightning_on_hit");
         lifeStealOnHitKey = new NamespacedKey(this, "ability_lifesteal_on_hit");
+        poisonOnHitKey = new NamespacedKey(this, "ability_poison_on_hit");
+        frostOnHitKey = new NamespacedKey(this, "ability_frost_on_hit");
+        flameOnHitKey = new NamespacedKey(this, "ability_flame_on_hit");
+        knockbackOnHitKey = new NamespacedKey(this, "ability_knockback_on_hit");
         tntCooldownKey = new NamespacedKey(this, "ability_tnt_cooldown_ms");
         lightningCooldownKey = new NamespacedKey(this, "ability_lightning_cooldown_ms");
         lifeStealCooldownKey = new NamespacedKey(this, "ability_lifesteal_cooldown_ms");
+        poisonCooldownKey = new NamespacedKey(this, "ability_poison_cooldown_ms");
+        frostCooldownKey = new NamespacedKey(this, "ability_frost_cooldown_ms");
+        flameCooldownKey = new NamespacedKey(this, "ability_flame_cooldown_ms");
+        knockbackCooldownKey = new NamespacedKey(this, "ability_knockback_cooldown_ms");
         initializeTemplates();
         Objects.requireNonNull(getCommand("ixkits")).setExecutor(this);
         Bukkit.getPluginManager().registerEvents(this, this);
@@ -1726,6 +1742,18 @@ public final class IxKitsPlugin extends JavaPlugin implements Listener, CommandE
             List<String> preview = new ArrayList<>();
             List<String> configured = lore.getStringList(key + (isEnglish() ? ".lore_en" : ".lore"));
             if (configured.isEmpty()) configured = lore.getStringList(key + ".lore");
+            ItemStack previewTarget = project == null ? p.getInventory().getItemInMainHand() : getProjectItem(project, projectPage, targetSlot);
+            if (previewTarget != null && !previewTarget.getType().isAir()) {
+                configured = resolveLorePlaceholders(configured, previewTarget);
+            } else {
+                List<String> samples = new ArrayList<>();
+                for (String line : configured) {
+                    if ("{enchantments}".equalsIgnoreCase(line.trim())) samples.add("<#FBBF24>⚔ <#D1D5DB>Filo <#FDE68A>V");
+                    else if ("{abilities}".equalsIgnoreCase(line.trim())) samples.add("<#F87171>✦ <#FECACA>Veneno");
+                    else samples.add(line.replace("{item}", "Espada"));
+                }
+                configured = samples;
+            }
             preview.addAll(configured.stream().limit(4).toList());
             preview.add("");
             preview.add(project == null
@@ -1735,6 +1763,10 @@ public final class IxKitsPlugin extends JavaPlugin implements Listener, CommandE
             ItemStack templateIcon = new ItemStack(Material.WRITABLE_BOOK);
             ItemMeta templateMeta = templateIcon.getItemMeta();
             templateMeta.displayName(deserializeLoreLine(display));
+            if (preview.stream().noneMatch(line -> line.contains("IxKits Studio") || line.contains("CS Studios"))) {
+                preview.add("");
+                preview.add("§8✦ §7IxKits Studio §8• §3CS Studios");
+            }
             templateMeta.lore(loreComponents(preview));
             templateIcon.setItemMeta(templateMeta);
             inv.setItem(slot, templateIcon);
@@ -1923,39 +1955,60 @@ public final class IxKitsPlugin extends JavaPlugin implements Listener, CommandE
         Inventory inv = menu("item-editor", project, page, targetSlot, 0, tr("§3✦ §bIxKits §8• §0Editor de objeto", "§3✦ §bIxKits §8• §0Item editor"));
         border(inv);
         inv.setItem(4, target.clone());
-        inv.setItem(15, item(Material.PAPER, tr("§bCopiar objeto", "§bCopy item"),
-            tr("§7Guardar una copia exacta en IxKits.", "§7Keep an exact copy in IxKits."),
-            tr("§7Después haz clic en una ranura vacía.", "§7Then click an empty project slot.")));
+        inv.setItem(15, item(Material.PAPER, tr("§b✦ Copiar objeto", "§b✦ Copy item"),
+            tr("§7Guarda una copia exacta de este objeto.", "§7Keep an exact copy of this item."),
+            tr("§7Después haz clic en una ranura vacía.", "§7Then click an empty project slot."),
+            tr("§eAcción: guardar en el portapapeles", "§eAction: save to clipboard")));
         inv.setItem(16, item(Material.CHEST, tr("§bPortapapeles", "§bClipboard"),
-            itemClipboard.containsKey(p.getUniqueId()) ? tr("§aHay un objeto copiado", "§aAn item is copied") : tr("§8Está vacío", "§8It is empty"),
-            tr("§7Clic para ver el estado", "§7Click to check status")));
-        inv.setItem(14, item(Material.NETHER_STAR, tr("§dPropiedades especiales", "§dSpecial properties"),
-            tr("§7Libros, estandartes, armaduras,", "§7Books, banners, armor trims,"),
-            tr("§7cabezas y fuegos artificiales.", "§7heads and fireworks."),
-            tr("§eClic para abrir", "§eClick to open")));
-        inv.setItem(20, item(Material.ENCHANTED_BOOK, tr("§bEncantamientos", "§bEnchantments"),
-            tr("§7Añadir, subir o quitar niveles.", "§7Add, raise or lower levels."),
-            tr("§eClic para abrir el editor", "§eClick to open the editor")));
+            itemClipboard.containsKey(p.getUniqueId()) ? tr("§a● Contiene un objeto", "§a● Contains an item") : tr("§8○ Sin objeto guardado", "§8○ No item saved"),
+            tr("§7Guarda una copia exacta para duplicarla.", "§7Keep an exact copy ready to duplicate."),
+            tr("§eClic para consultar su contenido", "§eClick to inspect its contents")));
+        inv.setItem(14, item(Material.NETHER_STAR, tr("§d✦ Propiedades especiales", "§d✦ Special properties"),
+            tr("§7Personaliza metadatos avanzados:", "§7Customize advanced metadata:"),
+            tr("§8• §7Libros y páginas", "§8• §7Books and pages"),
+            tr("§8• §7Estandartes, armaduras y cabezas", "§8• §7Banners, armor and heads"),
+            tr("§8• §7Fuegos artificiales", "§8• §7Fireworks"),
+            tr("§eClic para explorar opciones", "§eClick to explore options")));
+        inv.setItem(20, item(Material.ENCHANTED_BOOK, tr("§b✦ Encantamientos", "§b✦ Enchantments"),
+            tr("§7Control total sobre cada encantamiento.", "§7Full control over every enchantment."),
+            tr("§8• §7Clic: subir nivel", "§8• §7Click: raise level"),
+            tr("§8• §7Clic derecho: bajar nivel", "§8• §7Right-click: lower level"),
+            tr("§8• §7Mayús + clic: nivel exacto", "§8• §7Shift-click: exact level"),
+            tr("§eClic para editar", "§eClick to edit")));
         List<String> enchantLore = new ArrayList<>();
         enchantLore.add(tr("§7Objeto: §f", "§7Item: §f") + displayName);
-        if (target.getEnchantments().isEmpty()) enchantLore.add(tr("§8Sin encantamientos", "§8No enchantments"));
-        else target.getEnchantments().entrySet().stream().sorted(Comparator.comparing(entry -> entry.getKey().getKey().toString())).forEach(entry ->
-            enchantLore.add("§b• §f" + prettyKey(entry.getKey().getKey().getKey()) + " " + romanLevel(entry.getValue())));
-        inv.setItem(22, item(Material.WRITABLE_BOOK, tr("§bPlantillas de lore", "§bLore templates"),
-            tr("§7Aplicar un diseño predeterminado.", "§7Apply a built-in style."),
-            tr("§eClic para elegir", "§eClick to choose")));
+        enchantLore.add(tr("§7Tipo: §f", "§7Material: §f") + prettyKey(target.getType().name()));
+        enchantLore.add(tr("§7Líneas de lore: §b", "§7Lore lines: §b") + (targetMeta == null || targetMeta.lore() == null ? 0 : targetMeta.lore().size()));
+        if (target.getEnchantments().isEmpty()) enchantLore.add(tr("§8✧ Sin encantamientos aplicados", "§8✧ No enchantments applied"));
+        else {
+            enchantLore.add(tr("§6⚔ Encantamientos actuales:", "§6⚔ Current enchantments:"));
+            target.getEnchantments().entrySet().stream().sorted(Comparator.comparing(entry -> entry.getKey().getKey().toString())).forEach(entry ->
+                enchantLore.add("§b› §f" + enchantmentDisplayName(entry.getKey()) + " §e" + romanLevel(entry.getValue())));
+        }
+        enchantLore.add(targetMeta != null && targetMeta.isUnbreakable() ? tr("§a✓ Irrompible", "§a✓ Unbreakable") : tr("§8○ Durabilidad normal", "§8○ Normal durability"));
+        inv.setItem(22, item(Material.WRITABLE_BOOK, tr("§b✧ Plantillas de lore", "§b✧ Lore templates"),
+            tr("§7Estilos originales para armas y objetos.", "§7Original styles for weapons and items."),
+            tr("§7Algunos insertan encantamientos y habilidades.", "§7Some insert enchantments and abilities."),
+            tr("§eClic para explorar diseños", "§eClick to explore designs")));
         inv.setItem(31, item(Material.PAPER, tr("§fDetalles del objeto", "§fItem details"), enchantLore.toArray(new String[0])));
-        inv.setItem(11, item(Material.NAME_TAG, tr("§bEditar nombre", "§bEdit name"), tr("§7Admite MiniMessage y RGB.", "§7Supports MiniMessage and RGB."), tr("§eClic para escribir", "§eClick to type")));
-        inv.setItem(13, item(Material.WRITABLE_BOOK, tr("§bEditor visual de lore", "§bVisual lore editor"),
-            tr("§7Añadir, editar, borrar y ordenar líneas.", "§7Add, edit, delete and reorder lines."),
-            tr("§7Cada línea se edita por separado.", "§7Edit each line separately."),
-            tr("§eClic para abrir", "§eClick to open")));
+        inv.setItem(11, item(Material.NAME_TAG, tr("§b✎ Nombre del objeto", "§b✎ Item name"),
+            tr("§7Actual: §f" + displayName, "§7Current: §f" + displayName),
+            tr("§7Gradientes, estilos y colores RGB.", "§7Gradients, styles and RGB colors."),
+            tr("§eClic para editar el nombre", "§eClick to edit the name")));
+        inv.setItem(13, item(Material.WRITABLE_BOOK, tr("§b✦ Editor visual de lore", "§b✦ Visual lore editor"),
+            tr("§7Diseña la descripción línea por línea.", "§7Design the description one line at a time."),
+            tr("§8• §7MiniMessage, RGB y gradientes", "§8• §7MiniMessage, RGB and gradients"),
+            tr("§8• §7Añadir, editar, duplicar y ordenar", "§8• §7Add, edit, duplicate and reorder"),
+            tr("§8• §7Previsualiza cada línea", "§8• §7Preview every line"),
+            tr("§eClic para abrir el taller", "§eClick to open the editor")));
         inv.setItem(24, item(Material.BARRIER, tr("§cQuitar todos los encantamientos", "§cRemove all enchantments"), tr("§7Solo afecta a este objeto del proyecto.", "§7Only affects this project item."), tr("§eClic para confirmar al instante", "§eClick to apply immediately")));
         inv.setItem(27, item(Material.ENCHANTED_BOOK, tr("§dPlantillas de encantamientos", "§dEnchantment presets"), tr("§7Aplicar una combinación guardada.", "§7Apply a saved combination."), tr("§eClic para elegir", "§eClick to choose")));
         inv.setItem(32, item(Material.PAINTING, tr("§bPaleta de colores", "§bColor palette"), tr("§7Cambiar el estilo del nombre y el lore.", "§7Restyle the name and lore."), tr("§eClic para elegir", "§eClick to choose")));
-        inv.setItem(30, item(Material.TNT, tr("§cHabilidades especiales", "§cCustom abilities"),
-            tr("§7Efectos activados al usar el objeto.", "§7Effects triggered when using the item."),
-            tr("§eClic para configurar", "§eClick to configure")));
+        inv.setItem(30, item(Material.TNT, tr("§c⚡ Habilidades especiales", "§c⚡ Special abilities"),
+            tr("§7Activa poderes de combate por objeto.", "§7Enable per-item combat abilities."),
+            tr("§8• §7TNT, rayo y robo de vida", "§8• §7TNT, lightning and lifesteal"),
+            tr("§8• §7Veneno, escarcha, llama e impacto", "§8• §7Venom, frost, flame and knockback"),
+            tr("§eClic para configurar los poderes", "§eClick to configure abilities")));
         inv.setItem(29, item(Material.IRON_BLOCK, tr("§bIrrompible", "§bUnbreakable"), tr("§7Alternar la propiedad del objeto.", "§7Toggle the item's property."), tr("§eClic para cambiar", "§eClick to toggle")));
         inv.setItem(33, item(Material.ANVIL, tr("§bDurabilidad", "§bDurability"), tr("§7Clic: +10 de daño", "§7Click: +10 damage"), tr("§7Derecho: -10; Mayús: reparar", "§7Right-click: -10; Shift: repair")));
         inv.setItem(35, item(Material.CARVED_PUMPKIN, tr("§bModelo personalizado", "§bCustom model data"), tr("§7Define o borra el número de modelo.", "§7Set or clear the model number."), tr("§eClic para escribir", "§eClick to type")));
@@ -1999,15 +2052,16 @@ public final class IxKitsPlugin extends JavaPlugin implements Listener, CommandE
             int slot = EDIT_SLOTS[index - start];
             ItemStack lineItem = new ItemStack(Material.PAPER);
             ItemMeta lineMeta = lineItem.getItemMeta();
-            lineMeta.displayName(net.kyori.adventure.text.Component.text("§bLínea " + (index + 1)));
+            lineMeta.displayName(legacy.deserialize("§b✦ Línea " + (index + 1)));
             List<net.kyori.adventure.text.Component> previewLore = new ArrayList<>();
             previewLore.add(legacy.deserialize("§7Vista previa: ").append(lines.get(index)));
             previewLore.add(net.kyori.adventure.text.Component.empty());
-            previewLore.add(net.kyori.adventure.text.Component.text(tr("§eClic: editar esta línea", "§eClick: edit this line")));
-            previewLore.add(net.kyori.adventure.text.Component.text(tr("§cClic derecho: borrar", "§cRight-click: delete")));
-            previewLore.add(net.kyori.adventure.text.Component.text(tr("§bMayús + clic: mover arriba", "§bShift-click: move up")));
-            previewLore.add(net.kyori.adventure.text.Component.text(tr("§bMayús + clic derecho: mover abajo", "§bShift + right-click: move down")));
-            previewLore.add(net.kyori.adventure.text.Component.text(tr("§dClic central: duplicar", "§dMiddle-click: duplicate")));
+            previewLore.add(legacy.deserialize(tr("§eClic: editar esta línea", "§eClick: edit this line")));
+            previewLore.add(legacy.deserialize(tr("§cClic derecho: borrar", "§cRight-click: delete")));
+            previewLore.add(legacy.deserialize(tr("§bMayús + clic: mover arriba", "§bShift-click: move up")));
+            previewLore.add(legacy.deserialize(tr("§bMayús + clic derecho: mover abajo", "§bShift + right-click: move down")));
+            previewLore.add(legacy.deserialize(tr("§dClic central: duplicar", "§dMiddle-click: duplicate")));
+            previewLore.add(legacy.deserialize("§8✦ §7IxKits Studio §8• §3CS Studios"));
             lineMeta.lore(previewLore);
             lineItem.setItemMeta(lineMeta);
             inv.setItem(slot, lineItem);
@@ -2041,6 +2095,10 @@ public final class IxKitsPlugin extends JavaPlugin implements Listener, CommandE
             case "tnt" -> tntCooldownKey;
             case "lightning" -> lightningCooldownKey;
             case "lifesteal" -> lifeStealCooldownKey;
+            case "poison" -> poisonCooldownKey;
+            case "frost" -> frostCooldownKey;
+            case "flame" -> flameCooldownKey;
+            case "knockback" -> knockbackCooldownKey;
             default -> null;
         };
     }
@@ -2053,6 +2111,10 @@ public final class IxKitsPlugin extends JavaPlugin implements Listener, CommandE
             case "tnt" -> { path = "abilities.tnt-on-hit-cooldown-ms"; fallback = 3000L; }
             case "lightning" -> { path = "abilities.lightning-on-hit-cooldown-ms"; fallback = 5000L; }
             case "lifesteal" -> { path = "abilities.lifesteal-on-hit-cooldown-ms"; fallback = 1000L; }
+            case "poison" -> { path = "abilities.poison-on-hit-cooldown-ms"; fallback = 4500L; }
+            case "frost" -> { path = "abilities.frost-on-hit-cooldown-ms"; fallback = 3000L; }
+            case "flame" -> { path = "abilities.flame-on-hit-cooldown-ms"; fallback = 3500L; }
+            case "knockback" -> { path = "abilities.knockback-on-hit-cooldown-ms"; fallback = 2500L; }
             default -> { return 0L; }
         }
         if (stack != null && !stack.getType().isAir() && stack.hasItemMeta() && key != null) {
@@ -2116,10 +2178,35 @@ public final class IxKitsPlugin extends JavaPlugin implements Listener, CommandE
             tr("§7Enfriamiento: ", "§7Cooldown: ") + formatCooldown(getAbilityCooldown(target, "lifesteal")),
             tr("§eClic izquierdo: activar/desactivar", "§eLeft-click: toggle"),
             tr("§bClic derecho: configurar cooldown", "§bRight-click: configure cooldown")));
-        inv.setItem(31, item(Material.BOOK, tr("§fCómo funciona", "§fHow it works"),
-            tr("§7Se aplica al arma cuando está en tu", "§7Applies when the item is in your"),
-            tr("§7mano principal y golpeas a un ser vivo.", "§7main hand and you hit a living entity."),
-            tr("§7Cada habilidad tiene su enfriamiento.", "§7Each ability has its own cooldown.")));
+        inv.setItem(29, item(isAbilityEnabled(target, poisonOnHitKey) ? Material.SPIDER_EYE : Material.FERMENTED_SPIDER_EYE,
+            isAbilityEnabled(target, poisonOnHitKey) ? tr("§aVeneno: ACTIVADO", "§aVenom: ENABLED") : tr("§cVeneno: DESACTIVADO", "§cVenom: DISABLED"),
+            tr("§7Envenena al objetivo durante unos segundos.", "§7Poisons the target for a few seconds."),
+            tr("§7Cooldown: ", "§7Cooldown: ") + formatCooldown(getAbilityCooldown(target, "poison")),
+            tr("§eClic izquierdo: activar/desactivar", "§eLeft-click: toggle"),
+            tr("§bClic derecho: cambiar cooldown", "§bRight-click: change cooldown")));
+        inv.setItem(31, item(isAbilityEnabled(target, frostOnHitKey) ? Material.PACKED_ICE : Material.ICE,
+            isAbilityEnabled(target, frostOnHitKey) ? tr("§aEscarcha: ACTIVADA", "§aFrost: ENABLED") : tr("§cEscarcha: DESACTIVADA", "§cFrost: DISABLED"),
+            tr("§7Ralentiza al enemigo al golpear.", "§7Slows the enemy when hit."),
+            tr("§7Cooldown: ", "§7Cooldown: ") + formatCooldown(getAbilityCooldown(target, "frost")),
+            tr("§eClic izquierdo: activar/desactivar", "§eLeft-click: toggle"),
+            tr("§bClic derecho: cambiar cooldown", "§bRight-click: change cooldown")));
+        inv.setItem(33, item(isAbilityEnabled(target, flameOnHitKey) ? Material.MAGMA_BLOCK : Material.FLINT_AND_STEEL,
+            isAbilityEnabled(target, flameOnHitKey) ? tr("§aLlama: ACTIVADA", "§aFlame: ENABLED") : tr("§cLlama: DESACTIVADA", "§cFlame: DISABLED"),
+            tr("§7Prende fuego al objetivo al golpear.", "§7Sets the target on fire on hit."),
+            tr("§7Cooldown: ", "§7Cooldown: ") + formatCooldown(getAbilityCooldown(target, "flame")),
+            tr("§eClic izquierdo: activar/desactivar", "§eLeft-click: toggle"),
+            tr("§bClic derecho: cambiar cooldown", "§bRight-click: change cooldown")));
+        inv.setItem(40, item(isAbilityEnabled(target, knockbackOnHitKey) ? Material.PISTON : Material.STICK,
+            isAbilityEnabled(target, knockbackOnHitKey) ? tr("§aImpacto: ACTIVADO", "§aKnockback: ENABLED") : tr("§cImpacto: DESACTIVADO", "§cKnockback: DISABLED"),
+            tr("§7Empuja al enemigo con un golpe reforzado.", "§7Pushes the enemy back with a stronger hit."),
+            tr("§7Cooldown: ", "§7Cooldown: ") + formatCooldown(getAbilityCooldown(target, "knockback")),
+            tr("§eClic izquierdo: activar/desactivar", "§eLeft-click: toggle"),
+            tr("§bClic derecho: cambiar cooldown", "§bRight-click: change cooldown")));
+        inv.setItem(42, item(Material.BOOK, tr("§f§lCómo configurar", "§f§lHow to configure"),
+            tr("§8Los efectos solo funcionan en combate.", "§8Effects only work in combat."),
+            tr("§7Clic izquierdo para activar o desactivar.", "§7Left-click to enable or disable."),
+            tr("§7Clic derecho para personalizar el cooldown.", "§7Right-click to customize cooldown."),
+            tr("§8Los cambios se guardan en el objeto.", "§8Changes are saved onto the item.")));
         inv.setItem(45, item(Material.ARROW, tr("§7Volver al objeto", "§7Back to item")));
         p.openInventory(inv);
     }
@@ -2609,6 +2696,10 @@ public final class IxKitsPlugin extends JavaPlugin implements Listener, CommandE
             else if (slot == 20) { if (e.isRightClick()) promptAbilityCooldown(p, h.project, h.page, h.targetSlot, "tnt"); else toggleAbility(p, h.project, h.page, h.targetSlot, tntOnHitKey); }
             else if (slot == 22) { if (e.isRightClick()) promptAbilityCooldown(p, h.project, h.page, h.targetSlot, "lightning"); else toggleAbility(p, h.project, h.page, h.targetSlot, lightningOnHitKey); }
             else if (slot == 24) { if (e.isRightClick()) promptAbilityCooldown(p, h.project, h.page, h.targetSlot, "lifesteal"); else toggleAbility(p, h.project, h.page, h.targetSlot, lifeStealOnHitKey); }
+            else if (slot == 29) { if (e.isRightClick()) promptAbilityCooldown(p, h.project, h.page, h.targetSlot, "poison"); else toggleAbility(p, h.project, h.page, h.targetSlot, poisonOnHitKey); }
+            else if (slot == 31) { if (e.isRightClick()) promptAbilityCooldown(p, h.project, h.page, h.targetSlot, "frost"); else toggleAbility(p, h.project, h.page, h.targetSlot, frostOnHitKey); }
+            else if (slot == 33) { if (e.isRightClick()) promptAbilityCooldown(p, h.project, h.page, h.targetSlot, "flame"); else toggleAbility(p, h.project, h.page, h.targetSlot, flameOnHitKey); }
+            else if (slot == 40) { if (e.isRightClick()) promptAbilityCooldown(p, h.project, h.page, h.targetSlot, "knockback"); else toggleAbility(p, h.project, h.page, h.targetSlot, knockbackOnHitKey); }
         } else if (h.kind.equals("item-editor")) {
             if (slot == 45) {
                 if (h.targetSlot < 0) openEquipment(p, h.project, h.page);
@@ -2939,6 +3030,34 @@ public final class IxKitsPlugin extends JavaPlugin implements Listener, CommandE
                 attacker.sendActionBar(Component.text("+" + String.format(Locale.US, "%.1f", healing) + " ♥"));
             }
         }
+        if (isAbilityEnabled(weapon, poisonOnHitKey)
+            && canTriggerAbility(attacker, "poison-on-hit", getAbilityCooldown(weapon, "poison"))) {
+            var poison = Registry.MOB_EFFECT.get(NamespacedKey.minecraft("poison"));
+            if (poison != null) target.addPotionEffect(new PotionEffect(poison,
+                Math.max(20, Math.min(1200, getConfig().getInt("abilities.poison-on-hit-duration-ticks", 60))),
+                Math.max(0, Math.min(4, getConfig().getInt("abilities.poison-on-hit-amplifier", 0))), false, true, true));
+        }
+        if (isAbilityEnabled(weapon, frostOnHitKey)
+            && canTriggerAbility(attacker, "frost-on-hit", getAbilityCooldown(weapon, "frost"))) {
+            var slowness = Registry.MOB_EFFECT.get(NamespacedKey.minecraft("slowness"));
+            if (slowness != null) target.addPotionEffect(new PotionEffect(slowness,
+                Math.max(20, Math.min(1200, getConfig().getInt("abilities.frost-on-hit-duration-ticks", 40))),
+                Math.max(0, Math.min(4, getConfig().getInt("abilities.frost-on-hit-amplifier", 1))), false, true, true));
+        }
+        if (isAbilityEnabled(weapon, flameOnHitKey)
+            && canTriggerAbility(attacker, "flame-on-hit", getAbilityCooldown(weapon, "flame"))) {
+            int fireTicks = Math.max(20, Math.min(1200, getConfig().getInt("abilities.flame-on-hit-duration-ticks", 80)));
+            target.setFireTicks(Math.max(target.getFireTicks(), fireTicks));
+        }
+        if (isAbilityEnabled(weapon, knockbackOnHitKey)
+            && canTriggerAbility(attacker, "knockback-on-hit", getAbilityCooldown(weapon, "knockback"))) {
+            org.bukkit.util.Vector direction = target.getLocation().toVector().subtract(attacker.getLocation().toVector());
+            if (direction.lengthSquared() > 0.0001) {
+                direction.normalize().multiply(Math.max(0.1, Math.min(3.5, getConfig().getDouble("abilities.knockback-on-hit-strength", 1.25))));
+                direction.setY(Math.max(0.0, Math.min(1.0, getConfig().getDouble("abilities.knockback-on-hit-y", 0.35))));
+                target.setVelocity(direction);
+            }
+        }
     }
 
     private boolean isEquipmentPlaceholder(ItemStack item) {
@@ -3220,6 +3339,129 @@ public final class IxKitsPlugin extends JavaPlugin implements Listener, CommandE
                 "<#2563EB>⚡ <#DBEAFE>Control: <#93C5FD>Absolute", "",
                 "<gradient:#FDE047:#60A5FA>➤ Break the silence of the sky</gradient>",
                 "<gradient:#1D4ED8:#93C5FD>━━━━━━━━━━━━━━━━━━━━</gradient>"));
+        ensureLoreTemplate(lore, "vanguard_pvp", "§c⚔ Vanguardia PvP", "§c⚔ PvP Vanguard",
+            List.of("<#4B5563>━━━━━━━━━━━━━━━━━━━━",
+                "<gradient:#F97316:#FDE68A><bold>⚔ ESPADA DE VANGUARDIA ⚔</bold></gradient>",
+                "<#9CA3AF>Forjada para combates sin tregua.", "",
+                "<#F87171>▸ <#D1D5DB>Clase: <#FDE68A>Guerrero",
+                "<#F87171>▸ <#D1D5DB>Estado: <#86EFAC>Templada", "",
+                "<#FBBF24>⚔ <#F3F4F6>ENCANTAMIENTOS", "{enchantments}", "",
+                "<#FB923C>✦ <#F3F4F6>PODERES", "{abilities}",
+                "<#4B5563>━━━━━━━━━━━━━━━━━━━━"),
+            List.of("<#4B5563>━━━━━━━━━━━━━━━━━━━━",
+                "<gradient:#F97316:#FDE68A><bold>⚔ PVP VANGUARD SWORD ⚔</bold></gradient>",
+                "<#9CA3AF>Forged for battles without mercy.", "",
+                "<#F87171>▸ <#D1D5DB>Class: <#FDE68A>Warrior",
+                "<#F87171>▸ <#D1D5DB>State: <#86EFAC>Tempered", "",
+                "<#FBBF24>⚔ <#F3F4F6>ENCHANTMENTS", "{enchantments}", "",
+                "<#FB923C>✦ <#F3F4F6>POWERS", "{abilities}",
+                "<#4B5563>━━━━━━━━━━━━━━━━━━━━"));
+        ensureLoreTemplate(lore, "soulreaper", "&#C084FC☠ Segador de almas", "&#C084FC☠ Soul Reaper",
+            List.of("<#312E81>☠━━━━━━━━━━━━━━━━☠",
+                "<gradient:#C084FC:#F5D0FE><bold>SEGADOR DE ALMAS</bold></gradient>",
+                "<#A5B4FC>Una hoja nacida en el silencio.",
+                "<#6D28D9>«Cada golpe reclama un recuerdo»", "",
+                "<#C4B5FD>✧ <#E9D5FF>Vínculo: <#F5D0FE>Inmortal",
+                "<#C4B5FD>✧ <#E9D5FF>Portador: <#F3E8FF>{item}", "",
+                "{enchantments}", "{abilities}",
+                "<#312E81>☠━━━━━━━━━━━━━━━━☠"),
+            List.of("<#312E81>☠━━━━━━━━━━━━━━━━☠",
+                "<gradient:#C084FC:#F5D0FE><bold>SOUL REAPER</bold></gradient>",
+                "<#A5B4FC>A blade born from silence.",
+                "<#6D28D9>“Every strike claims a memory.”", "",
+                "<#C4B5FD>✧ <#E9D5FF>Bond: <#F5D0FE>Immortal",
+                "<#C4B5FD>✧ <#E9D5FF>Bearer: <#F3E8FF>{item}", "",
+                "{enchantments}", "{abilities}",
+                "<#312E81>☠━━━━━━━━━━━━━━━━☠"));
+        ensureLoreTemplate(lore, "frostbite_fang", "&#67E8F9❄ Colmillo glacial", "&#67E8F9❄ Frostbite Fang",
+            List.of("<#164E63>❄ ɪᴄᴇ ʙᴏᴜɴᴅ ❄",
+                "<#67E8F9><bold>COLMILLO GLACIAL</bold>",
+                "<#CBD5E1>El frío no avisa. Solo sentencia.", "",
+                "<#22D3EE>✦ <#E0F2FE>Elemento",
+                "<#94A3B8>   Hielo antiguo",
+                "<#22D3EE>✦ <#E0F2FE>Sinergia",
+                "<#94A3B8>   Escarcha y control", "",
+                "<#67E8F9>⚔ <#E0F2FE>Runas activas",
+                "{enchantments}", "{abilities}",
+                "<#164E63>❄ ɪᴄᴇ ʙᴏᴜɴᴅ ❄"),
+            List.of("<#164E63>❄ ɪᴄᴇ ʙᴏᴜɴᴅ ❄",
+                "<#67E8F9><bold>FROSTBITE FANG</bold>",
+                "<#CBD5E1>The cold does not warn. It condemns.", "",
+                "<#22D3EE>✦ <#E0F2FE>Element",
+                "<#94A3B8>   Ancient ice",
+                "<#22D3EE>✦ <#E0F2FE>Synergy",
+                "<#94A3B8>   Frost and control", "",
+                "<#67E8F9>⚔ <#E0F2FE>Active runes",
+                "{enchantments}", "{abilities}",
+                "<#164E63>❄ ɪᴄᴇ ʙᴏᴜɴᴅ ❄"));
+        ensureLoreTemplate(lore, "netherbrand", "&#FB923C♜ Marca del Nether", "&#FB923C♜ Netherbrand",
+            List.of("<#7F1D1D>╔══════════════════╗",
+                "<gradient:#FDE68A:#EF4444><bold>  MARCA DEL NETHER  </bold></gradient>",
+                "<#FDBA74>El fuego recuerda quién lo dominó.", "",
+                "<#EF4444>◆ <#FED7AA>Elemento: <#FBBF24>Infernal",
+                "<#EF4444>◆ <#FED7AA>Forja: <#FECACA>Basalto eterno", "",
+                "<#FDE68A>✦ Juramento del portador",
+                "<#FECACA>  «No retrocedas ante las llamas»", "",
+                "{enchantments}", "{abilities}",
+                "<#7F1D1D>╚══════════════════╝"),
+            List.of("<#7F1D1D>╔══════════════════╗",
+                "<gradient:#FDE68A:#EF4444><bold>  NETHERBRAND  </bold></gradient>",
+                "<#FDBA74>Fire remembers who mastered it.", "",
+                "<#EF4444>◆ <#FED7AA>Element: <#FBBF24>Infernal",
+                "<#EF4444>◆ <#FED7AA>Forge: <#FECACA>Eternal basalt", "",
+                "<#FDE68A>✦ The bearer's oath",
+                "<#FECACA>  “Never retreat before the flame.”", "",
+                "{enchantments}", "{abilities}",
+                "<#7F1D1D>╚══════════════════╝"));
+        ensureLoreTemplate(lore, "ranger_marksman", "&#86EFAC➶ Tirador élite", "&#86EFAC➶ Elite Marksman",
+            List.of("<#14532D>➶━━━━━━━━━━━━━━━━",
+                "<#86EFAC><bold>ARCO DEL VIGÍA</bold>",
+                "<#D1FAE5>Una cuerda. Una flecha. Ningún error.", "",
+                "<#4ADE80>⌖ <#ECFDF5>Disciplina: <#BBF7D0>Precisión",
+                "<#4ADE80>⌖ <#ECFDF5>Alcance: <#BBF7D0>Letal", "",
+                "<#86EFAC>↳ <#F0FDF4>El viento guía el disparo",
+                "{enchantments}", "{abilities}",
+                "<#14532D>➶━━━━━━━━━━━━━━━━"),
+            List.of("<#14532D>➶━━━━━━━━━━━━━━━━",
+                "<#86EFAC><bold>WATCHER'S BOW</bold>",
+                "<#D1FAE5>One string. One arrow. No mistakes.", "",
+                "<#4ADE80>⌖ <#ECFDF5>Discipline: <#BBF7D0>Precision",
+                "<#4ADE80>⌖ <#ECFDF5>Range: <#BBF7D0>Lethal", "",
+                "<#86EFAC>↳ <#F0FDF4>The wind guides the shot",
+                "{enchantments}", "{abilities}",
+                "<#14532D>➶━━━━━━━━━━━━━━━━"));
+        ensureLoreTemplate(lore, "gladiator_badge", "&#FDE68A♛ Insignia del gladiador", "&#FDE68A♛ Gladiator's Mark",
+            List.of("<#78350F>╭─── ⚔ ───╮",
+                "<gradient:#FDE68A:#F59E0B><bold>GLADIADOR</bold></gradient>",
+                "<#D6D3D1>La arena conoce tu nombre.", "",
+                "<#FBBF24>✦ <#FFFBEB>Victorias: <#FDE68A>Forjadas",
+                "<#FBBF24>✦ <#FFFBEB>Honor: <#FDE68A>Inquebrantable", "",
+                "<#D97706>« Que hable el acero. »",
+                "{enchantments}", "{abilities}",
+                "<#78350F>╰─── ⚔ ───╯"),
+            List.of("<#78350F>╭─── ⚔ ───╮",
+                "<gradient:#FDE68A:#F59E0B><bold>GLADIATOR</bold></gradient>",
+                "<#D6D3D1>The arena knows your name.", "",
+                "<#FBBF24>✦ <#FFFBEB>Victories: <#FDE68A>Forged",
+                "<#FBBF24>✦ <#FFFBEB>Honor: <#FDE68A>Unbroken", "",
+                "<#D97706>“ Let steel speak. ”",
+                "{enchantments}", "{abilities}",
+                "<#78350F>╰─── ⚔ ───╯"));
+        ensureLoreTemplate(lore, "venom_bloom", "&#86EFAC☣ Flor venenosa", "&#86EFAC☣ Venom Bloom",
+            List.of("<#064E3B>☣ ᴠᴇɴᴏᴍ ʀɪᴛᴜᴀʟ ☣",
+                "<#86EFAC><bold>FLOR VENENOSA</bold>",
+                "<#A7F3D0>Hermosa de lejos. Mortal de cerca.", "",
+                "<#34D399>☣ <#D1FAE5>Extracto: <#86EFAC>Letal",
+                "<#34D399>☣ <#D1FAE5>Curación: <#FCA5A5>Ninguna", "",
+                "{enchantments}", "{abilities}",
+                "<#064E3B>☣ ᴠᴇɴᴏᴍ ʀɪᴛᴜᴀʟ ☣"),
+            List.of("<#064E3B>☣ ᴠᴇɴᴏᴍ ʀɪᴛᴜᴀʟ ☣",
+                "<#86EFAC><bold>VENOM BLOOM</bold>",
+                "<#A7F3D0>Beautiful from afar. Deadly up close.", "",
+                "<#34D399>☣ <#D1FAE5>Extract: <#86EFAC>Lethal",
+                "<#34D399>☣ <#D1FAE5>Healing: <#FCA5A5>None", "",
+                "{enchantments}", "{abilities}",
+                "<#064E3B>☣ ᴠᴇɴᴏᴍ ʀɪᴛᴜᴀʟ ☣"));
         saveYaml(lore, loreFile);
 
         File paletteFile = new File(templatesDir, "palettes.yml");
@@ -3281,6 +3523,91 @@ public final class IxKitsPlugin extends JavaPlugin implements Listener, CommandE
         if (!yaml.contains(key + ".display_en")) yaml.set(key + ".display_en", displayEn);
     }
 
+    /**
+     * Expands optional placeholders in lore templates. Keep {enchantments} and {abilities}
+     * on their own line so each generated entry becomes a separate Minecraft lore row.
+     */
+    private List<String> resolveLorePlaceholders(List<String> lines, ItemStack stack) {
+        List<String> result = new ArrayList<>();
+        if (lines == null) return result;
+        for (String raw : lines) {
+            if (raw == null) continue;
+            String token = raw.trim().toLowerCase(Locale.ROOT);
+            if (token.equals("{enchantments}")) { result.addAll(generatedEnchantmentLore(stack)); continue; }
+            if (token.equals("{abilities}")) { result.addAll(generatedAbilityLore(stack)); continue; }
+            String itemName = stack == null || stack.getType().isAir() ? tr("Objeto", "Item") : prettyKey(stack.getType().name());
+            result.add(raw.replace("{item}", itemName).replace("{ITEM}", itemName));
+        }
+        return result;
+    }
+
+    private List<String> generatedEnchantmentLore(ItemStack stack) {
+        if (stack == null || stack.getType().isAir() || stack.getEnchantments().isEmpty()) return List.of();
+        String format = getConfig().getString("lore.enchantment-line-format", "<#FBBF24>⚔ <#D1D5DB>{name} <#FDE68A>{level}");
+        List<String> lines = new ArrayList<>();
+        stack.getEnchantments().entrySet().stream()
+            .sorted(Comparator.comparing(entry -> entry.getKey().getKey().toString()))
+            .forEach(entry -> lines.add(format.replace("{name}", enchantmentDisplayName(entry.getKey()))
+                .replace("{level}", romanLevel(entry.getValue()))
+                .replace("{key}", entry.getKey().getKey().toString())));
+        return lines;
+    }
+
+    private String enchantmentDisplayName(Enchantment enchantment) {
+        String key = enchantment.getKey().getKey();
+        return switch (key) {
+            case "sharpness" -> tr("Filo", "Sharpness");
+            case "smite" -> tr("Castigo", "Smite");
+            case "bane_of_arthropods" -> tr("Aniquilación de artrópodos", "Bane of Arthropods");
+            case "protection" -> tr("Protección", "Protection");
+            case "fire_protection" -> tr("Protección contra el fuego", "Fire Protection");
+            case "blast_protection" -> tr("Protección contra explosiones", "Blast Protection");
+            case "projectile_protection" -> tr("Protección contra proyectiles", "Projectile Protection");
+            case "unbreaking" -> tr("Irrompibilidad", "Unbreaking");
+            case "fire_aspect" -> tr("Aspecto ígneo", "Fire Aspect");
+            case "looting" -> tr("Saqueo", "Looting");
+            case "sweeping_edge" -> tr("Filo arrasador", "Sweeping Edge");
+            case "knockback" -> tr("Empuje", "Knockback");
+            case "power" -> tr("Poder", "Power");
+            case "punch" -> tr("Retroceso", "Punch");
+            case "flame" -> tr("Llama", "Flame");
+            case "infinity" -> tr("Infinidad", "Infinity");
+            case "efficiency" -> tr("Eficiencia", "Efficiency");
+            case "fortune" -> tr("Fortuna", "Fortune");
+            case "silk_touch" -> tr("Toque de seda", "Silk Touch");
+            case "mending" -> tr("Reparación", "Mending");
+            case "feather_falling" -> tr("Caída de pluma", "Feather Falling");
+            case "depth_strider" -> tr("Agilidad acuática", "Depth Strider");
+            case "soul_speed" -> tr("Velocidad de almas", "Soul Speed");
+            case "respiration" -> tr("Respiración", "Respiration");
+            case "aqua_affinity" -> tr("Afinidad acuática", "Aqua Affinity");
+            case "thorns" -> tr("Espinas", "Thorns");
+            case "loyalty" -> tr("Lealtad", "Loyalty");
+            case "impaling" -> tr("Empalamiento", "Impaling");
+            case "channeling" -> tr("Conductividad", "Channeling");
+            case "riptide" -> tr("Propulsión acuática", "Riptide");
+            case "density" -> tr("Densidad", "Density");
+            case "breach" -> tr("Brecha", "Breach");
+            case "wind_burst" -> tr("Estallido de viento", "Wind Burst");
+            case "swift_sneak" -> tr("Sigilo veloz", "Swift Sneak");
+            default -> prettyKey(key);
+        };
+    }
+
+    private List<String> generatedAbilityLore(ItemStack stack) {
+        if (stack == null || stack.getType().isAir()) return List.of();
+        String format = getConfig().getString("lore.ability-line-format", "<#F87171>✦ <#FECACA>{name} <#9CA3AF>({cooldown})");
+        List<String> lines = new ArrayList<>();
+        if (isAbilityEnabled(stack, tntOnHitKey)) lines.add(format.replace("{name}", tr("TNT al golpear", "TNT on hit")).replace("{cooldown}", formatCooldown(getAbilityCooldown(stack, "tnt"))).replace("{key}", "tnt"));
+        if (isAbilityEnabled(stack, lightningOnHitKey)) lines.add(format.replace("{name}", tr("Rayo al golpear", "Lightning on hit")).replace("{cooldown}", formatCooldown(getAbilityCooldown(stack, "lightning"))).replace("{key}", "lightning"));
+        if (isAbilityEnabled(stack, lifeStealOnHitKey)) lines.add(format.replace("{name}", tr("Robo de vida", "Lifesteal")).replace("{cooldown}", formatCooldown(getAbilityCooldown(stack, "lifesteal"))).replace("{key}", "lifesteal"));
+        if (isAbilityEnabled(stack, poisonOnHitKey)) lines.add(format.replace("{name}", tr("Veneno", "Venom")).replace("{cooldown}", formatCooldown(getAbilityCooldown(stack, "poison"))).replace("{key}", "poison"));
+        if (isAbilityEnabled(stack, frostOnHitKey)) lines.add(format.replace("{name}", tr("Escarcha", "Frost")).replace("{cooldown}", formatCooldown(getAbilityCooldown(stack, "frost"))).replace("{key}", "frost"));
+        if (isAbilityEnabled(stack, flameOnHitKey)) lines.add(format.replace("{name}", tr("Llama", "Flame")).replace("{cooldown}", formatCooldown(getAbilityCooldown(stack, "flame"))).replace("{key}", "flame"));
+        if (isAbilityEnabled(stack, knockbackOnHitKey)) lines.add(format.replace("{name}", tr("Impacto reforzado", "Enhanced knockback")).replace("{cooldown}", formatCooldown(getAbilityCooldown(stack, "knockback"))).replace("{key}", "knockback"));
+        return lines;
+    }
+
     private void applyLoreTemplateToProject(Player p, String key, String project, int projectPage, int targetSlot) {
         File file = projectFile(project);
         YamlConfiguration yaml = YamlConfiguration.loadConfiguration(file);
@@ -3301,6 +3628,7 @@ public final class IxKitsPlugin extends JavaPlugin implements Listener, CommandE
             p.sendMessage(PREFIX + tr("No se pudo editar ese objeto.", "Could not edit that item."));
             return;
         }
+        lines = resolveLorePlaceholders(lines, target);
         meta.lore(loreComponents(lines));
         target.setItemMeta(meta);
         yaml.set(itemPath, target);
@@ -3335,6 +3663,7 @@ public final class IxKitsPlugin extends JavaPlugin implements Listener, CommandE
             p.sendMessage(PREFIX + tr("No se pudo editar ese objeto.", "Could not edit that item."));
             return;
         }
+        lines = resolveLorePlaceholders(lines, held);
         meta.lore(loreComponents(lines));
         held.setItemMeta(meta);
         p.sendMessage(PREFIX + tr("Lore aplicado: §b", "Lore applied: §b") + yaml.getString(key + (isEnglish() ? ".display_en" : ".display"), yaml.getString(key + ".display", prettyKey(key))));
@@ -3381,11 +3710,28 @@ public final class IxKitsPlugin extends JavaPlugin implements Listener, CommandE
         return level < numerals.length ? numerals[level] : Integer.toString(level);
     }
 
+    private List<String> decorateMenuLore(List<String> source) {
+        List<String> lore = new ArrayList<>();
+        if (source != null) {
+            for (String line : source) {
+                if (line == null) continue;
+                if (line.isBlank() && (lore.isEmpty() || lore.get(lore.size() - 1).isBlank())) continue;
+                lore.add(line);
+            }
+        }
+        boolean branded = lore.stream().anyMatch(line -> line.contains("IxKits Studio") || line.contains("CS Studios"));
+        if (!lore.isEmpty() && !branded) {
+            if (!lore.get(lore.size() - 1).isBlank()) lore.add("");
+            lore.add("§8✦ §7IxKits Studio §8• §3CS Studios");
+        }
+        return lore;
+    }
+
     private ItemStack itemWithLore(Material material, String name, List<String> lore) {
         ItemStack stack = new ItemStack(material);
         ItemMeta meta = stack.getItemMeta();
         meta.setDisplayName(name);
-        meta.setLore(lore);
+        meta.setLore(decorateMenuLore(lore));
         meta.addItemFlags(ItemFlag.HIDE_ATTRIBUTES);
         stack.setItemMeta(meta);
         return stack;
@@ -3407,9 +3753,13 @@ public final class IxKitsPlugin extends JavaPlugin implements Listener, CommandE
         for (int i=0;i<54;i++) if (i<9 || i>=45 || i%9==0 || i%9==8) inv.setItem(i, glass);
     }
     private ItemStack item(Material material, String name, String... lore) {
-        ItemStack stack = new ItemStack(material); ItemMeta meta = stack.getItemMeta();
-        meta.setDisplayName(name); meta.setLore(Arrays.asList(lore)); meta.addItemFlags(ItemFlag.HIDE_ATTRIBUTES);
-        stack.setItemMeta(meta); return stack;
+        ItemStack stack = new ItemStack(material);
+        ItemMeta meta = stack.getItemMeta();
+        meta.setDisplayName(name);
+        meta.setLore(decorateMenuLore(Arrays.asList(lore)));
+        meta.addItemFlags(ItemFlag.HIDE_ATTRIBUTES);
+        stack.setItemMeta(meta);
+        return stack;
     }
     private boolean contains(int[] arr, int value) { for (int n : arr) if (n == value) return true; return false; }
     private List<String> color(List<String> lines) { return lines.stream().map(this::translateLoreColors).toList(); }
