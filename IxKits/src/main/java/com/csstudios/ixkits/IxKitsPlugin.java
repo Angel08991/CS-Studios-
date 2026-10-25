@@ -135,7 +135,7 @@ public final class IxKitsPlugin extends JavaPlugin implements Listener, CommandE
         String prefix = args.length == 0 ? "" : args[args.length - 1].toLowerCase(Locale.ROOT);
         List<String> suggestions = new ArrayList<>();
         if (args.length == 1) {
-            suggestions.addAll(List.of("claim", "comunidad", "plantillas", "catalogo", "buscar", "idioma"));
+            suggestions.addAll(List.of("help", "ayuda", "claim", "comunidad", "plantillas", "catalogo", "buscar", "idioma"));
             if (sender.hasPermission("ixkits.admin")) suggestions.addAll(List.of("crear", "editar", "proyectos", "exportar", "exportar-essentials",
                 "importar", "importar-essentials", "importar-mano", "equipamiento", "validar", "duplicar", "renombrar",
                 "eliminar", "papelera", "restaurar-eliminado", "deshacer", "rehacer", "recargar", "paleta", "lore", "encantamientos"));
@@ -170,7 +170,7 @@ public final class IxKitsPlugin extends JavaPlugin implements Listener, CommandE
             return true;
         }
         String sub = args[0].toLowerCase(Locale.ROOT);
-        boolean communityCommand = Set.of("comunidad", "community", "catalogo", "catálogo", "buscar", "descargar", "valorar", "favorito", "versiones", "versions", "plantillas", "cancelar", "cancel", "claim").contains(sub)
+        boolean communityCommand = Set.of("help", "ayuda", "comunidad", "community", "catalogo", "catálogo", "buscar", "descargar", "valorar", "favorito", "versiones", "versions", "plantillas", "cancelar", "cancel", "claim").contains(sub)
             || (sub.equals("lore") && args.length >= 3 && args[1].equalsIgnoreCase("aplicar"))
             || (sub.equals("paleta") && args.length >= 3 && args[1].equalsIgnoreCase("aplicar"))
             || (sub.equals("encantamientos") && args.length >= 3 && args[1].equalsIgnoreCase("aplicar"));
@@ -179,6 +179,7 @@ public final class IxKitsPlugin extends JavaPlugin implements Listener, CommandE
             player.sendMessage(prefix() + tr("No tienes permiso para administrar IxKits. Puedes navegar la comunidad con /ixkits comunidad.", "You do not have permission to administer IxKits. You can browse Community with /ixkits comunidad."));
             return true;
         }
+        if (sub.equals("help") || sub.equals("ayuda")) { sendHelp(player); return true; }
         if (sub.equals("claim")) { claimProjectItems(player, args); return true; }
         if (sub.equals("cancelar") || sub.equals("cancel")) { cancelPendingInput(player); return true; }
         if (sub.equals("comunidad") || sub.equals("community")) { openCommunityHub(player); return true; }
@@ -1475,7 +1476,11 @@ public final class IxKitsPlugin extends JavaPlugin implements Listener, CommandE
 
     private String configuredMessage(String key, String spanish, String english, String... replacements) {
         String fallback = isEnglish() ? english : spanish;
-        String raw = messages == null ? fallback : messages.getString((isEnglish() ? "en." : "es.") + key, fallback);
+        String raw = fallback;
+        if (messages != null) {
+            raw = messages.getString(language() + "." + key,
+                messages.getString((isEnglish() ? "en." : "es.") + key, fallback));
+        }
         raw = translateLoreColors(raw);
         for (int i = 0; i + 1 < replacements.length; i += 2) raw = raw.replace(replacements[i], replacements[i + 1]);
         return raw;
@@ -1879,10 +1884,24 @@ public final class IxKitsPlugin extends JavaPlugin implements Listener, CommandE
     private void openLanguages(Player p) {
         Inventory inv = menu("language", null, 0, tr("§3✦ §bIxKits §8• §0Idioma", "§3✦ §bIxKits §8• §0Language"));
         border(inv);
-        inv.setItem(21, item(Material.WRITABLE_BOOK, "§bEnglish", tr("§7Idioma inglés", "§7English language"), isEnglish() ? "§a✓ " + tr("Seleccionado", "Selected") : "§e" + tr("Clic para elegir", "Click to select")));
-        inv.setItem(23, item(Material.WRITABLE_BOOK, "§eEspañol", tr("§7Idioma español", "§7Spanish language"), !isEnglish() ? "§a✓ " + tr("Seleccionado", "Selected") : "§e" + tr("Clic para elegir", "Click to select")));
-        inv.setItem(31, item(Material.MAP, tr("§fConfiguración guardada", "§fSaved setting"), tr("§7Se aplica a todo el plugin.", "§7Applies to the whole plugin."), tr("§7También puedes editar config.yml", "§7You can also edit config.yml"), "§b language: en / es"));
-        inv.setItem(45, item(Material.ARROW, tr("§7Volver", "§7Back"), tr("§8Menú principal", "§8Main menu")));
+        String[] codes = {"es", "en", "pt", "fr", "de", "it", "zh", "ru"};
+        String[] names = {"§eEspañol", "§bEnglish", "§aPortuguês", "§9Français", "§fDeutsch", "§6Italiano", "§d中文", "§cРусский"};
+        String[] localized = {"Idioma español", "English language", "Idioma português", "Langue française", "Deutsche Sprache", "Lingua italiana", "中文语言", "Русский язык"};
+        int[] slots = {10, 12, 14, 16, 28, 30, 32, 34};
+        for (int i = 0; i < codes.length; i++) {
+            boolean selected = language().equals(codes[i]);
+            inv.setItem(slots[i], item(Material.WRITABLE_BOOK, names[i],
+                "§7" + localized[i], "",
+                selected ? "§a✓ " + tr("Idioma actual", "Current language") : "§e" + tr("Clic para seleccionar", "Click to select"),
+                "§8" + codes[i]));
+        }
+        inv.setItem(22, item(Material.MAP, "§f§l" + tr("Idioma del plugin", "Plugin language"),
+            tr("§7Los menús y mensajes principales", "§7Common menus and messages"),
+            tr("§7usan el idioma seleccionado cuando", "§7use the selected language where"),
+            tr("§7hay una traducción disponible.", "§7a translation is available."), "",
+            "§8es · en · pt · fr · de · it · zh · ru",
+            tr("§eTambién puedes usar /ixkits idioma <código>", "§eYou can also use /ixkits idioma <code>")));
+        inv.setItem(45, item(Material.ARROW, "§7← " + tr("Volver", "Back"), tr("§8Menú principal", "§8Main menu")));
         p.openInventory(inv);
     }
 
@@ -2391,6 +2410,38 @@ public final class IxKitsPlugin extends JavaPlugin implements Listener, CommandE
     }
 
 
+    private void sendHelp(Player player) {
+        String divider = "§8§m━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━";
+        player.sendMessage(divider);
+        player.sendMessage("§8┃ §b§l✦ IXKITS §f/ §bKIT CREATION STUDIO");
+        player.sendMessage("§8┃ §7" + tr("Crea objetos, kits y conjuntos desde una sola GUI.", "Create items, kits and sets from one GUI."));
+        player.sendMessage(divider);
+        player.sendMessage("§8┃ §b§l" + tr("ESTUDIO", "STUDIO"));
+        player.sendMessage("§8┃ §f/ixkits §8— §7" + tr("Abrir el taller", "Open the workshop"));
+        player.sendMessage("§8┃ §f/ixkits crear <nombre> §8— §7" + tr("Crear un proyecto", "Create a project"));
+        player.sendMessage("§8┃ §f/ixkits proyectos §8— §7" + tr("Buscar y organizar proyectos", "Search and organize projects"));
+        player.sendMessage("§8┃ §f/ixkits editar <proyecto> §8— §7" + tr("Editar un kit", "Edit a kit"));
+        player.sendMessage("§8┃ §f/ixkits plantillas §8— §7" + tr("Explorar plantillas de lore", "Browse lore templates"));
+        player.sendMessage("§8┃ §f/ixkits equipamiento <proyecto> §8— §7" + tr("Editar el equipamiento", "Edit equipment"));
+        player.sendMessage("");
+        player.sendMessage("§8┃ §d§l" + tr("PROYECTOS", "PROJECTS"));
+        player.sendMessage("§8┃ §f/ixkits claim <proyecto> §8— §7" + tr("Reclamar copia de los objetos", "Claim a copy of the items"));
+        player.sendMessage("§8┃ §f/ixkits exportar <proyecto> §8— §7" + tr("Exportar .ixkit.yml", "Export .ixkit.yml"));
+        player.sendMessage("§8┃ §f/ixkits importar <archivo.yml> [nombre] §8— §7" + tr("Importar desde imports", "Import from imports"));
+        player.sendMessage("§8┃ §f/ixkits importar-mano <proyecto> <página> <ranura>");
+        player.sendMessage("§8┃   §7" + tr("Copiar el objeto de tu mano al proyecto", "Copy the held item into the project"));
+        player.sendMessage("");
+        player.sendMessage("§8┃ §e§l" + tr("HERRAMIENTAS", "TOOLS"));
+        player.sendMessage("§8┃ §f/ixkits idioma <es|en|pt|fr|de|it|zh|ru> §8— §7" + tr("Cambiar idioma", "Change language"));
+        player.sendMessage("§8┃ §f/ixkits comunidad §8— §7" + tr("Abrir la comunidad", "Open Community"));
+        player.sendMessage("§8┃ §f/ixkits validar <proyecto> §8— §7" + tr("Revisar un proyecto", "Validate a project"));
+        player.sendMessage("§8┃ §f/ixkits recargar §8— §7" + tr("Recargar configuración y plantillas", "Reload configuration and templates"));
+        player.sendMessage(divider);
+        player.sendMessage("§8┃ §7" + tr("Documentación de CS Studios:", "CS Studios documentation:"));
+        player.sendMessage("§8┃ §bhttps://github.com/Angel08991/CS-Studios-");
+        player.sendMessage(divider);
+    }
+
     private void claimProjectItems(Player player, String[] args) {
         if (!getConfig().getBoolean("claim.enabled", true)) {
             player.sendMessage(prefix() + configuredMessage("claim.disabled", "&cLa reclamación de proyectos está desactivada por la configuración.", "&cProject claiming is disabled by server configuration."));
@@ -2859,8 +2910,14 @@ public final class IxKitsPlugin extends JavaPlugin implements Listener, CommandE
             } else if (slot == 40) openLanguages(p);
         } else if (h.kind.equals("language")) {
             if (slot == 45) openMain(p);
-            else if (slot == 21) setLanguage(p, "en");
-            else if (slot == 23) setLanguage(p, "es");
+            else if (slot == 10) setLanguage(p, "es");
+            else if (slot == 12) setLanguage(p, "en");
+            else if (slot == 14) setLanguage(p, "pt");
+            else if (slot == 16) setLanguage(p, "fr");
+            else if (slot == 28) setLanguage(p, "de");
+            else if (slot == 30) setLanguage(p, "it");
+            else if (slot == 32) setLanguage(p, "zh");
+            else if (slot == 34) setLanguage(p, "ru");
         } else if (h.kind.equals("projects")) {
             if (slot == 45) openMain(p);
             else if (slot == 47) openProjects(p, Math.max(0, h.page - 1), h.query);
@@ -4920,24 +4977,204 @@ public final class IxKitsPlugin extends JavaPlugin implements Listener, CommandE
     }
 
     private void setLanguage(Player p, String requested) {
-        String language = requested.toLowerCase(Locale.ROOT);
-        if (!language.equals("es") && !language.equals("en")) {
-            p.sendMessage(prefix() + tr("Idiomas disponibles: §bes§7 y §ben§7.", "Available languages: §bes§7 and §ben§7."));
+        String code = requested.toLowerCase(Locale.ROOT);
+        if (!Set.of("es", "en", "pt", "fr", "de", "it", "zh", "ru").contains(code)) {
+            p.sendMessage(prefix() + tr("§eIdiomas disponibles: §bes, en, pt, fr, de, it, zh, ru§e.", "§eAvailable languages: §bes, en, pt, fr, de, it, zh, ru§e."));
             openLanguages(p);
             return;
         }
-        getConfig().set("language", language);
+        getConfig().set("language", code);
         saveConfig();
-        p.sendMessage(prefix() + tr("Idioma guardado: Español.", "Language saved: English."));
+        p.sendMessage(prefix() + tr("§aIdioma guardado: §f", "§aLanguage saved: §f") + languageDisplayName(code) + "§7.");
         openMain(p);
     }
 
+    private String languageDisplayName(String code) {
+        return switch (code) {
+            case "en" -> "English";
+            case "pt" -> "Português";
+            case "fr" -> "Français";
+            case "de" -> "Deutsch";
+            case "it" -> "Italiano";
+            case "zh" -> "中文";
+            case "ru" -> "Русский";
+            default -> "Español";
+        };
+    }
+
+    private String language() {
+        String value = getConfig().getString("language", "es").toLowerCase(Locale.ROOT);
+        return Set.of("es", "en", "pt", "fr", "de", "it", "zh", "ru").contains(value) ? value : "es";
+    }
+
     private boolean isEnglish() {
-        return getConfig().getString("language", "es").equalsIgnoreCase("en");
+        return !language().equals("es");
     }
 
     private String tr(String spanish, String english) {
-        return isEnglish() ? english : spanish;
+        String locale = language();
+        if (locale.equals("es")) return spanish;
+        if (locale.equals("en")) return english;
+        String clean = english
+            .replaceAll("(?i)§x(?:§[0-9a-f]){6}", "")
+            .replaceAll("(?i)[§&][0-9a-fk-or]", "")
+            .trim();
+        String translated = translateUiPhrase(locale, clean);
+        if (translated == null) return english;
+        java.util.regex.Matcher colorPrefix = java.util.regex.Pattern
+            .compile("^(?:(?:§x(?:§[0-9a-f]){6})|[§&][0-9a-fk-or])*", java.util.regex.Pattern.CASE_INSENSITIVE)
+            .matcher(english);
+        return (colorPrefix.find() ? colorPrefix.group() : "") + translated;
+    }
+
+    private String translateUiPhrase(String locale, String text) {
+        return switch (locale) {
+            case "pt" -> switch (text) {
+                case "Back" -> "Voltar";
+                case "Previous" -> "Anterior";
+                case "Next" -> "Próximo";
+                case "My projects" -> "Meus projetos";
+                case "Create project" -> "Criar projeto";
+                case "Item workshop" -> "Oficina de itens";
+                case "✦ IxKits • Item workshop" -> "✦ IxKits • Oficina de itens";
+                case "Item name" -> "Nome do item";
+                case "Lore editor" -> "Editor de lore";
+                case "Lore templates" -> "Modelos de lore";
+                case "Enchantment presets" -> "Predefinições de encantamentos";
+                case "RGB palette" -> "Paleta RGB";
+                case "Special properties" -> "Propriedades especiais";
+                case "Special abilities" -> "Habilidades especiais";
+                case "Item details" -> "Detalhes do item";
+                case "Equipment" -> "Equipamento";
+                case "Tools" -> "Ferramentas";
+                case "Language" -> "Idioma";
+                case "Quick guide" -> "Guia rápido";
+                case "Fill complete set" -> "Completar conjunto";
+                case "Add blank line" -> "Adicionar linha vazia";
+                default -> null;
+            };
+            case "fr" -> switch (text) {
+                case "Back" -> "Retour";
+                case "Previous" -> "Précédent";
+                case "Next" -> "Suivant";
+                case "My projects" -> "Mes projets";
+                case "Create project" -> "Créer un projet";
+                case "Item workshop" -> "Atelier d'objet";
+                case "✦ IxKits • Item workshop" -> "✦ IxKits • Atelier d'objet";
+                case "Item name" -> "Nom de l'objet";
+                case "Lore editor" -> "Éditeur de lore";
+                case "Lore templates" -> "Modèles de lore";
+                case "Enchantment presets" -> "Préréglages d'enchantements";
+                case "RGB palette" -> "Palette RGB";
+                case "Special properties" -> "Propriétés spéciales";
+                case "Special abilities" -> "Compétences spéciales";
+                case "Item details" -> "Détails de l'objet";
+                case "Equipment" -> "Équipement";
+                case "Tools" -> "Outils";
+                case "Language" -> "Langue";
+                case "Quick guide" -> "Guide rapide";
+                case "Fill complete set" -> "Compléter l'ensemble";
+                case "Add blank line" -> "Ajouter une ligne vide";
+                default -> null;
+            };
+            case "de" -> switch (text) {
+                case "Back" -> "Zurück";
+                case "Previous" -> "Zurück";
+                case "Next" -> "Weiter";
+                case "My projects" -> "Meine Projekte";
+                case "Create project" -> "Projekt erstellen";
+                case "Item workshop" -> "Objekt-Werkstatt";
+                case "✦ IxKits • Item workshop" -> "✦ IxKits • Objekt-Werkstatt";
+                case "Item name" -> "Objektname";
+                case "Lore editor" -> "Lore-Editor";
+                case "Lore templates" -> "Lore-Vorlagen";
+                case "Enchantment presets" -> "Verzauberungs-Presets";
+                case "RGB palette" -> "RGB-Palette";
+                case "Special properties" -> "Spezielle Eigenschaften";
+                case "Special abilities" -> "Spezialfähigkeiten";
+                case "Item details" -> "Objektdetails";
+                case "Equipment" -> "Ausrüstung";
+                case "Tools" -> "Werkzeuge";
+                case "Language" -> "Sprache";
+                case "Quick guide" -> "Kurzanleitung";
+                case "Fill complete set" -> "Set vervollständigen";
+                case "Add blank line" -> "Leere Zeile hinzufügen";
+                default -> null;
+            };
+            case "it" -> switch (text) {
+                case "Back" -> "Indietro";
+                case "Previous" -> "Precedente";
+                case "Next" -> "Successivo";
+                case "My projects" -> "I miei progetti";
+                case "Create project" -> "Crea progetto";
+                case "Item workshop" -> "Officina oggetti";
+                case "✦ IxKits • Item workshop" -> "✦ IxKits • Officina oggetti";
+                case "Item name" -> "Nome oggetto";
+                case "Lore editor" -> "Editor lore";
+                case "Lore templates" -> "Modelli lore";
+                case "Enchantment presets" -> "Preset incantesimi";
+                case "RGB palette" -> "Palette RGB";
+                case "Special properties" -> "Proprietà speciali";
+                case "Special abilities" -> "Abilità speciali";
+                case "Item details" -> "Dettagli oggetto";
+                case "Equipment" -> "Equipaggiamento";
+                case "Tools" -> "Strumenti";
+                case "Language" -> "Lingua";
+                case "Quick guide" -> "Guida rapida";
+                case "Fill complete set" -> "Completa il set";
+                case "Add blank line" -> "Aggiungi riga vuota";
+                default -> null;
+            };
+            case "zh" -> switch (text) {
+                case "Back" -> "返回";
+                case "Previous" -> "上一页";
+                case "Next" -> "下一页";
+                case "My projects" -> "我的项目";
+                case "Create project" -> "创建项目";
+                case "Item workshop" -> "物品工作台";
+                case "✦ IxKits • Item workshop" -> "✦ IxKits • 物品工作台";
+                case "Item name" -> "物品名称";
+                case "Lore editor" -> "描述编辑器";
+                case "Lore templates" -> "描述模板";
+                case "Enchantment presets" -> "附魔预设";
+                case "RGB palette" -> "RGB 调色板";
+                case "Special properties" -> "特殊属性";
+                case "Special abilities" -> "特殊技能";
+                case "Item details" -> "物品详情";
+                case "Equipment" -> "装备";
+                case "Tools" -> "工具";
+                case "Language" -> "语言";
+                case "Quick guide" -> "快速指南";
+                case "Fill complete set" -> "补全套装";
+                case "Add blank line" -> "添加空白行";
+                default -> null;
+            };
+            case "ru" -> switch (text) {
+                case "Back" -> "Назад";
+                case "Previous" -> "Назад";
+                case "Next" -> "Далее";
+                case "My projects" -> "Мои проекты";
+                case "Create project" -> "Создать проект";
+                case "Item workshop" -> "Мастерская предметов";
+                case "✦ IxKits • Item workshop" -> "✦ IxKits • Мастерская предметов";
+                case "Item name" -> "Название предмета";
+                case "Lore editor" -> "Редактор описания";
+                case "Lore templates" -> "Шаблоны описания";
+                case "Enchantment presets" -> "Наборы зачарований";
+                case "RGB palette" -> "RGB-палитра";
+                case "Special properties" -> "Особые свойства";
+                case "Special abilities" -> "Особые способности";
+                case "Item details" -> "Детали предмета";
+                case "Equipment" -> "Снаряжение";
+                case "Tools" -> "Инструменты";
+                case "Language" -> "Язык";
+                case "Quick guide" -> "Краткое руководство";
+                case "Fill complete set" -> "Дополнить комплект";
+                case "Add blank line" -> "Добавить пустую строку";
+                default -> null;
+            };
+            default -> null;
+        };
     }
 
     private String prettyKey(String key) {
