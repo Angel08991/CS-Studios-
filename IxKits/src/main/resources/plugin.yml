@@ -3,11 +3,11 @@ version: '${version}'
 main: com.csstudios.ixkits.IxKitsPlugin
 api-version: '1.21'
 author: CS Studios
-description: Editor visual para crear, personalizar y exportar kits.
+description: Estudio visual para diseñar, personalizar, reclamar y exportar proyectos de kits.
 commands:
   ixkits:
-    description: Abre IxKits o navega la comunidad
-    usage: /ixkits
+    description: Abre IxKits, gestiona proyectos y reclama sus objetos
+    usage: /ixkits [claim <proyecto>]
 permissions:
   ixkits.admin:
     description: Permite crear, editar y administrar proyectos de IxKits
@@ -15,3 +15,7 @@ permissions:
   ixkits.community.publish:
     description: Permite publicar kits, lores, paletas y presets en IxKits Community sin acceso completo de administración
     default: op
+
+  ixkits.claim:
+    description: Permite reclamar objetos de proyectos cuando claim.permission lo requiere
+    default: true
