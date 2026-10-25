@@ -2,7 +2,7 @@
 
 **Desarrollado por CS Studios.**
 
-IxKits es un plugin administrativo para diseñar, personalizar, organizar, validar e intercambiar proyectos de kits. No añade un comando para que los jugadores reclamen kits.
+IxKits es un estudio visual para diseñar, personalizar, organizar, validar, exportar y compartir proyectos de kits. Incluye `/ixkits claim <proyecto>` para entregar los objetos y piezas de equipamiento de un proyecto cuando el servidor habilite esa función.
 
 ## Estado actual
 
@@ -11,10 +11,10 @@ La compilación de CI se ejecuta contra Paper API 1.21.11. La GUI debe probarse 
 - GUI de estudio con bordes y editor de inventario en dos páginas.
 - Editor de encantamientos: clic izquierdo sube el nivel, clic derecho lo baja, Mayús + clic izquierdo permite escribir un nivel exacto (1–32767) y Mayús + clic derecho elimina el encantamiento. Incluye presets con niveles personalizados.
 - Editor de pociones para escoger el tipo base y añadir/quitar efectos personalizados o subir su nivel desde una GUI.
-- Menú de propiedades especiales para libros escritos (título, autor y páginas MiniMessage), patrones y colores de estandartes, trims de armadura, propietario de cabezas y fuegos artificiales (potencia, tipo/color de efecto y eliminación de efectos).
+- Diseñador de escudos y estandartes: modifica patrones, el color de cada patrón y el color base del diseño. También incluye trims de armadura, libros, cabezas y fuegos artificiales.
 - Papelera recuperable en la GUI del navegador de proyectos, con acciones para deshacer y rehacer.
-- Portapapeles de objetos para duplicar una copia exacta desde un proyecto a otra ranura vacía.
-- Biblioteca bilingüe de plantillas originales para armas y objetos: Vanguardia PvP, Segador de almas, Colmillo glacial, Marca del Nether, Tirador élite, Insignia del gladiador y Flor venenosa, además de estilos previos, paletas RGB y presets de encantamientos.
+- Portapapeles visual para copiar el objeto actual, inspeccionar la copia guardada, reemplazar el objeto seleccionado, vaciar el portapapeles y pegar la copia en otra ranura vacía. Conserva los metadatos serializados de la copia.
+- Biblioteca de lores organizada por categorías: armas, armaduras, objetos especiales, minerales/materiales, consumibles y otros diseños. Incluye estilos originales inspirados en armas AERIS/ONI, armaduras de conjunto, minerales ancestrales, consumibles y tokens de evento, además de las plantillas anteriores.
 - Las plantillas pueden añadir automáticamente las líneas reales de encantamientos y habilidades especiales del objeto usando `{enchantments}` y `{abilities}`; `{item}` inserta el nombre del tipo de objeto.
 - Editor de nombre y lore con MiniMessage; separa las líneas de lore usando el separador vertical. Las GUI muestran controles más explicativos, vistas previas mejoradas y una firma visual de CS Studios.
 - Alternar irrompible, cambiar durabilidad, custom model data, flags, color de armadura de cuero y modificadores propios de atributos.
@@ -60,7 +60,7 @@ También se cambia con /ixkits idioma. Para que el cambio manual del archivo se 
 | /ixkits crear <nombre> | Crear un proyecto |
 | /ixkits editar <proyecto> | Abrir un proyecto |
 | /ixkits proyectos | Abrir la biblioteca paginada y con búsqueda |
-| /ixkits plantillas | Explorar los lores predeterminados |
+| /ixkits plantillas | Explorar las plantillas de lore por categoría |
 | /ixkits idioma o /ixkits idioma es/en | Cambiar idioma |
 | /ixkits duplicar <origen> <nuevo nombre> | Duplicar proyecto |
 | /ixkits renombrar <origen> <nuevo nombre> | Renombrar |
@@ -72,7 +72,8 @@ También se cambia con /ixkits idioma. Para que el cambio manual del archivo se 
 | /ixkits validar <proyecto> | Comprobar problemas básicos |
 | /ixkits equipamiento <proyecto> | Editar las cinco ranuras de equipamiento |
 | /ixkits importar-mano <proyecto> <página 1-2> <ranura GUI> | Copiar el objeto de tu mano al proyecto conservando sus metadatos Bukkit/Paper |
-| /ixkits exportar <proyecto> | Exportar formato nativo .ixkit.yml |
+| /ixkits exportar <proyecto> | Exportar formato nativo .ixkit.yml, con resumen de objetos y metadatos |
+| /ixkits claim <proyecto> | Entregar los objetos y el equipamiento del proyecto al jugador |
 | /ixkits importar <archivo.yml> [nombre] | Importar desde plugins/IxKits/imports/ |
 | /ixkits exportar-essentials <proyecto> | Crear exportación legible para EssentialsX |
 | /ixkits importar-essentials <archivo.yml> <kit> <nombre> | Importar un kit legible de EssentialsX |
@@ -155,6 +156,61 @@ Ajustes en `plugins/IxKits/config.yml`:
       knockback-on-hit-y: 0.35
 
 Las habilidades se ejecutan en el servidor que tiene IxKits instalado y habilitado. Algunas exportaciones a formatos de otros plugins no conservan metadatos personalizados de IxKits; valida el resultado antes de poner esos objetos en producción.
+
+
+### Personalizar las plantillas desde YAML
+
+Después del primer inicio del plugin, abre `plugins/IxKits/templates/lore.yml`. Cada plantilla está agrupada por identificador y usa estos campos:
+
+```yaml
+espada_aeris:
+  display: "&#38BDF8✦ &lEspada de AERIS"
+  display_en: "&#38BDF8✦ &lAERIS Blade"
+  description: "Una espada elemental de estilo azul."
+  description_en: "A blue elemental sword style."
+  category: weapons
+  lore:
+    - "<gradient:#0EA5E9:#A5F3FC><bold>✦ ESPADA DE AERIS ✦</bold></gradient>"
+    - "<#7DD3FC>El poder de las corrientes."
+    - ""
+    - "<#38BDF8>⚔ Encantamientos"
+    - "{enchantments}"
+    - "<#38BDF8>✧ Habilidades"
+    - "{abilities}"
+  lore_en:
+    - "<gradient:#0EA5E9:#A5F3FC><bold>✦ AERIS BLADE ✦</bold></gradient>"
+    - "<#7DD3FC>The power of the currents."
+    - ""
+    - "<#38BDF8>⚔ Enchantments"
+    - "{enchantments}"
+    - "<#38BDF8>✧ Abilities"
+    - "{abilities}"
+```
+
+Valores admitidos para `category`: `weapons`, `armor`, `items`, `minerals`, `consumables` y `misc`. La categoría decide en qué sección se muestra la plantilla y qué icono se utiliza. Para añadir otra plantilla, crea otro bloque con una clave única. No elimines las claves de plantillas que ya quieras conservar; puedes editar sus nombres, colores, descripciones y líneas.
+
+Los colores y formatos admiten MiniMessage, códigos clásicos con `&` y RGB hexadecimal con `&#RRGGBB`. También funciona el estilo RGB por carácter, por ejemplo:
+
+```text
+&#F2FF00&lU&#F4F300&lS&#F6E800&lU&#F9DC00&lA&#FBD000&lR&#FDC500&lI&#FFB900&lO
+```
+
+El código mezcla colores hexadecimales individuales con negrita (`&l`). Para un degradado más sencillo, usa `<gradient:#F2FF00:#FFB900><bold>USUARIO</bold></gradient>`. En `plugins/IxKits/config.yml`, `lore.template-preview-lines` ajusta cuántas líneas se muestran como vista previa; `lore.enchantment-line-format` y `lore.ability-line-format` controlan las líneas dinámicas de encantamientos y habilidades. Después de editar la configuración o las plantillas, ejecuta `/ixkits recargar`.
+
+### Reclamar los objetos de un proyecto
+
+`/ixkits claim espada-pvp` entrega al jugador los objetos que hay en las dos páginas del proyecto y las cinco ranuras de equipamiento. Usa el identificador/nombre del proyecto tal como aparece en la biblioteca. Si el inventario no tiene espacio, los objetos sobrantes se dejan en el suelo cerca del jugador.
+
+La opción está configurada en `plugins/IxKits/config.yml`:
+
+```yaml
+claim:
+  enabled: true
+  permission: ""
+  cooldown-seconds: 0
+```
+
+Por defecto la reclamación está activada, no exige un permiso aparte y no tiene enfriamiento. Para restringirla, define `permission: "ixkits.claim"` y administra ese permiso con tu plugin de permisos. Cambia `cooldown-seconds` a un valor mayor que cero para limitar reclamaciones por jugador. Si esto se utiliza en un servidor público, protege los proyectos cuyo contenido no quieras regalar: cualquier jugador autorizado puede recibir sus objetos completos.
 
 ### Importar objetos creados con otros plugins
 
