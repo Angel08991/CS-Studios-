@@ -372,6 +372,7 @@ public final class IxKitsPlugin extends JavaPlugin implements Listener, CommandE
         player.sendMessage(tr("§f/ixkits plantillas §8| §7Plantillas locales", "§f/ixkits plantillas §8| §7Local templates"));
         player.sendMessage(tr("§f/ixkits idioma §8| §7Cambiar idioma", "§f/ixkits idioma §8| §7Change language"));
         player.sendMessage(tr("§f/ixkits exportar <proyecto> §8| §7Exportar proyecto IxKits", "§f/ixkits exportar <project> §8| §7Export IxKits project"));
+        player.sendMessage(tr("§f/ixkits claim <proyecto> §8| §7Recibir los objetos del proyecto", "§f/ixkits claim <project> §8| §7Receive the project items"));
         player.sendMessage("§f/ixkits exportar-essentials <proyecto>");
         player.sendMessage("§f/ixkits importar <archivo.yml> [nombre]");
         player.sendMessage("§f/ixkits importar-essentials <archivo.yml> <kit> <nombre>");
@@ -787,9 +788,13 @@ public final class IxKitsPlugin extends JavaPlugin implements Listener, CommandE
         inv.setItem(33, item(Material.WRITABLE_BOOK, tr("§eIdioma / Language", "§eLanguage / Idioma"),
             tr("§7Actual: " + (isEnglish() ? "English" : "Español"), "§7Current: " + (isEnglish() ? "English" : "Spanish")),
             tr("§eClic para cambiar", "§eClick to change")));
-        inv.setItem(38, item(Material.COMPASS, tr("§fAyuda rápida", "§fQuick help"),
-            "§7/ixkits crear <nombre>", "§7/ixkits editar <proyecto>",
-            "§7/ixkits importar-mano <proyecto> <página> <ranura>"));
+        inv.setItem(38, item(Material.COMPASS, tr("§f§lGuía rápida", "§f§lQuick guide"),
+            tr("§7Crea y diseña proyectos", "§7Create and design projects"),
+            "§b/ixkits crear <nombre>", "§b/ixkits editar <proyecto>",
+            "§b/ixkits plantillas §7· §fLores por categoría",
+            "§b/ixkits claim <proyecto> §7· §fRecibir objetos",
+            "§b/ixkits exportar <proyecto>",
+            tr("§8RGB, MiniMessage y metadatos", "§8RGB, MiniMessage and metadata")));
         inv.setItem(40, item(Material.PAPER, "§f§lIxKits §7v0.1.0",
             tr("§7Editor administrativo de kits", "§7Administrative kit editor"),
             "§8Creado por CS Studios",
