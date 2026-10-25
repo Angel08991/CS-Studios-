@@ -1,0 +1,48 @@
+# IxKits — mensajes editables
+# Usa colores legacy (&a, &l) o RGB (&#F2FF00). Los marcadores entre llaves se reemplazan automáticamente.
+# Ejecuta /ixkits recargar para aplicar los cambios.
+prefix: "&8[&3✦ &bIxKits&8] &7"
+
+es:
+  clipboard:
+    saved: "&aObjeto copiado y guardado en disco."
+    cleared: "&aPortapapeles vaciado."
+    empty: "&eEl portapapeles está vacío. Copia un objeto primero."
+    pasted: "&aCopia pegada correctamente."
+  claim:
+    no-permission: "&cNo tienes permiso para reclamar proyectos."
+    usage: "&eUso: /ixkits claim <proyecto>"
+    not-found: "&cNo existe el proyecto &f{project}&c."
+    empty: "&eEl proyecto &b{project} &eno contiene objetos."
+    success: "&aReclamaste &e{count} &aunidad(es) del proyecto &b{project}&a. El proyecto original no se modifica."
+    overflow: "&eEl inventario estaba lleno: &f{count} &eunidad(es) se dejaron en el suelo."
+  export:
+    success: "&aExportación creada: &b{file}"
+    failed: "&cNo se pudo exportar el proyecto."
+  import:
+    success: "&aProyecto importado y validado."
+    failed: "&cNo se pudo importar. Revisa el formato del archivo."
+  general:
+    reload-success: "&aConfiguración, mensajes y plantillas recargados."
+
+en:
+  clipboard:
+    saved: "&aItem copied and saved to disk."
+    cleared: "&aClipboard cleared."
+    empty: "&eThe clipboard is empty. Copy an item first."
+    pasted: "&aCopy pasted successfully."
+  claim:
+    no-permission: "&cYou do not have permission to claim projects."
+    usage: "&eUsage: /ixkits claim <project>"
+    not-found: "&cProject &f{project} &cdoes not exist."
+    empty: "&eProject &b{project} &econtains no items."
+    success: "&aClaimed &e{count} &aitem unit(s) from &b{project}&a. The original project stays unchanged."
+    overflow: "&eYour inventory was full: &f{count} &eitem unit(s) were dropped."
+  export:
+    success: "&aExport created: &b{file}"
+    failed: "&cCould not export the project."
+  import:
+    success: "&aProject imported and validated."
+    failed: "&cImport failed. Check the file format."
+  general:
+    reload-success: "&aConfiguration, messages and templates reloaded."
