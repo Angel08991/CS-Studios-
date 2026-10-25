@@ -66,7 +66,8 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.UUID;
 
 public final class IxKitsPlugin extends JavaPlugin implements Listener, CommandExecutor, TabCompleter {
-    private File projectsDir, templatesDir, exportsDir;
+    private File projectsDir, templatesDir, exportsDir, clipboardDir;
+    private YamlConfiguration messages;
     private ProjectService projectService;
     private CatalogClient catalogClient;
     private final Map<UUID, PendingInput> pendingInputs = new ConcurrentHashMap<>();
@@ -99,11 +100,13 @@ public final class IxKitsPlugin extends JavaPlugin implements Listener, CommandE
     @Override public void onEnable() {
         saveDefaultConfig();
         reloadConfig();
+        loadMessages();
         if (!getConfig().contains("language")) { getConfig().set("language", "es"); saveConfig(); }
         projectsDir = new File(getDataFolder(), "projects");
         templatesDir = new File(getDataFolder(), "templates");
         exportsDir = new File(getDataFolder(), "exports");
-        projectsDir.mkdirs(); templatesDir.mkdirs(); exportsDir.mkdirs();
+        clipboardDir = new File(getDataFolder(), "clipboard");
+        projectsDir.mkdirs(); templatesDir.mkdirs(); exportsDir.mkdirs(); clipboardDir.mkdirs();
         projectService = new ProjectService(this, getDataFolder());
         catalogClient = new CatalogClient(this);
         tntOnHitKey = new NamespacedKey(this, "ability_tnt_on_hit");
@@ -162,7 +165,7 @@ public final class IxKitsPlugin extends JavaPlugin implements Listener, CommandE
         }
         if (args.length == 0) {
             if (!player.hasPermission("ixkits.admin")) {
-                player.sendMessage(PREFIX + tr("Para usar el editor necesitas ixkits.admin. Para la comunidad usa /ixkits comunidad.", "The editor requires ixkits.admin. To browse Community, use /ixkits comunidad."));
+                player.sendMessage(prefix() + tr("Para usar el editor necesitas ixkits.admin. Para la comunidad usa /ixkits comunidad.", "The editor requires ixkits.admin. To browse Community, use /ixkits comunidad."));
             } else openMain(player);
             return true;
         }
@@ -173,7 +176,7 @@ public final class IxKitsPlugin extends JavaPlugin implements Listener, CommandE
             || (sub.equals("encantamientos") && args.length >= 3 && args[1].equalsIgnoreCase("aplicar"));
         boolean communityPublisher = sub.equals("publicar") && player.hasPermission("ixkits.community.publish");
         if (!player.hasPermission("ixkits.admin") && !communityCommand && !communityPublisher) {
-            player.sendMessage(PREFIX + tr("No tienes permiso para administrar IxKits. Puedes navegar la comunidad con /ixkits comunidad.", "You do not have permission to administer IxKits. You can browse Community with /ixkits comunidad."));
+            player.sendMessage(prefix() + tr("No tienes permiso para administrar IxKits. Puedes navegar la comunidad con /ixkits comunidad.", "You do not have permission to administer IxKits. You can browse Community with /ixkits comunidad."));
             return true;
         }
         if (sub.equals("claim")) { claimProjectItems(player, args); return true; }
@@ -186,20 +189,20 @@ public final class IxKitsPlugin extends JavaPlugin implements Listener, CommandE
         }
         if (sub.equals("crear") && args.length >= 2) {
             String name = slug(String.join("-", Arrays.copyOfRange(args, 1, args.length)));
-            if (name.isBlank()) { player.sendMessage(PREFIX + tr("Nombre no válido.", "Invalid project name.")); return true; }
+            if (name.isBlank()) { player.sendMessage(prefix() + tr("Nombre no válido.", "Invalid project name.")); return true; }
             File f = projectFile(name);
-            if (f.exists()) { player.sendMessage(PREFIX + tr("Ya existe un proyecto con ese nombre.", "A project with that name already exists.")); return true; }
+            if (f.exists()) { player.sendMessage(prefix() + tr("Ya existe un proyecto con ese nombre.", "A project with that name already exists.")); return true; }
             YamlConfiguration y = new YamlConfiguration();
             y.set("name", String.join(" ", Arrays.copyOfRange(args, 1, args.length)));
             y.set("version", 1);
             saveYaml(y, f);
-            player.sendMessage(PREFIX + tr("Proyecto creado: §b", "Project created: §b") + name);
+            player.sendMessage(prefix() + tr("Proyecto creado: §b", "Project created: §b") + name);
             openEditor(player, name, 0);
             return true;
         }
         if (sub.equals("editar") && args.length >= 2) {
             String name = slug(args[1]);
-            if (!projectFile(name).exists()) player.sendMessage(PREFIX + tr("No existe ese proyecto.", "That project does not exist."));
+            if (!projectFile(name).exists()) player.sendMessage(prefix() + tr("No existe ese proyecto.", "That project does not exist."));
             else openEditor(player, name, 0);
             return true;
         }
@@ -213,59 +216,59 @@ public final class IxKitsPlugin extends JavaPlugin implements Listener, CommandE
             String source = slug(args[1]);
             String targetName = String.join(" ", Arrays.copyOfRange(args, 2, args.length));
             try {
-                if (projectService.duplicate(source, targetName)) player.sendMessage(PREFIX + tr("Proyecto duplicado: §b", "Project duplicated: §b") + targetName);
-                else player.sendMessage(PREFIX + tr("No se pudo duplicar. Comprueba el origen y que el nombre no exista.", "Could not duplicate. Check the source and make sure the name is unused."));
-            } catch (IOException ex) { player.sendMessage(PREFIX + "§c" + ex.getMessage()); }
+                if (projectService.duplicate(source, targetName)) player.sendMessage(prefix() + tr("Proyecto duplicado: §b", "Project duplicated: §b") + targetName);
+                else player.sendMessage(prefix() + tr("No se pudo duplicar. Comprueba el origen y que el nombre no exista.", "Could not duplicate. Check the source and make sure the name is unused."));
+            } catch (IOException ex) { player.sendMessage(prefix() + "§c" + ex.getMessage()); }
             return true;
         }
         if (sub.equals("renombrar") && args.length >= 3) {
             String source = slug(args[1]);
             String targetName = String.join(" ", Arrays.copyOfRange(args, 2, args.length));
             try {
-                if (projectService.rename(source, targetName)) player.sendMessage(PREFIX + tr("Proyecto renombrado: §b", "Project renamed: §b") + targetName);
-                else player.sendMessage(PREFIX + tr("No se pudo renombrar el proyecto.", "Could not rename the project."));
-            } catch (IOException ex) { player.sendMessage(PREFIX + "§c" + ex.getMessage()); }
+                if (projectService.rename(source, targetName)) player.sendMessage(prefix() + tr("Proyecto renombrado: §b", "Project renamed: §b") + targetName);
+                else player.sendMessage(prefix() + tr("No se pudo renombrar el proyecto.", "Could not rename the project."));
+            } catch (IOException ex) { player.sendMessage(prefix() + "§c" + ex.getMessage()); }
             return true;
         }
         if (sub.equals("eliminar") && args.length >= 2) {
             try {
-                if (projectService.moveToTrash(slug(args[1]))) player.sendMessage(PREFIX + tr("Proyecto movido a la papelera recuperable.", "Project moved to recoverable trash."));
-                else player.sendMessage(PREFIX + tr("No existe ese proyecto.", "That project does not exist."));
-            } catch (IOException ex) { player.sendMessage(PREFIX + "§c" + ex.getMessage()); }
+                if (projectService.moveToTrash(slug(args[1]))) player.sendMessage(prefix() + tr("Proyecto movido a la papelera recuperable.", "Project moved to recoverable trash."));
+                else player.sendMessage(prefix() + tr("No existe ese proyecto.", "That project does not exist."));
+            } catch (IOException ex) { player.sendMessage(prefix() + "§c" + ex.getMessage()); }
             return true;
         }
         if ((sub.equals("deshacer") || sub.equals("restaurar")) && args.length >= 2) {
             try {
-                if (projectService.undo(slug(args[1]))) player.sendMessage(PREFIX + tr("Se restauró la última copia disponible.", "The latest available backup was restored."));
-                else player.sendMessage(PREFIX + tr("No hay copias disponibles para ese proyecto.", "No backups are available for that project."));
-            } catch (IOException ex) { player.sendMessage(PREFIX + "§c" + ex.getMessage()); }
+                if (projectService.undo(slug(args[1]))) player.sendMessage(prefix() + tr("Se restauró la última copia disponible.", "The latest available backup was restored."));
+                else player.sendMessage(prefix() + tr("No hay copias disponibles para ese proyecto.", "No backups are available for that project."));
+            } catch (IOException ex) { player.sendMessage(prefix() + "§c" + ex.getMessage()); }
             return true;
         }
         if (sub.equals("rehacer") && args.length >= 2) {
             try {
-                if (projectService.redo(slug(args[1]))) player.sendMessage(PREFIX + tr("Se rehizo el último cambio deshecho.", "The last undone change was redone."));
-                else player.sendMessage(PREFIX + tr("No hay una acción para rehacer.", "There is no action to redo."));
-            } catch (IOException ex) { player.sendMessage(PREFIX + "§c" + ex.getMessage()); }
+                if (projectService.redo(slug(args[1]))) player.sendMessage(prefix() + tr("Se rehizo el último cambio deshecho.", "The last undone change was redone."));
+                else player.sendMessage(prefix() + tr("No hay una acción para rehacer.", "There is no action to redo."));
+            } catch (IOException ex) { player.sendMessage(prefix() + "§c" + ex.getMessage()); }
             return true;
         }
         if (sub.equals("papelera")) { openTrash(player); return true; }
         if (sub.equals("restaurar-eliminado") && args.length >= 2) {
             try {
-                if (projectService.restoreFromTrash(slug(args[1]))) player.sendMessage(PREFIX + tr("Proyecto restaurado desde la papelera.", "Project restored from trash."));
-                else player.sendMessage(PREFIX + tr("No se pudo restaurar: no existe en la papelera o el ID ya está ocupado.", "Restore failed: item is not in trash or the project ID is already in use."));
-            } catch (IOException ex) { player.sendMessage(PREFIX + "§c" + ex.getMessage()); }
+                if (projectService.restoreFromTrash(slug(args[1]))) player.sendMessage(prefix() + tr("Proyecto restaurado desde la papelera.", "Project restored from trash."));
+                else player.sendMessage(prefix() + tr("No se pudo restaurar: no existe en la papelera o el ID ya está ocupado.", "Restore failed: item is not in trash or the project ID is already in use."));
+            } catch (IOException ex) { player.sendMessage(prefix() + "§c" + ex.getMessage()); }
             return true;
         }
         if (sub.equals("validar") && args.length >= 2) {
-            for (String line : projectService.validate(slug(args[1]))) player.sendMessage(PREFIX + "§7" + line);
+            for (String line : projectService.validate(slug(args[1]))) player.sendMessage(prefix() + "§7" + line);
             return true;
         }
         if (sub.equals("exportar-essentials") && args.length >= 2) {
             try {
                 File output = projectService.exportEssentials(slug(args[1]));
-                player.sendMessage(PREFIX + tr("Exportación EssentialsX creada: §b", "EssentialsX export created: §b") + output.getPath());
-                player.sendMessage(PREFIX + tr("Aviso: el formato legible no conserva todas las propiedades avanzadas.", "Warning: the human-readable format cannot preserve all advanced metadata."));
-            } catch (IOException ex) { player.sendMessage(PREFIX + "§c" + ex.getMessage()); }
+                player.sendMessage(prefix() + tr("Exportación EssentialsX creada: §b", "EssentialsX export created: §b") + output.getPath());
+                player.sendMessage(prefix() + tr("Aviso: el formato legible no conserva todas las propiedades avanzadas.", "Warning: the human-readable format cannot preserve all advanced metadata."));
+            } catch (IOException ex) { player.sendMessage(prefix() + "§c" + ex.getMessage()); }
             return true;
         }
         if (sub.equals("importar") && args.length >= 2) {
@@ -273,9 +276,9 @@ public final class IxKitsPlugin extends JavaPlugin implements Listener, CommandE
             File input = new File(projectService.importsDirectory(), safeName);
             String requestedName = args.length >= 3 ? String.join(" ", Arrays.copyOfRange(args, 2, args.length)) : null;
             try {
-                if (projectService.importNative(input, requestedName)) player.sendMessage(PREFIX + tr("Proyecto importado y validado desde la carpeta imports.", "Project imported and validated from the imports folder."));
-                else player.sendMessage(PREFIX + tr("No se pudo importar. Usa un archivo IxKits YAML válido y un nombre nuevo.", "Import failed. Use a valid IxKits YAML file and a new project name."));
-            } catch (IOException ex) { player.sendMessage(PREFIX + "§c" + ex.getMessage()); }
+                if (projectService.importNative(input, requestedName)) player.sendMessage(prefix() + tr("Proyecto importado y validado desde la carpeta imports.", "Project imported and validated from the imports folder."));
+                else player.sendMessage(prefix() + tr("No se pudo importar. Usa un archivo IxKits YAML válido y un nombre nuevo.", "Import failed. Use a valid IxKits YAML file and a new project name."));
+            } catch (IOException ex) { player.sendMessage(prefix() + "§c" + ex.getMessage()); }
             return true;
         }
         if (sub.equals("importar-essentials") && args.length >= 4) {
@@ -283,9 +286,9 @@ public final class IxKitsPlugin extends JavaPlugin implements Listener, CommandE
             String kit = args[2];
             String projectName = String.join(" ", Arrays.copyOfRange(args, 3, args.length));
             try {
-                if (projectService.importEssentials(input, kit, projectName)) player.sendMessage(PREFIX + tr("Importación EssentialsX completada. Revisa el kit con /ixkits validar.", "EssentialsX import completed. Review the kit with /ixkits validar."));
-                else player.sendMessage(PREFIX + tr("No se pudo importar ese kit. Los kits NBT/base64 no se pueden convertir con este importador básico.", "Could not import that kit. NBT/base64 kits cannot be converted by this basic importer."));
-            } catch (IOException ex) { player.sendMessage(PREFIX + "§c" + ex.getMessage()); }
+                if (projectService.importEssentials(input, kit, projectName)) player.sendMessage(prefix() + tr("Importación EssentialsX completada. Revisa el kit con /ixkits validar.", "EssentialsX import completed. Review the kit with /ixkits validar."));
+                else player.sendMessage(prefix() + tr("No se pudo importar ese kit. Los kits NBT/base64 no se pueden convertir con este importador básico.", "Could not import that kit. NBT/base64 kits cannot be converted by this basic importer."));
+            } catch (IOException ex) { player.sendMessage(prefix() + "§c" + ex.getMessage()); }
             return true;
         }
         if (sub.equals("catalogo") || sub.equals("catálogo") || sub.equals("buscar")) {
@@ -310,20 +313,20 @@ public final class IxKitsPlugin extends JavaPlugin implements Listener, CommandE
         if (sub.equals("valorar") && args.length >= 3) {
             int rating;
             try { rating = Integer.parseInt(args[2]); } catch (NumberFormatException ex) {
-                player.sendMessage(PREFIX + tr("La valoración debe ser un número del 1 al 5.", "Rating must be a number from 1 to 5.")); return true;
+                player.sendMessage(prefix() + tr("La valoración debe ser un número del 1 al 5.", "Rating must be a number from 1 to 5.")); return true;
             }
             if (rating < 1 || rating > 5) {
-                player.sendMessage(PREFIX + tr("La valoración debe ser del 1 al 5.", "Rating must be from 1 to 5.")); return true;
+                player.sendMessage(prefix() + tr("La valoración debe ser del 1 al 5.", "Rating must be from 1 to 5.")); return true;
             }
             catalogClient.rate(args[1], player.getUniqueId().toString(), rating).whenComplete((ignored, error) ->
-                Bukkit.getScheduler().runTask(this, () -> player.sendMessage(PREFIX + (error == null
+                Bukkit.getScheduler().runTask(this, () -> player.sendMessage(prefix() + (error == null
                     ? tr("Valoración enviada.", "Rating submitted.")
                     : tr("No se pudo valorar: ", "Rating failed: ") + rootMessage(error)))));
             return true;
         }
         if (sub.equals("favorito") && args.length >= 2) {
             catalogClient.toggleFavorite(args[1], player.getUniqueId().toString()).whenComplete((ignored, error) ->
-                Bukkit.getScheduler().runTask(this, () -> player.sendMessage(PREFIX + (error == null
+                Bukkit.getScheduler().runTask(this, () -> player.sendMessage(prefix() + (error == null
                     ? tr("Favorito actualizado.", "Favorite updated.")
                     : tr("No se pudo actualizar: ", "Could not update favorite: ") + rootMessage(error)))));
             return true;
@@ -336,20 +339,20 @@ public final class IxKitsPlugin extends JavaPlugin implements Listener, CommandE
                 pageNumber = Integer.parseInt(args[2]);
                 slot = Integer.parseInt(args[3]);
             } catch (NumberFormatException ex) {
-                player.sendMessage(PREFIX + tr("Uso: /ixkits importar-mano <proyecto> <página 1-2> <ranura GUI>.", "Usage: /ixkits importar-mano <project> <page 1-2> <GUI slot>."));
+                player.sendMessage(prefix() + tr("Uso: /ixkits importar-mano <proyecto> <página 1-2> <ranura GUI>.", "Usage: /ixkits importar-mano <project> <page 1-2> <GUI slot>."));
                 return true;
             }
             ItemStack held = player.getInventory().getItemInMainHand();
             if (!projectFile(project).isFile()) {
-                player.sendMessage(PREFIX + tr("No existe ese proyecto.", "That project does not exist."));
+                player.sendMessage(prefix() + tr("No existe ese proyecto.", "That project does not exist."));
                 return true;
             }
             if (pageNumber < 1 || pageNumber > 2 || !contains(EDIT_SLOTS, slot)) {
-                player.sendMessage(PREFIX + tr("Página o ranura inválida. Usa página 1-2 y una ranura editable del inventario.", "Invalid page or slot. Use page 1-2 and an editable inventory slot."));
+                player.sendMessage(prefix() + tr("Página o ranura inválida. Usa página 1-2 y una ranura editable del inventario.", "Invalid page or slot. Use page 1-2 and an editable inventory slot."));
                 return true;
             }
             if (held == null || held.getType().isAir()) {
-                player.sendMessage(PREFIX + tr("Sostén primero el objeto que quieras importar.", "Hold the item you want to import first."));
+                player.sendMessage(prefix() + tr("Sostén primero el objeto que quieras importar.", "Hold the item you want to import first."));
                 return true;
             }
             File targetFile = projectFile(project);
@@ -359,7 +362,7 @@ public final class IxKitsPlugin extends JavaPlugin implements Listener, CommandE
             yaml.set("updated", System.currentTimeMillis());
             yaml.set("pages." + (pageNumber - 1) + "." + slot, held.clone());
             saveYaml(yaml, targetFile);
-            player.sendMessage(PREFIX + tr("Objeto importado conservando sus metadatos en página ", "Item imported with its metadata preserved on page ") + pageNumber + tr(", ranura ", ", slot ") + slot + ".");
+            player.sendMessage(prefix() + tr("Objeto importado conservando sus metadatos en página ", "Item imported with its metadata preserved on page ") + pageNumber + tr(", ranura ", ", slot ") + slot + ".");
             openEditor(player, project, pageNumber - 1);
             return true;
         }
@@ -368,14 +371,14 @@ public final class IxKitsPlugin extends JavaPlugin implements Listener, CommandE
             catalogClient.versions(templateId).whenComplete((versions, error) ->
                 Bukkit.getScheduler().runTask(this, () -> {
                     if (error != null) {
-                        player.sendMessage(PREFIX + tr("No se pudo cargar el historial: ", "Could not load version history: ") + rootMessage(error));
+                        player.sendMessage(prefix() + tr("No se pudo cargar el historial: ", "Could not load version history: ") + rootMessage(error));
                         return;
                     }
                     if (versions.isEmpty()) {
-                        player.sendMessage(PREFIX + tr("No hay versiones disponibles para esa plantilla.", "No versions are available for that template."));
+                        player.sendMessage(prefix() + tr("No hay versiones disponibles para esa plantilla.", "No versions are available for that template."));
                         return;
                     }
-                    player.sendMessage(PREFIX + tr("Historial de versiones de §d", "Version history for §d") + templateId + "§7:");
+                    player.sendMessage(prefix() + tr("Historial de versiones de §d", "Version history for §d") + templateId + "§7:");
                     for (Map<String, Object> version : versions) {
                         Object revision = version.getOrDefault("revision", "?");
                         Object mcVersion = version.getOrDefault("mcVersion", "unknown");
@@ -390,10 +393,10 @@ public final class IxKitsPlugin extends JavaPlugin implements Listener, CommandE
         }
         if (sub.equals("equipamiento") && args.length >= 2) {
             if (projectFile(slug(args[1])).exists()) openEquipment(player, slug(args[1]));
-            else player.sendMessage(PREFIX + tr("No existe ese proyecto.", "That project does not exist."));
+            else player.sendMessage(prefix() + tr("No existe ese proyecto.", "That project does not exist."));
             return true;
         }
-        if (sub.equals("recargar")) { reloadConfig(); initializeTemplates(); player.sendMessage(PREFIX + tr("Configuración y plantillas recargadas.", "Configuration and templates reloaded.")); return true; }
+        if (sub.equals("recargar")) { reloadConfig(); loadMessages(); initializeTemplates(); player.sendMessage(prefix() + tr("Configuración y plantillas recargadas.", "Configuration and templates reloaded.")); return true; }
         player.sendMessage(tr("§bIxKits §7— comandos:", "§bIxKits §7— commands:"));
         player.sendMessage(tr("§f/ixkits §8| §7Abrir editor", "§f/ixkits §8| §7Open studio"));
         player.sendMessage(tr("§f/ixkits crear <nombre> §8| §7Crear proyecto", "§f/ixkits crear <name> §8| §7Create project"));
@@ -452,15 +455,15 @@ public final class IxKitsPlugin extends JavaPlugin implements Listener, CommandE
 
     private void openCommunityResources(Player p, String type, int page) {
         if (!catalogClient.isEnabled()) {
-            p.sendMessage(PREFIX + tr("La Community no está configurada. Define catalog.enabled y catalog.base-url en config.yml.", "Community is not configured. Set catalog.enabled and catalog.base-url in config.yml."));
+            p.sendMessage(prefix() + tr("La Community no está configurada. Define catalog.enabled y catalog.base-url en config.yml.", "Community is not configured. Set catalog.enabled and catalog.base-url in config.yml."));
             return;
         }
         int safePage = Math.max(1, page);
-        p.sendMessage(PREFIX + tr("Cargando recursos de la comunidad…", "Loading community resources…"));
+        p.sendMessage(prefix() + tr("Cargando recursos de la comunidad…", "Loading community resources…"));
         catalogClient.searchResources(type, "", safePage, EDIT_SLOTS.length).whenComplete((resources, error) ->
             Bukkit.getScheduler().runTask(this, () -> {
                 if (error != null) {
-                    p.sendMessage(PREFIX + tr("No se pudieron cargar los recursos: ", "Could not load resources: ") + rootMessage(error));
+                    p.sendMessage(prefix() + tr("No se pudieron cargar los recursos: ", "Could not load resources: ") + rootMessage(error));
                     return;
                 }
                 String typeLabel = switch (type) {
@@ -507,11 +510,11 @@ public final class IxKitsPlugin extends JavaPlugin implements Listener, CommandE
         catalogClient.downloadResource(id).whenComplete((resource, error) ->
             Bukkit.getScheduler().runTask(this, () -> {
                 if (error != null) {
-                    p.sendMessage(PREFIX + tr("Descarga fallida: ", "Download failed: ") + rootMessage(error));
+                    p.sendMessage(prefix() + tr("Descarga fallida: ", "Download failed: ") + rootMessage(error));
                     return;
                 }
                 if (!type.equals(resource.type())) {
-                    p.sendMessage(PREFIX + tr("El catálogo devolvió un tipo de recurso inesperado.", "The catalog returned an unexpected resource type."));
+                    p.sendMessage(prefix() + tr("El catálogo devolvió un tipo de recurso inesperado.", "The catalog returned an unexpected resource type."));
                     return;
                 }
                 String key = slug(resource.title());
@@ -529,7 +532,7 @@ public final class IxKitsPlugin extends JavaPlugin implements Listener, CommandE
                     Object raw = data.get("lore");
                     if (!(raw instanceof List<?> rows) || rows.isEmpty() || rows.size() > 40
                         || rows.stream().anyMatch(line -> !(line instanceof String value) || value.length() > 300)) {
-                        p.sendMessage(PREFIX + tr("Este lore no pasó la validación local.", "This lore failed local validation."));
+                        p.sendMessage(prefix() + tr("Este lore no pasó la validación local.", "This lore failed local validation."));
                         return;
                     }
                     List<String> loreLines = rows.stream().map(String.class::cast).toList();
@@ -538,7 +541,7 @@ public final class IxKitsPlugin extends JavaPlugin implements Listener, CommandE
                     if (rawEnglish != null) {
                         if (!(rawEnglish instanceof List<?> englishRows) || englishRows.isEmpty() || englishRows.size() > 40
                             || englishRows.stream().anyMatch(line -> !(line instanceof String value) || value.length() > 300)) {
-                            p.sendMessage(PREFIX + tr("El lore en inglés no pasó la validación local.", "The English lore failed local validation."));
+                            p.sendMessage(prefix() + tr("El lore en inglés no pasó la validación local.", "The English lore failed local validation."));
                             return;
                         }
                         englishLines = englishRows.stream().map(String.class::cast).toList();
@@ -554,7 +557,7 @@ public final class IxKitsPlugin extends JavaPlugin implements Listener, CommandE
                     Object rawAccent = data.get("accent");
                     if (!(rawColor instanceof String color) || !isValidPaletteColor(color)
                         || (rawAccent != null && (!(rawAccent instanceof String accent) || !isValidPaletteColor((String) rawAccent)))) {
-                        p.sendMessage(PREFIX + tr("Esta paleta no pasó la validación local.", "This palette failed local validation."));
+                        p.sendMessage(prefix() + tr("Esta paleta no pasó la validación local.", "This palette failed local validation."));
                         return;
                     }
                     yaml.set(key + ".display", resource.title());
@@ -562,27 +565,27 @@ public final class IxKitsPlugin extends JavaPlugin implements Listener, CommandE
                     if (rawAccent instanceof String accent) yaml.set(key + ".accent", accent);
                 } else if ("enchantments".equals(type)) {
                     if (data.isEmpty() || data.size() > 32) {
-                        p.sendMessage(PREFIX + tr("Este preset no pasó la validación local.", "This preset failed local validation."));
+                        p.sendMessage(prefix() + tr("Este preset no pasó la validación local.", "This preset failed local validation."));
                         return;
                     }
                     for (Map.Entry<String, Object> entry : data.entrySet()) {
                         if (!entry.getKey().matches("(?i)^(?:[a-z0-9_-]+:)?[a-z0-9_-]{1,80}$")) {
-                            p.sendMessage(PREFIX + tr("Este preset contiene una clave de encantamiento no válida.", "This preset contains an invalid enchantment key."));
+                            p.sendMessage(prefix() + tr("Este preset contiene una clave de encantamiento no válida.", "This preset contains an invalid enchantment key."));
                             return;
                         }
                         if (!(entry.getValue() instanceof Number level) || level.intValue() < 1 || level.intValue() > 32767) {
-                            p.sendMessage(PREFIX + tr("Este preset contiene niveles no válidos.", "This preset contains invalid levels."));
+                            p.sendMessage(prefix() + tr("Este preset contiene niveles no válidos.", "This preset contains invalid levels."));
                             return;
                         }
                     }
                     yaml.set(key + ".display", resource.title());
                     for (Map.Entry<String, Object> entry : data.entrySet()) yaml.set(key + "." + entry.getKey(), ((Number) entry.getValue()).intValue());
                 } else {
-                    p.sendMessage(PREFIX + tr("Tipo de recurso no compatible.", "Unsupported resource type."));
+                    p.sendMessage(prefix() + tr("Tipo de recurso no compatible.", "Unsupported resource type."));
                     return;
                 }
                 saveYaml(yaml, templateFile);
-                p.sendMessage(PREFIX + tr("Recurso instalado en la biblioteca local: §d", "Resource installed in local library: §d") + resource.title());
+                p.sendMessage(prefix() + tr("Recurso instalado en la biblioteca local: §d", "Resource installed in local library: §d") + resource.title());
                 openCommunityResources(p, type, page);
             }));
     }
@@ -593,7 +596,7 @@ public final class IxKitsPlugin extends JavaPlugin implements Listener, CommandE
 
     private void publishLocalResource(Player p, String type, String key, String title) {
         if (!catalogClient.isEnabled()) {
-            p.sendMessage(PREFIX + tr("La Community no está configurada. Define catalog.enabled y catalog.base-url en config.yml.", "Community is not configured. Set catalog.enabled and catalog.base-url in config.yml."));
+            p.sendMessage(prefix() + tr("La Community no está configurada. Define catalog.enabled y catalog.base-url en config.yml.", "Community is not configured. Set catalog.enabled and catalog.base-url in config.yml."));
             return;
         }
         Map<String, Object> data = new LinkedHashMap<>();
@@ -611,7 +614,7 @@ public final class IxKitsPlugin extends JavaPlugin implements Listener, CommandE
             List<String> englishLines = yaml.getStringList(key + ".lore_en");
             if (lines.isEmpty()) lines = englishLines;
             if (englishLines.isEmpty()) englishLines = lines;
-            if (lines.isEmpty()) { p.sendMessage(PREFIX + tr("Esta plantilla no contiene lore.", "This template contains no lore.")); return; }
+            if (lines.isEmpty()) { p.sendMessage(prefix() + tr("Esta plantilla no contiene lore.", "This template contains no lore.")); return; }
             data.put("lore", lines);
             if (!englishLines.isEmpty()) data.put("lore_en", englishLines);
             String displayEs = yaml.getString(key + ".display", display);
@@ -623,7 +626,7 @@ public final class IxKitsPlugin extends JavaPlugin implements Listener, CommandE
             String color = yaml.getString(key + ".color");
             String accent = yaml.getString(key + ".accent", color);
             if (!isValidPaletteColor(color) || !isValidPaletteColor(accent)) {
-                p.sendMessage(PREFIX + tr("La paleta tiene un color no válido.", "The palette contains an invalid color."));
+                p.sendMessage(prefix() + tr("La paleta tiene un color no válido.", "The palette contains an invalid color."));
                 return;
             }
             data.put("color", color);
@@ -632,7 +635,7 @@ public final class IxKitsPlugin extends JavaPlugin implements Listener, CommandE
         } else if ("enchantments".equals(type)) {
             ConfigurationSection section = yaml.getConfigurationSection(key);
             if (section == null || section.getKeys(false).isEmpty()) {
-                p.sendMessage(PREFIX + tr("Este preset no tiene encantamientos.", "This preset has no enchantments."));
+                p.sendMessage(prefix() + tr("Este preset no tiene encantamientos.", "This preset has no enchantments."));
                 return;
             }
             for (String enchant : section.getKeys(false)) {
@@ -640,13 +643,13 @@ public final class IxKitsPlugin extends JavaPlugin implements Listener, CommandE
                 if (level < 1 || level > 32767) continue;
                 data.put(enchant, level);
             }
-            if (data.isEmpty()) { p.sendMessage(PREFIX + tr("No hay niveles válidos para publicar.", "No valid levels to publish.")); return; }
+            if (data.isEmpty()) { p.sendMessage(prefix() + tr("No hay niveles válidos para publicar.", "No valid levels to publish.")); return; }
         } else {
-            p.sendMessage(PREFIX + tr("Tipo de recurso no compatible.", "Unsupported resource type."));
+            p.sendMessage(prefix() + tr("Tipo de recurso no compatible.", "Unsupported resource type."));
             return;
         }
         catalogClient.publishResource(type, display, p.getName(), description, data).whenComplete((published, error) ->
-            Bukkit.getScheduler().runTask(this, () -> p.sendMessage(PREFIX + (error == null
+            Bukkit.getScheduler().runTask(this, () -> p.sendMessage(prefix() + (error == null
                 ? tr("Recurso publicado en IxKits Community con ID §d", "Resource published to IxKits Community with ID §d") + published.id()
                 : tr("No se pudo publicar el recurso: ", "Could not publish resource: ") + rootMessage(error)))));
     }
@@ -658,14 +661,14 @@ public final class IxKitsPlugin extends JavaPlugin implements Listener, CommandE
     private void openCatalog(Player p, String query, int requestedPage) {
         int page = Math.max(1, requestedPage);
         if (!catalogClient.isEnabled()) {
-            p.sendMessage(PREFIX + tr("El catálogo todavía no está configurado. Activa catalog.enabled y define catalog.base-url en config.yml.", "The catalog is not configured yet. Enable catalog.enabled and set catalog.base-url in config.yml."));
+            p.sendMessage(prefix() + tr("El catálogo todavía no está configurado. Activa catalog.enabled y define catalog.base-url en config.yml.", "The catalog is not configured yet. Enable catalog.enabled and set catalog.base-url in config.yml."));
             return;
         }
-        p.sendMessage(PREFIX + tr("Conectando con IxKits Community...", "Connecting to IxKits Community..."));
+        p.sendMessage(prefix() + tr("Conectando con IxKits Community...", "Connecting to IxKits Community..."));
         catalogClient.search(query, page, EDIT_SLOTS.length).whenComplete((items, error) ->
             Bukkit.getScheduler().runTask(this, () -> {
                 if (error != null) {
-                    p.sendMessage(PREFIX + tr("No se pudo cargar el catálogo: ", "Could not load catalog: ") + rootMessage(error));
+                    p.sendMessage(prefix() + tr("No se pudo cargar el catálogo: ", "Could not load catalog: ") + rootMessage(error));
                     return;
                 }
                 Inventory inv = menu("catalog", null, page, tr("§3✦ §bIxKits §8• §0Community", "§3✦ §bIxKits §8• §0Community") + " §7[" + page + "]");
@@ -700,13 +703,13 @@ public final class IxKitsPlugin extends JavaPlugin implements Listener, CommandE
 
     private void downloadCatalogTemplate(Player p, String id) {
         if (!catalogClient.isEnabled()) {
-            p.sendMessage(PREFIX + tr("El catálogo no está configurado.", "The catalog is not configured."));
+            p.sendMessage(prefix() + tr("El catálogo no está configurado.", "The catalog is not configured."));
             return;
         }
         catalogClient.download(id).whenComplete((download, error) ->
             Bukkit.getScheduler().runTask(this, () -> {
                 if (error != null) {
-                    p.sendMessage(PREFIX + tr("Descarga fallida: ", "Download failed: ") + rootMessage(error));
+                    p.sendMessage(prefix() + tr("Descarga fallida: ", "Download failed: ") + rootMessage(error));
                     return;
                 }
                 try {
@@ -716,33 +719,33 @@ public final class IxKitsPlugin extends JavaPlugin implements Listener, CommandE
                     if (!projectService.importNative(file, name)) {
                         name = download.title() + " " + Long.toString(System.currentTimeMillis() % 100000);
                         if (!projectService.importNative(file, name)) {
-                            p.sendMessage(PREFIX + tr("El archivo no pasó la validación o el nombre ya existe.", "The file failed validation or the project name already exists."));
+                            p.sendMessage(prefix() + tr("El archivo no pasó la validación o el nombre ya existe.", "The file failed validation or the project name already exists."));
                             return;
                         }
                     }
-                    p.sendMessage(PREFIX + tr("Plantilla importada como proyecto local: §b", "Template imported as local project: §b") + name);
+                    p.sendMessage(prefix() + tr("Plantilla importada como proyecto local: §b", "Template imported as local project: §b") + name);
                     if (p.hasPermission("ixkits.admin")) openProjects(p);
                     else openCatalog(p, "");
                 } catch (IOException ex) {
-                    p.sendMessage(PREFIX + "§c" + ex.getMessage());
+                    p.sendMessage(prefix() + "§c" + ex.getMessage());
                 }
             }));
     }
 
     private void publishProjectRevision(Player p, String templateId, String project, String changelog) {
         if (!catalogClient.isEnabled()) {
-            p.sendMessage(PREFIX + tr("Configura primero el catálogo online en config.yml.", "Configure the online catalog in config.yml first."));
+            p.sendMessage(prefix() + tr("Configura primero el catálogo online en config.yml.", "Configure the online catalog in config.yml first."));
             return;
         }
         File file = projectFile(project);
         if (!file.isFile()) {
-            p.sendMessage(PREFIX + tr("No existe ese proyecto.", "Project not found."));
+            p.sendMessage(prefix() + tr("No existe ese proyecto.", "Project not found."));
             return;
         }
         List<String> issues = projectService.validate(project);
         if (issues.stream().anyMatch(line -> line.startsWith("ERROR:"))) {
-            p.sendMessage(PREFIX + tr("El proyecto tiene errores; corrígelos antes de publicarlo.", "The project has errors; fix them before publishing."));
-            for (String issue : issues) if (issue.startsWith("ERROR:")) p.sendMessage(PREFIX + "§c" + issue);
+            p.sendMessage(prefix() + tr("El proyecto tiene errores; corrígelos antes de publicarlo.", "The project has errors; fix them before publishing."));
+            for (String issue : issues) if (issue.startsWith("ERROR:")) p.sendMessage(prefix() + "§c" + issue);
             return;
         }
         try {
@@ -750,22 +753,22 @@ public final class IxKitsPlugin extends JavaPlugin implements Listener, CommandE
             String version = getConfig().getString("catalog.minecraft-version", "1.21.11");
             catalogClient.publishRevision(templateId, version, changelog, yaml).whenComplete((updated, error) ->
                 Bukkit.getScheduler().runTask(this, () -> {
-                    if (error != null) p.sendMessage(PREFIX + tr("No se pudo actualizar la publicación: ", "Could not update publication: ") + rootMessage(error));
-                    else p.sendMessage(PREFIX + tr("Publicación actualizada a la versión §b", "Publication updated to revision §b") + updated.revision());
+                    if (error != null) p.sendMessage(prefix() + tr("No se pudo actualizar la publicación: ", "Could not update publication: ") + rootMessage(error));
+                    else p.sendMessage(prefix() + tr("Publicación actualizada a la versión §b", "Publication updated to revision §b") + updated.revision());
                 }));
         } catch (IOException ex) {
-            p.sendMessage(PREFIX + "§c" + ex.getMessage());
+            p.sendMessage(prefix() + "§c" + ex.getMessage());
         }
     }
 
     private void publishProject(Player p, String project, String category, String description) {
         if (!catalogClient.isEnabled()) {
-            p.sendMessage(PREFIX + tr("Configura primero el catálogo online en config.yml.", "Configure the online catalog in config.yml first."));
+            p.sendMessage(prefix() + tr("Configura primero el catálogo online en config.yml.", "Configure the online catalog in config.yml first."));
             return;
         }
         File file = projectFile(project);
         if (!file.isFile()) {
-            p.sendMessage(PREFIX + tr("No existe ese proyecto.", "Project not found."));
+            p.sendMessage(prefix() + tr("No existe ese proyecto.", "Project not found."));
             return;
         }
         try {
@@ -776,11 +779,11 @@ public final class IxKitsPlugin extends JavaPlugin implements Listener, CommandE
             String license = getConfig().getString("catalog.default-license", "all-rights-reserved");
             catalogClient.publish(title, p.getName(), category, description, version, license, yaml)
                 .whenComplete((result, error) -> Bukkit.getScheduler().runTask(this, () -> {
-                    if (error != null) p.sendMessage(PREFIX + tr("No se pudo publicar: ", "Publish failed: ") + rootMessage(error));
-                    else p.sendMessage(PREFIX + tr("Plantilla publicada con ID §b", "Template published with ID §b") + result.id());
+                    if (error != null) p.sendMessage(prefix() + tr("No se pudo publicar: ", "Publish failed: ") + rootMessage(error));
+                    else p.sendMessage(prefix() + tr("Plantilla publicada con ID §b", "Template published with ID §b") + result.id());
                 }));
         } catch (IOException ex) {
-            p.sendMessage(PREFIX + "§c" + ex.getMessage());
+            p.sendMessage(prefix() + "§c" + ex.getMessage());
         }
     }
 
@@ -990,7 +993,7 @@ public final class IxKitsPlugin extends JavaPlugin implements Listener, CommandE
     private void openPotionEffects(Player p, String project, int projectPage, int targetSlot, int requestedPage) {
         ItemStack target = getProjectItem(project, projectPage, targetSlot);
         if (target == null || !(target.getItemMeta() instanceof PotionMeta potionMeta)) {
-            p.sendMessage(PREFIX + tr("Este objeto no admite efectos de poción.", "This item does not support potion effects."));
+            p.sendMessage(prefix() + tr("Este objeto no admite efectos de poción.", "This item does not support potion effects."));
             openItemEditor(p, project, projectPage, targetSlot);
             return;
         }
@@ -1074,7 +1077,7 @@ public final class IxKitsPlugin extends JavaPlugin implements Listener, CommandE
     private void openBookEditor(Player p, String project, int page, int targetSlot) {
         ItemStack target = getProjectItem(project, page, targetSlot);
         if (target == null || !(target.getItemMeta() instanceof BookMeta bookMeta) || target.getType() != Material.WRITTEN_BOOK) {
-            p.sendMessage(PREFIX + tr("El editor de libro requiere un libro escrito.", "The book editor requires a written book."));
+            p.sendMessage(prefix() + tr("El editor de libro requiere un libro escrito.", "The book editor requires a written book."));
             openItemEditor(p, project, page, targetSlot);
             return;
         }
@@ -1113,7 +1116,7 @@ public final class IxKitsPlugin extends JavaPlugin implements Listener, CommandE
     private void openBannerEditor(Player p, String project, int projectPage, int targetSlot, int requestedPage, String requestedColor) {
         ItemStack target = getProjectItem(project, projectPage, targetSlot);
         if (target == null || !(target.getItemMeta() instanceof BannerMeta bannerMeta)) {
-            p.sendMessage(PREFIX + tr("Este objeto no admite patrones de estandarte.", "This item does not support banner patterns."));
+            p.sendMessage(prefix() + tr("Este objeto no admite patrones de estandarte.", "This item does not support banner patterns."));
             openSpecialProperties(p, project, projectPage, targetSlot);
             return;
         }
@@ -1159,7 +1162,7 @@ public final class IxKitsPlugin extends JavaPlugin implements Listener, CommandE
     private void openTrimEditor(Player p, String project, int projectPage, int targetSlot, int requestedPage, String requestedMaterial) {
         ItemStack target = getProjectItem(project, projectPage, targetSlot);
         if (target == null || !(target.getItemMeta() instanceof ArmorMeta armorMeta)) {
-            p.sendMessage(PREFIX + tr("Este objeto no admite adornos de armadura.", "This item does not support armor trims."));
+            p.sendMessage(prefix() + tr("Este objeto no admite adornos de armadura.", "This item does not support armor trims."));
             openSpecialProperties(p, project, projectPage, targetSlot);
             return;
         }
@@ -1170,7 +1173,7 @@ public final class IxKitsPlugin extends JavaPlugin implements Listener, CommandE
         for (TrimMaterial material : Registry.TRIM_MATERIAL) materials.add(material);
         materials.sort(Comparator.comparing(material -> material.getKey().toString()));
         if (materials.isEmpty() || patterns.isEmpty()) {
-            p.sendMessage(PREFIX + tr("Paper no expone patrones de trim en esta versión.", "Paper exposes no trim patterns in this version."));
+            p.sendMessage(prefix() + tr("Paper no expone patrones de trim en esta versión.", "Paper exposes no trim patterns in this version."));
             openItemEditor(p, project, projectPage, targetSlot);
             return;
         }
@@ -1214,7 +1217,7 @@ public final class IxKitsPlugin extends JavaPlugin implements Listener, CommandE
     private void openFireworkEditor(Player p, String project, int projectPage, int targetSlot, String selection) {
         ItemStack target = getProjectItem(project, projectPage, targetSlot);
         if (target == null || !(target.getItemMeta() instanceof FireworkMeta fireworkMeta)) {
-            p.sendMessage(PREFIX + tr("Este objeto no es un cohete de fuegos artificiales.", "This item is not a firework rocket."));
+            p.sendMessage(prefix() + tr("Este objeto no es un cohete de fuegos artificiales.", "This item is not a firework rocket."));
             openSpecialProperties(p, project, projectPage, targetSlot);
             return;
         }
@@ -1249,7 +1252,7 @@ public final class IxKitsPlugin extends JavaPlugin implements Listener, CommandE
     private void openPotionTypes(Player p, String project, int projectPage, int targetSlot, int requestedSubPage) {
         ItemStack target = getProjectItem(project, projectPage, targetSlot);
         if (target == null || !(target.getItemMeta() instanceof PotionMeta potionMeta)) {
-            p.sendMessage(PREFIX + tr("Este objeto no admite tipos de poción.", "This item does not support potion types."));
+            p.sendMessage(prefix() + tr("Este objeto no admite tipos de poción.", "This item does not support potion types."));
             openItemEditor(p, project, projectPage, targetSlot);
             return;
         }
@@ -1355,7 +1358,7 @@ public final class IxKitsPlugin extends JavaPlugin implements Listener, CommandE
         ItemStack target = yaml.getItemStack(path);
         if (target == null || target.getType().isAir()) { openEditor(p, holder.project, holder.page); return; }
         Attribute attribute = Registry.ATTRIBUTE.get(NamespacedKey.minecraft(key));
-        if (attribute == null) { p.sendMessage(PREFIX + tr("Atributo no disponible en esta versión.", "Attribute is unavailable in this version.")); return; }
+        if (attribute == null) { p.sendMessage(prefix() + tr("Atributo no disponible en esta versión.", "Attribute is unavailable in this version.")); return; }
         ItemMeta meta = target.getItemMeta();
         double previousAmount = ownedAttributeAmount(target, key);
         NamespacedKey modifierKey = new NamespacedKey(this, "attr_" + key);
@@ -1386,14 +1389,14 @@ public final class IxKitsPlugin extends JavaPlugin implements Listener, CommandE
         PendingInput pending = new PendingInput(type, project, page, slot, -1, argument);
         pendingInputs.put(p.getUniqueId(), pending);
         p.closeInventory();
-        p.sendMessage(PREFIX + tr(promptEs, promptEn));
+        p.sendMessage(prefix() + tr(promptEs, promptEn));
         sendCurrentValueAssist(p, pending);
         sendCancelPrompt(p);
     }
 
     private void sendCancelPrompt(Player p) {
         var legacy = net.kyori.adventure.text.serializer.legacy.LegacyComponentSerializer.legacySection();
-        net.kyori.adventure.text.Component beginning = legacy.deserialize(PREFIX + "§7Pulsa ");
+        net.kyori.adventure.text.Component beginning = legacy.deserialize(prefix() + "§7Pulsa ");
         net.kyori.adventure.text.Component cancel = net.kyori.adventure.text.Component
             .text(tr("Cancelar", "Cancel"), net.kyori.adventure.text.format.NamedTextColor.RED)
             .decorate(net.kyori.adventure.text.format.TextDecoration.UNDERLINED)
@@ -1426,7 +1429,7 @@ public final class IxKitsPlugin extends JavaPlugin implements Listener, CommandE
             .clickEvent(net.kyori.adventure.text.event.ClickEvent.suggestCommand(currentValue))
             .hoverEvent(net.kyori.adventure.text.event.HoverEvent.showText(net.kyori.adventure.text.Component.text(hover)));
         var legacy = net.kyori.adventure.text.serializer.legacy.LegacyComponentSerializer.legacySection();
-        player.sendMessage(legacy.deserialize(PREFIX + "§7").append(link));
+        player.sendMessage(legacy.deserialize(prefix() + "§7").append(link));
     }
 
     private String currentInputValue(PendingInput pending) {
@@ -1451,6 +1454,87 @@ public final class IxKitsPlugin extends JavaPlugin implements Listener, CommandE
             return MiniMessage.miniMessage().serialize(lore.get(pending.lineIndex));
         }
         return null;
+    }
+
+    private void loadMessages() {
+        File file = new File(getDataFolder(), "messages.yml");
+        if (!file.isFile()) saveResource("messages.yml", false);
+        messages = YamlConfiguration.loadConfiguration(file);
+    }
+
+    private String prefix() {
+        String raw = messages == null ? "&8[&3✦ &bIxKits&8] &7" : messages.getString("prefix", "&8[&3✦ &bIxKits&8] &7");
+        if (raw.contains("<") && raw.contains(">")) {
+            try {
+                return net.kyori.adventure.text.serializer.legacy.LegacyComponentSerializer.legacySection()
+                    .serialize(MiniMessage.miniMessage().deserialize(translateLegacyMarkupToMiniMessage(raw)));
+            } catch (RuntimeException ignored) { }
+        }
+        return translateLoreColors(raw);
+    }
+
+    private String configuredMessage(String key, String spanish, String english, String... replacements) {
+        String fallback = isEnglish() ? english : spanish;
+        String raw = messages == null ? fallback : messages.getString((isEnglish() ? "en." : "es.") + key, fallback);
+        raw = translateLoreColors(raw);
+        for (int i = 0; i + 1 < replacements.length; i += 2) raw = raw.replace(replacements[i], replacements[i + 1]);
+        return raw;
+    }
+
+    private File clipboardFile(UUID playerId) {
+        if (clipboardDir == null) clipboardDir = new File(getDataFolder(), "clipboard");
+        return new File(clipboardDir, playerId.toString() + ".yml");
+    }
+
+    private ItemStack clipboardItem(UUID playerId) {
+        ItemStack cached = itemClipboard.get(playerId);
+        if (cached != null && !cached.getType().isAir()) return cached.clone();
+        File file = clipboardFile(playerId);
+        if (!file.isFile()) return null;
+        ItemStack loaded = YamlConfiguration.loadConfiguration(file).getItemStack("item");
+        if (loaded == null || loaded.getType().isAir()) return null;
+        itemClipboard.put(playerId, loaded.clone());
+        return loaded.clone();
+    }
+
+    private void setClipboard(UUID playerId, ItemStack item) {
+        if (item == null || item.getType().isAir()) return;
+        ItemStack copy = item.clone();
+        itemClipboard.put(playerId, copy);
+        YamlConfiguration yaml = new YamlConfiguration();
+        yaml.set("format-version", 1);
+        yaml.set("item", copy);
+        saveYaml(yaml, clipboardFile(playerId));
+    }
+
+    private void clearClipboard(UUID playerId) {
+        itemClipboard.remove(playerId);
+        try { Files.deleteIfExists(clipboardFile(playerId).toPath()); }
+        catch (IOException ex) { getLogger().warning("Could not clear clipboard for " + playerId + ": " + ex.getMessage()); }
+    }
+
+    private String paletteHex(String color) {
+        String value = color == null ? "&b" : color.trim();
+        if (value.matches("(?i)&#[0-9a-f]{6}")) return "#" + value.substring(2);
+        if (value.matches("(?i)#[0-9a-f]{6}")) return value.toUpperCase(Locale.ROOT);
+        String code = value.toLowerCase(Locale.ROOT).replace("&", "");
+        return switch (code) {
+            case "0" -> "#000000"; case "1" -> "#0000AA"; case "2" -> "#00AA00"; case "3" -> "#00AAAA";
+            case "4" -> "#AA0000"; case "5" -> "#AA00AA"; case "6" -> "#FFAA00"; case "7" -> "#AAAAAA";
+            case "8" -> "#555555"; case "9" -> "#5555FF"; case "a" -> "#55FF55"; case "b" -> "#55FFFF";
+            case "c" -> "#FF5555"; case "d" -> "#FF55FF"; case "e" -> "#FFFF55"; case "f" -> "#FFFFFF";
+            default -> "#55FFFF";
+        };
+    }
+
+    private String escapeMiniMessageText(String text) {
+        return text.replace("\\", "\\\\").replace("<", "\\<").replace(">", "\\>");
+    }
+
+    private Component gradientComponent(String text, String startHex, String endHex) {
+        String markup = "<gradient:" + startHex + ":" + endHex + ">" + escapeMiniMessageText(text) + "</gradient>";
+        try { return MiniMessage.miniMessage().deserialize(markup); }
+        catch (RuntimeException ignored) { return Component.text(text); }
     }
 
     private net.kyori.adventure.text.Component deserializeLoreLine(String line) {
@@ -1519,7 +1603,7 @@ public final class IxKitsPlugin extends JavaPlugin implements Listener, CommandE
     }
 
     private void returnFromCancelledInput(Player player, PendingInput pending) {
-        player.sendMessage(PREFIX + tr("Edición cancelada.", "Edit cancelled."));
+        player.sendMessage(prefix() + tr("Edición cancelada.", "Edit cancelled."));
         if (pending.type == InputType.PROJECT_SEARCH) openProjects(player);
         else if (pending.type == InputType.CATALOG_SEARCH) openCatalog(player, "");
         else if (pending.project != null && projectFile(pending.project).isFile()
@@ -1540,7 +1624,7 @@ public final class IxKitsPlugin extends JavaPlugin implements Listener, CommandE
     private void cancelPendingInput(Player player) {
         PendingInput pending = pendingInputs.remove(player.getUniqueId());
         if (pending == null) {
-            player.sendMessage(PREFIX + tr("No tienes ninguna edición pendiente para cancelar.", "There is no pending edit to cancel."));
+            player.sendMessage(prefix() + tr("No tienes ninguna edición pendiente para cancelar.", "There is no pending edit to cancel."));
             return;
         }
         returnFromCancelledInput(player, pending);
@@ -1563,7 +1647,7 @@ public final class IxKitsPlugin extends JavaPlugin implements Listener, CommandE
         if (pending.type == InputType.PUBLISH_PROJECT_CATEGORY) {
             String category = slug(input.trim());
             if (category.isBlank()) {
-                player.sendMessage(PREFIX + tr("Categoría no válida. Prueba pvp, survival, rpg o utility.", "Invalid category. Try pvp, survival, rpg or utility."));
+                player.sendMessage(prefix() + tr("Categoría no válida. Prueba pvp, survival, rpg o utility.", "Invalid category. Try pvp, survival, rpg or utility."));
                 promptInput(player, InputType.PUBLISH_PROJECT_CATEGORY, pending.project, 0, -1,
                     "Escribe una categoría para el kit:", "Type a category for this kit:");
                 return;
@@ -1595,13 +1679,13 @@ public final class IxKitsPlugin extends JavaPlugin implements Listener, CommandE
             String displayName = input.trim();
             String id = slug(displayName);
             if (displayName.isBlank() || id.isBlank()) {
-                player.sendMessage(PREFIX + tr("Nombre de proyecto no válido.", "Invalid project name."));
+                player.sendMessage(prefix() + tr("Nombre de proyecto no válido.", "Invalid project name."));
                 openProjects(player);
                 return;
             }
             File targetFile = projectFile(id);
             if (targetFile.exists()) {
-                player.sendMessage(PREFIX + tr("Ya existe un proyecto con ese nombre.", "A project with that name already exists."));
+                player.sendMessage(prefix() + tr("Ya existe un proyecto con ese nombre.", "A project with that name already exists."));
                 openProjects(player);
                 return;
             }
@@ -1612,7 +1696,7 @@ public final class IxKitsPlugin extends JavaPlugin implements Listener, CommandE
             projectYaml.set("format-version", 2);
             projectYaml.set("created", System.currentTimeMillis());
             saveYaml(projectYaml, targetFile);
-            player.sendMessage(PREFIX + tr("Proyecto creado: §b", "Project created: §b") + displayName);
+            player.sendMessage(prefix() + tr("Proyecto creado: §b", "Project created: §b") + displayName);
             openEditor(player, id, 0);
             return;
         }
@@ -1621,28 +1705,28 @@ public final class IxKitsPlugin extends JavaPlugin implements Listener, CommandE
                 boolean changed = pending.type == InputType.DUPLICATE_PROJECT
                     ? projectService.duplicate(pending.project, input)
                     : projectService.rename(pending.project, input);
-                player.sendMessage(PREFIX + (changed ? tr("Operación completada.", "Operation completed.") : tr("No se pudo completar. Comprueba que el nombre no esté ocupado.", "Could not complete. Make sure the name is not already in use.")));
+                player.sendMessage(prefix() + (changed ? tr("Operación completada.", "Operation completed.") : tr("No se pudo completar. Comprueba que el nombre no esté ocupado.", "Could not complete. Make sure the name is not already in use.")));
                 openProjects(player);
-            } catch (IOException ex) { player.sendMessage(PREFIX + "§c" + ex.getMessage()); }
+            } catch (IOException ex) { player.sendMessage(prefix() + "§c" + ex.getMessage()); }
             return;
         }
         File file = projectFile(pending.project);
         YamlConfiguration yaml = YamlConfiguration.loadConfiguration(file);
         String itemPath = storagePath(pending.page, pending.slot);
         ItemStack target = yaml.getItemStack(itemPath);
-        if (target == null || target.getType().isAir()) { player.sendMessage(PREFIX + tr("No se encontró el objeto.", "Item not found.")); openEditor(player, pending.project, pending.page); return; }
+        if (target == null || target.getType().isAir()) { player.sendMessage(prefix() + tr("No se encontró el objeto.", "Item not found.")); openEditor(player, pending.project, pending.page); return; }
         if (pending.type == InputType.ENCHANTMENT_LEVEL) {
             NamespacedKey enchantmentKey = pending.argument == null ? null : NamespacedKey.fromString(pending.argument);
             Enchantment enchantment = enchantmentKey == null ? null : Registry.ENCHANTMENT.get(enchantmentKey);
             int level;
             try { level = Integer.parseInt(input.trim()); }
             catch (NumberFormatException ex) {
-                player.sendMessage(PREFIX + tr("Nivel inválido. Usa un número del 1 al 32767.", "Invalid level. Use a number from 1 to 32767."));
+                player.sendMessage(prefix() + tr("Nivel inválido. Usa un número del 1 al 32767.", "Invalid level. Use a number from 1 to 32767."));
                 promptEnchantLevel(player, pending.project, pending.page, pending.slot, pending.argument == null ? "" : pending.argument);
                 return;
             }
             if (enchantment == null || level < 1 || level > 32767) {
-                player.sendMessage(PREFIX + tr("No se pudo aplicar el nivel. Usa un encantamiento válido y un nivel de 1 a 32767.", "Could not apply the level. Use a valid enchantment and a level from 1 to 32767."));
+                player.sendMessage(prefix() + tr("No se pudo aplicar el nivel. Usa un encantamiento válido y un nivel de 1 a 32767.", "Could not apply the level. Use a valid enchantment and a level from 1 to 32767."));
                 promptEnchantLevel(player, pending.project, pending.page, pending.slot, pending.argument == null ? "" : pending.argument);
                 return;
             }
@@ -1652,7 +1736,7 @@ public final class IxKitsPlugin extends JavaPlugin implements Listener, CommandE
             yaml.set("format-version", 2);
             yaml.set("updated", System.currentTimeMillis());
             saveYaml(yaml, file);
-            player.sendMessage(PREFIX + tr("Encantamiento configurado a nivel §b", "Enchantment set to level §b") + level + "§7.");
+            player.sendMessage(prefix() + tr("Encantamiento configurado a nivel §b", "Enchantment set to level §b") + level + "§7.");
             openEnchantments(player, pending.project, pending.page, pending.slot, 0);
             return;
         }
@@ -1660,18 +1744,18 @@ public final class IxKitsPlugin extends JavaPlugin implements Listener, CommandE
             double seconds;
             try { seconds = Double.parseDouble(input.trim().replace(',', '.')); }
             catch (NumberFormatException ex) {
-                player.sendMessage(PREFIX + tr("Cooldown inválido. Escribe segundos, por ejemplo 2.5.", "Invalid cooldown. Type seconds, for example 2.5."));
+                player.sendMessage(prefix() + tr("Cooldown inválido. Escribe segundos, por ejemplo 2.5.", "Invalid cooldown. Type seconds, for example 2.5."));
                 promptAbilityCooldown(player, pending.project, pending.page, pending.slot, pending.argument == null ? "tnt" : pending.argument);
                 return;
             }
             if (!Double.isFinite(seconds) || seconds < 0 || seconds > 86400) {
-                player.sendMessage(PREFIX + tr("El cooldown debe estar entre 0 y 86400 segundos.", "Cooldown must be between 0 and 86400 seconds."));
+                player.sendMessage(prefix() + tr("El cooldown debe estar entre 0 y 86400 segundos.", "Cooldown must be between 0 and 86400 seconds."));
                 promptAbilityCooldown(player, pending.project, pending.page, pending.slot, pending.argument == null ? "tnt" : pending.argument);
                 return;
             }
             NamespacedKey cooldownKey = abilityCooldownKey(pending.argument);
             if (cooldownKey == null) {
-                player.sendMessage(PREFIX + tr("No se reconoció esa habilidad.", "That ability was not recognized."));
+                player.sendMessage(prefix() + tr("No se reconoció esa habilidad.", "That ability was not recognized."));
                 openAbilities(player, pending.project, pending.page, pending.slot);
                 return;
             }
@@ -1684,7 +1768,7 @@ public final class IxKitsPlugin extends JavaPlugin implements Listener, CommandE
             yaml.set("format-version", 2);
             yaml.set("updated", System.currentTimeMillis());
             saveYaml(yaml, file);
-            player.sendMessage(PREFIX + tr("Cooldown guardado: §b", "Cooldown saved: §b") + formatCooldown(cooldownMs));
+            player.sendMessage(prefix() + tr("Cooldown guardado: §b", "Cooldown saved: §b") + formatCooldown(cooldownMs));
             openAbilities(player, pending.project, pending.page, pending.slot);
             return;
         }
@@ -1695,7 +1779,7 @@ public final class IxKitsPlugin extends JavaPlugin implements Listener, CommandE
                 ? new ArrayList<>() : new ArrayList<>(loreMeta.lore());
             if (pending.type == InputType.LORE_CLEAR_CONFIRM) {
                 if (!input.equalsIgnoreCase("BORRAR") && !input.equalsIgnoreCase("CLEAR")) {
-                    player.sendMessage(PREFIX + tr("Lore conservado.", "Lore kept."));
+                    player.sendMessage(prefix() + tr("Lore conservado.", "Lore kept."));
                     openLoreEditor(player, pending.project, pending.page, pending.slot, 0);
                     return;
                 }
@@ -1705,7 +1789,7 @@ public final class IxKitsPlugin extends JavaPlugin implements Listener, CommandE
                 if (pending.type == InputType.LORE_ADD_LINE) lines.add(line);
                 else {
                     if (pending.lineIndex < 0 || pending.lineIndex >= lines.size()) {
-                        player.sendMessage(PREFIX + tr("Esa línea ya no existe.", "That line no longer exists."));
+                        player.sendMessage(prefix() + tr("Esa línea ya no existe.", "That line no longer exists."));
                         openLoreEditor(player, pending.project, pending.page, pending.slot, 0);
                         return;
                     }
@@ -1719,7 +1803,7 @@ public final class IxKitsPlugin extends JavaPlugin implements Listener, CommandE
             yaml.set("format-version", 2);
             yaml.set("updated", System.currentTimeMillis());
             saveYaml(yaml, file);
-            player.sendMessage(PREFIX + tr("Lore actualizado.", "Lore updated."));
+            player.sendMessage(prefix() + tr("Lore actualizado.", "Lore updated."));
             openLoreEditor(player, pending.project, pending.page, pending.slot, 0);
             return;
         }
@@ -1740,7 +1824,7 @@ public final class IxKitsPlugin extends JavaPlugin implements Listener, CommandE
                 }
                 case LEATHER_COLOR -> {
                     if (!(meta instanceof LeatherArmorMeta leather)) {
-                        player.sendMessage(PREFIX + tr("Este objeto no es una armadura de cuero.", "This item is not leather armor."));
+                        player.sendMessage(prefix() + tr("Este objeto no es una armadura de cuero.", "This item is not leather armor."));
                         openItemEditor(player, pending.project, pending.page, pending.slot);
                         return;
                     }
@@ -1773,7 +1857,7 @@ public final class IxKitsPlugin extends JavaPlugin implements Listener, CommandE
                 default -> { }
             }
         } catch (IllegalArgumentException ex) {
-            player.sendMessage(PREFIX + tr("Entrada inválida: ", "Invalid input: ") + ex.getMessage());
+            player.sendMessage(prefix() + tr("Entrada inválida: ", "Invalid input: ") + ex.getMessage());
             promptInput(player, pending.type, pending.project, pending.page, pending.slot,
                 "Vuelve a escribir el valor:", "Type the value again:");
             return;
@@ -1784,7 +1868,7 @@ public final class IxKitsPlugin extends JavaPlugin implements Listener, CommandE
         yaml.set("format-version", 2);
         yaml.set("updated", System.currentTimeMillis());
         saveYaml(yaml, file);
-        player.sendMessage(PREFIX + tr("Objeto actualizado.", "Item updated."));
+        player.sendMessage(prefix() + tr("Objeto actualizado.", "Item updated."));
         openItemEditor(player, pending.project, pending.page, pending.slot);
     }
 
@@ -1975,14 +2059,14 @@ public final class IxKitsPlugin extends JavaPlugin implements Listener, CommandE
         YamlConfiguration presets = YamlConfiguration.loadConfiguration(new File(templatesDir, "enchantments.yml"));
         ConfigurationSection section = presets.getConfigurationSection(presetName);
         if (section == null) {
-            p.sendMessage(PREFIX + tr("Ese preset de encantamientos no existe.", "That enchantment preset does not exist."));
+            p.sendMessage(prefix() + tr("Ese preset de encantamientos no existe.", "That enchantment preset does not exist."));
             if (project != null) openEnchantTemplates(p, 0, project, projectPage, targetSlot);
             return;
         }
         ItemStack target = project == null ? p.getInventory().getItemInMainHand()
             : getProjectItem(project, projectPage, targetSlot);
         if (target == null || target.getType().isAir()) {
-            p.sendMessage(PREFIX + tr("Selecciona primero un objeto.", "Select an item first."));
+            p.sendMessage(prefix() + tr("Selecciona primero un objeto.", "Select an item first."));
             return;
         }
         for (String rawKey : section.getKeys(false)) {
@@ -1991,7 +2075,7 @@ public final class IxKitsPlugin extends JavaPlugin implements Listener, CommandE
             if (enchantment != null) target.addUnsafeEnchantment(enchantment, Math.max(1, Math.min(32767, section.getInt(rawKey, 1))));
         }
         if (project != null) saveProjectItem(project, projectPage, targetSlot, target);
-        p.sendMessage(PREFIX + tr("Preset aplicado: §d", "Preset applied: §d") + prettyKey(presetName));
+        p.sendMessage(prefix() + tr("Preset aplicado: §d", "Preset applied: §d") + prettyKey(presetName));
         if (project != null) openItemEditor(p, project, projectPage, targetSlot);
         else openEnchantTemplates(p, 0, null, 0, -1);
     }
@@ -2059,25 +2143,20 @@ public final class IxKitsPlugin extends JavaPlugin implements Listener, CommandE
     private void applyPaletteToItem(ItemStack target, YamlConfiguration palettes, String key) {
         String color = palettes.getString(key + ".color");
         if (color == null || target == null || target.getType().isAir()) return;
-        String legacyColor = paletteLegacyColor(color);
-        String legacyAccent = paletteLegacyColor(palettes.getString(key + ".accent", color));
+        String startHex = paletteHex(color);
+        String endHex = paletteHex(palettes.getString(key + ".accent", color));
         ItemMeta meta = target.getItemMeta();
         if (meta == null) return;
         String name = meta.hasDisplayName() ? meta.getDisplayName() : prettyKey(target.getType().name());
-        meta.setDisplayName(legacyColor + ChatColor.stripColor(name));
+        meta.displayName(gradientComponent(ChatColor.stripColor(name), startHex, endHex));
         if (meta.lore() != null) {
             var legacy = net.kyori.adventure.text.serializer.legacy.LegacyComponentSerializer.legacySection();
-            List<String> recolored = new ArrayList<>();
-            int visibleLine = 0;
-            for (net.kyori.adventure.text.Component line : meta.lore()) {
+            List<Component> recolored = new ArrayList<>();
+            for (Component line : meta.lore()) {
                 String plain = ChatColor.stripColor(legacy.serialize(line));
-                if (plain.isBlank()) recolored.add("");
-                else {
-                    recolored.add((visibleLine % 2 == 0 ? legacyColor : legacyAccent) + plain);
-                    visibleLine++;
-                }
+                recolored.add(plain.isBlank() ? Component.empty() : gradientComponent(plain, startHex, endHex));
             }
-            meta.setLore(recolored);
+            meta.lore(recolored);
         }
         target.setItemMeta(meta);
     }
@@ -2085,18 +2164,18 @@ public final class IxKitsPlugin extends JavaPlugin implements Listener, CommandE
     private void applyPalettePreset(Player p, String key, String project, int projectPage, int targetSlot) {
         YamlConfiguration palettes = YamlConfiguration.loadConfiguration(new File(templatesDir, "palettes.yml"));
         if (!palettes.contains(key + ".color")) {
-            p.sendMessage(PREFIX + tr("Esa paleta no existe.", "That palette does not exist."));
+            p.sendMessage(prefix() + tr("Esa paleta no existe.", "That palette does not exist."));
             return;
         }
         ItemStack target = project == null ? p.getInventory().getItemInMainHand()
             : getProjectItem(project, projectPage, targetSlot);
         if (target == null || target.getType().isAir()) {
-            p.sendMessage(PREFIX + tr("Selecciona primero un objeto.", "Select an item first."));
+            p.sendMessage(prefix() + tr("Selecciona primero un objeto.", "Select an item first."));
             return;
         }
         applyPaletteToItem(target, palettes, key);
         if (project != null) saveProjectItem(project, projectPage, targetSlot, target);
-        p.sendMessage(PREFIX + tr("Paleta aplicada: §b", "Palette applied: §b") + palettes.getString(key + ".display", prettyKey(key)));
+        p.sendMessage(prefix() + tr("Paleta aplicada: §b", "Palette applied: §b") + palettes.getString(key + ".display", prettyKey(key)));
         if (project != null) openItemEditor(p, project, projectPage, targetSlot);
         else openPaletteTemplates(p, 0, null, 0, -1);
     }
@@ -2105,7 +2184,7 @@ public final class IxKitsPlugin extends JavaPlugin implements Listener, CommandE
         YamlConfiguration y = YamlConfiguration.loadConfiguration(projectFile(project));
         ItemStack target = y.getItemStack(storagePath(page, targetSlot));
         if (target == null || target.getType().isAir()) {
-            p.sendMessage(PREFIX + tr("Ese espacio no contiene ningún objeto.", "That slot does not contain an item."));
+            p.sendMessage(prefix() + tr("Ese espacio no contiene ningún objeto.", "That slot does not contain an item."));
             openEditor(p, project, page);
             return;
         }
@@ -2119,7 +2198,7 @@ public final class IxKitsPlugin extends JavaPlugin implements Listener, CommandE
             tr("§7Después haz clic en una ranura vacía.", "§7Then click an empty project slot."),
             tr("§eAcción: guardar en el portapapeles", "§eAction: save to clipboard")));
         inv.setItem(16, item(Material.CHEST, tr("§bPortapapeles", "§bClipboard"),
-            itemClipboard.containsKey(p.getUniqueId()) ? tr("§a● Contiene un objeto", "§a● Contains an item") : tr("§8○ Sin objeto guardado", "§8○ No item saved"),
+            clipboardItem(p.getUniqueId()) != null ? tr("§a● Contiene un objeto", "§a● Contains an item") : tr("§8○ Sin objeto guardado", "§8○ No item saved"),
             tr("§7Guarda una copia exacta para duplicarla.", "§7Keep an exact copy ready to duplicate."),
             tr("§eClic para consultar su contenido", "§eClick to inspect its contents")));
         inv.setItem(14, item(Material.NETHER_STAR, tr("§d§lPropiedades especiales", "§d§lSpecial properties"),
@@ -2181,13 +2260,13 @@ public final class IxKitsPlugin extends JavaPlugin implements Listener, CommandE
 
     private void openClipboard(Player p, String project, int page, int targetSlot) {
         ItemStack current = getProjectItem(project, page, targetSlot);
-        ItemStack copied = itemClipboard.get(p.getUniqueId());
+        ItemStack copied = clipboardItem(p.getUniqueId());
         Inventory inv = menu("clipboard", project, page, targetSlot, 0,
             tr("§3✦ §bIxKits Studio §8• §0Portapapeles", "§3✦ §bIxKits Studio §8• §0Clipboard"));
         border(inv);
         inv.setItem(4, item(Material.CHEST, tr("§b§lPortapapeles de objetos", "§b§lItem clipboard"),
             tr("§7Copia, consulta, reemplaza y reutiliza objetos.", "§7Copy, inspect, replace and reuse items."),
-            tr("§8La copia dura mientras permanezcas conectado.", "§8The copy lasts while you remain online.")));
+            tr("§8La copia se guarda en disco y sobrevive a los reinicios.", "§8The copy is saved to disk and survives restarts.")));
         inv.setItem(20, item(current == null || current.getType().isAir() ? Material.BARRIER : current.getType(),
             tr("§aCopiar objeto actual", "§aCopy current item"),
             tr("§7Objeto: §f", "§7Item: §f") + itemDisplayName(current),
@@ -2233,23 +2312,23 @@ public final class IxKitsPlugin extends JavaPlugin implements Listener, CommandE
 
     private void claimProjectItems(Player player, String[] args) {
         if (!getConfig().getBoolean("claim.enabled", true)) {
-            player.sendMessage(PREFIX + tr("La reclamación de proyectos está desactivada por la configuración del servidor.", "Project claiming is disabled in the server configuration."));
+            player.sendMessage(prefix() + tr("La reclamación de proyectos está desactivada por la configuración del servidor.", "Project claiming is disabled in the server configuration."));
             return;
         }
         if (args.length < 2) {
-            player.sendMessage(PREFIX + tr("Uso: §f/ixkits claim <proyecto>", "Usage: §f/ixkits claim <project>"));
-            player.sendMessage(PREFIX + tr("§7Entrega los objetos de las dos páginas y del equipamiento del proyecto.", "§7Gives items from both project pages and its equipment."));
+            player.sendMessage(prefix() + tr("Uso: §f/ixkits claim <proyecto>", "Usage: §f/ixkits claim <project>"));
+            player.sendMessage(prefix() + tr("§7Entrega los objetos de las dos páginas y del equipamiento del proyecto.", "§7Gives items from both project pages and its equipment."));
             return;
         }
         String permission = getConfig().getString("claim.permission", "").trim();
         if (!permission.isEmpty() && !player.hasPermission(permission)) {
-            player.sendMessage(PREFIX + tr("Necesitas el permiso §f" + permission + " §7para reclamar proyectos.", "You need permission §f" + permission + " §7to claim projects."));
+            player.sendMessage(prefix() + tr("Necesitas el permiso §f" + permission + " §7para reclamar proyectos.", "You need permission §f" + permission + " §7to claim projects."));
             return;
         }
         String project = slug(String.join("-", Arrays.copyOfRange(args, 1, args.length)));
         File file = projectFile(project);
         if (!file.isFile()) {
-            player.sendMessage(PREFIX + tr("No existe el proyecto §f" + project + "§7. Comprueba el nombre con §f/ixkits proyectos§7.", "Project §f" + project + " §7does not exist. Check the name with §f/ixkits proyectos§7."));
+            player.sendMessage(prefix() + tr("No existe el proyecto §f" + project + "§7. Comprueba el nombre con §f/ixkits proyectos§7.", "Project §f" + project + " §7does not exist. Check the name with §f/ixkits proyectos§7."));
             return;
         }
         long cooldownSeconds = Math.max(0L, getConfig().getLong("claim.cooldown-seconds", 0L));
@@ -2257,7 +2336,7 @@ public final class IxKitsPlugin extends JavaPlugin implements Listener, CommandE
         long now = System.currentTimeMillis();
         if (cooldownSeconds > 0 && lastClaim != null && now - lastClaim < cooldownSeconds * 1000L) {
             long remaining = Math.max(1L, (cooldownSeconds * 1000L - (now - lastClaim) + 999L) / 1000L);
-            player.sendMessage(PREFIX + tr("Espera §e" + remaining + " s §7antes de reclamar otro proyecto.", "Wait §e" + remaining + "s §7before claiming another project."));
+            player.sendMessage(prefix() + tr("Espera §e" + remaining + " s §7antes de reclamar otro proyecto.", "Wait §e" + remaining + "s §7before claiming another project."));
             return;
         }
         YamlConfiguration yaml = YamlConfiguration.loadConfiguration(file);
@@ -2273,14 +2352,14 @@ public final class IxKitsPlugin extends JavaPlugin implements Listener, CommandE
             if (stack != null && !stack.getType().isAir()) rewards.add(stack.clone());
         }
         if (rewards.isEmpty()) {
-            player.sendMessage(PREFIX + tr("Ese proyecto no contiene objetos para reclamar.", "That project has no items to claim."));
+            player.sendMessage(prefix() + tr("Ese proyecto no contiene objetos para reclamar.", "That project has no items to claim."));
             return;
         }
         Map<Integer, ItemStack> overflow = player.getInventory().addItem(rewards.toArray(new ItemStack[0]));
         overflow.values().forEach(stack -> player.getWorld().dropItemNaturally(player.getLocation(), stack));
         if (cooldownSeconds > 0) claimCooldowns.put(player.getUniqueId(), now);
-        player.sendMessage(PREFIX + tr("§a✓ Proyecto reclamado: §f", "§a✓ Project claimed: §f") + yaml.getString("name", project));
-        player.sendMessage(PREFIX + tr("§7Pilas de objetos entregadas: §b", "§7Item stacks delivered: §b") + rewards.size()
+        player.sendMessage(prefix() + tr("§a✓ Proyecto reclamado: §f", "§a✓ Project claimed: §f") + yaml.getString("name", project));
+        player.sendMessage(prefix() + tr("§7Pilas de objetos entregadas: §b", "§7Item stacks delivered: §b") + rewards.size()
             + (overflow.isEmpty() ? "" : tr(" §8• Los sobrantes se dejaron en el suelo.", " §8• Overflow items were dropped nearby.")));
         player.playSound(player.getLocation(), org.bukkit.Sound.ENTITY_ITEM_PICKUP, 0.7f, 1.1f);
     }
@@ -2289,7 +2368,7 @@ public final class IxKitsPlugin extends JavaPlugin implements Listener, CommandE
         PendingInput pending = new PendingInput(type, project, page, targetSlot, lineIndex);
         pendingInputs.put(p.getUniqueId(), pending);
         p.closeInventory();
-        p.sendMessage(PREFIX + tr(spanish, english));
+        p.sendMessage(prefix() + tr(spanish, english));
         sendCurrentValueAssist(p, pending);
         sendCancelPrompt(p);
     }
@@ -2297,7 +2376,7 @@ public final class IxKitsPlugin extends JavaPlugin implements Listener, CommandE
     private void openLoreEditor(Player p, String project, int page, int targetSlot, int requestedPage) {
         ItemStack target = getProjectItem(project, page, targetSlot);
         if (target == null || target.getType().isAir()) {
-            p.sendMessage(PREFIX + tr("No se encontró el objeto para editar el lore.", "Could not find the item to edit lore."));
+            p.sendMessage(prefix() + tr("No se encontró el objeto para editar el lore.", "Could not find the item to edit lore."));
             if (targetSlot < 0) openEquipment(p, project, page); else openEditor(p, project, page);
             return;
         }
@@ -2414,7 +2493,7 @@ public final class IxKitsPlugin extends JavaPlugin implements Listener, CommandE
     private void openAbilities(Player p, String project, int page, int targetSlot) {
         ItemStack target = getProjectItem(project, page, targetSlot);
         if (target == null || target.getType().isAir()) {
-            p.sendMessage(PREFIX + tr("No se encontró el objeto.", "Item not found."));
+            p.sendMessage(prefix() + tr("No se encontró el objeto.", "Item not found."));
             if (targetSlot < 0) openEquipment(p, project, page); else openEditor(p, project, page);
             return;
         }
@@ -2480,7 +2559,7 @@ public final class IxKitsPlugin extends JavaPlugin implements Listener, CommandE
         YamlConfiguration y = YamlConfiguration.loadConfiguration(projectFile(project));
         ItemStack target = y.getItemStack(storagePath(projectPage, targetSlot));
         if (target == null || target.getType().isAir()) {
-            p.sendMessage(PREFIX + tr("No se encontró el objeto del proyecto.", "Could not find the project item."));
+            p.sendMessage(prefix() + tr("No se encontró el objeto del proyecto.", "Could not find the project item."));
             openEditor(p, project, projectPage);
             return;
         }
@@ -2531,7 +2610,7 @@ public final class IxKitsPlugin extends JavaPlugin implements Listener, CommandE
                             if (present == null || present.getType().isAir()) { destination = editable; break; }
                         }
                         e.setCancelled(true);
-                        if (destination < 0) p.sendMessage(PREFIX + tr("No hay ranuras vacías en esta página.", "There are no empty slots on this page."));
+                        if (destination < 0) p.sendMessage(prefix() + tr("No hay ranuras vacías en esta página.", "There are no empty slots on this page."));
                         else {
                             top.setItem(destination, moving.clone());
                             e.setCurrentItem(new ItemStack(Material.AIR));
@@ -2562,14 +2641,14 @@ public final class IxKitsPlugin extends JavaPlugin implements Listener, CommandE
                     savePage(top, h);
                     openItemEditor(p, h.project, h.page, slot);
                 } else if ((clicked == null || clicked.getType().isAir()) && cursorEmpty && !e.isRightClick()
-                    && itemClipboard.containsKey(p.getUniqueId())) {
+                    && clipboardItem(p.getUniqueId()) != null) {
                     e.setCancelled(true);
-                    ItemStack copy = itemClipboard.get(p.getUniqueId());
+                    ItemStack copy = clipboardItem(p.getUniqueId());
                     if (copy != null) {
                         top.setItem(slot, copy.clone());
                         savePage(top, h);
                         openItemEditor(p, h.project, h.page, slot);
-                        p.sendMessage(PREFIX + tr("Objeto pegado desde el portapapeles de IxKits.", "Item pasted from the IxKits clipboard."));
+                        p.sendMessage(prefix() + tr("Objeto pegado desde el portapapeles de IxKits.", "Item pasted from the IxKits clipboard."));
                     }
                 }
                 return;
@@ -2578,7 +2657,7 @@ public final class IxKitsPlugin extends JavaPlugin implements Listener, CommandE
             if (slot == 45) { savePage(e.getView().getTopInventory(), h); openProjects(p); }
             else if (slot == 47) { savePage(e.getView().getTopInventory(), h); openEditor(p, h.project, Math.max(0, h.page-1)); }
             else if (slot == 51) { savePage(e.getView().getTopInventory(), h); openEditor(p, h.project, Math.min(1, h.page+1)); }
-            else if (slot == 49) { savePage(e.getView().getTopInventory(), h); p.closeInventory(); p.sendMessage(PREFIX + tr("Proyecto guardado.", "Project saved.")); }
+            else if (slot == 49) { savePage(e.getView().getTopInventory(), h); p.closeInventory(); p.sendMessage(prefix() + tr("Proyecto guardado.", "Project saved.")); }
             else if (slot == 44) { savePage(e.getView().getTopInventory(), h); openEquipment(p, h.project, h.page); }
             else if (slot == 53) { savePage(e.getView().getTopInventory(), h); exportProject(p, h.project); }
             return;
@@ -2594,7 +2673,7 @@ public final class IxKitsPlugin extends JavaPlugin implements Listener, CommandE
                         int destination = preferred >= 0 && isEmptyEquipmentSlot(top.getItem(preferred)) ? preferred : -1;
                         if (destination < 0 && preferred < 0 && isEmptyEquipmentSlot(top.getItem(31))) destination = 31;
                         e.setCancelled(true);
-                        if (destination < 0) p.sendMessage(PREFIX + tr("No hay una ranura de equipamiento compatible y vacía.", "No compatible empty equipment slot is available."));
+                        if (destination < 0) p.sendMessage(prefix() + tr("No hay una ranura de equipamiento compatible y vacía.", "No compatible empty equipment slot is available."));
                         else {
                             top.setItem(destination, moving.clone());
                             e.setCurrentItem(new ItemStack(Material.AIR));
@@ -2613,7 +2692,7 @@ public final class IxKitsPlugin extends JavaPlugin implements Listener, CommandE
             }
             if (slot == 40) {
                 e.setCancelled(true);
-                p.sendMessage(PREFIX + tr("Clic izquierdo para mover objetos; Mayús + clic desde tu inventario los coloca automáticamente; clic derecho sobre una pieza para editarla.", "Left-click to move items; Shift-click from your inventory equips automatically; right-click a piece to edit it."));
+                p.sendMessage(prefix() + tr("Clic izquierdo para mover objetos; Mayús + clic desde tu inventario los coloca automáticamente; clic derecho sobre una pieza para editarla.", "Left-click to move items; Shift-click from your inventory equips automatically; right-click a piece to edit it."));
                 return;
             }
             if (!contains(EQUIP_SLOTS, slot)) { e.setCancelled(true); return; }
@@ -2652,28 +2731,28 @@ public final class IxKitsPlugin extends JavaPlugin implements Listener, CommandE
             if (slot == 45) openItemEditor(p, h.project, h.page, h.targetSlot);
             else if (slot == 20) {
                 ItemStack current = getProjectItem(h.project, h.page, h.targetSlot);
-                if (current == null || current.getType().isAir()) p.sendMessage(PREFIX + tr("No hay un objeto válido que copiar.", "There is no valid item to copy."));
+                if (current == null || current.getType().isAir()) p.sendMessage(prefix() + tr("No hay un objeto válido que copiar.", "There is no valid item to copy."));
                 else {
-                    itemClipboard.put(p.getUniqueId(), current.clone());
-                    p.sendMessage(PREFIX + tr("§aObjeto copiado al portapapeles de IxKits.", "§aItem copied to the IxKits clipboard."));
+                    setClipboard(p.getUniqueId(), current);
+                    p.sendMessage(prefix() + configuredMessage("clipboard.saved", "&aObjeto copiado y guardado en disco.", "&aItem copied and saved to disk."));
                 }
                 openClipboard(p, h.project, h.page, h.targetSlot);
             } else if (slot == 24) {
-                ItemStack copied = itemClipboard.get(p.getUniqueId());
+                ItemStack copied = clipboardItem(p.getUniqueId());
                 if (copied == null || copied.getType().isAir()) {
-                    p.sendMessage(PREFIX + tr("§cEl portapapeles está vacío. Copia un objeto primero.", "§cThe clipboard is empty. Copy an item first."));
+                    p.sendMessage(prefix() + tr("§cEl portapapeles está vacío. Copia un objeto primero.", "§cThe clipboard is empty. Copy an item first."));
                     openClipboard(p, h.project, h.page, h.targetSlot);
                 } else {
                     saveProjectItem(h.project, h.page, h.targetSlot, copied.clone());
-                    p.sendMessage(PREFIX + tr("§aEl objeto actual se reemplazó por la copia guardada.", "§aThe current item was replaced with the saved copy."));
+                    p.sendMessage(prefix() + tr("§aEl objeto actual se reemplazó por la copia guardada.", "§aThe current item was replaced with the saved copy."));
                     openItemEditor(p, h.project, h.page, h.targetSlot);
                 }
             } else if (slot == 29) {
-                itemClipboard.remove(p.getUniqueId());
-                p.sendMessage(PREFIX + tr("Portapapeles vaciado.", "Clipboard cleared."));
+                clearClipboard(p.getUniqueId());
+                p.sendMessage(prefix() + configuredMessage("clipboard.cleared", "&aPortapapeles vaciado.", "&aClipboard cleared."));
                 openClipboard(p, h.project, h.page, h.targetSlot);
             } else if (slot == 49) {
-                p.sendMessage(PREFIX + tr("Copia un objeto, reemplaza el actual o pega la copia en una ranura vacía del proyecto.", "Copy an item, replace the current one, or paste the copy into an empty project slot."));
+                p.sendMessage(prefix() + tr("Copia un objeto, reemplaza el actual o pega la copia en una ranura vacía del proyecto.", "Copy an item, replace the current one, or paste the copy into an empty project slot."));
                 openClipboard(p, h.project, h.page, h.targetSlot);
             }
         } else if (h.kind.equals("main")) {
@@ -2715,26 +2794,26 @@ public final class IxKitsPlugin extends JavaPlugin implements Listener, CommandE
             else if (slot == 22) promptInput(p, InputType.RENAME_PROJECT, h.project, 0, -1, "Escribe el nuevo nombre:", "Type the new name:");
             else if (slot == 24) openDeleteConfirm(p, h.project);
             else if (slot == 30) {
-                for (String line : projectService.validate(h.project)) p.sendMessage(PREFIX + "§7" + line);
+                for (String line : projectService.validate(h.project)) p.sendMessage(prefix() + "§7" + line);
                 openProjectActions(p, h.project);
             } else if (slot == 32) {
                 try {
                     File output = projectService.exportEssentials(h.project);
-                    p.sendMessage(PREFIX + tr("Exportado: §b", "Exported: §b") + output.getPath());
-                    p.sendMessage(PREFIX + tr("Revisa los avisos de metadatos avanzados.", "Review the advanced metadata warning."));
-                } catch (IOException ex) { p.sendMessage(PREFIX + "§c" + ex.getMessage()); }
+                    p.sendMessage(prefix() + tr("Exportado: §b", "Exported: §b") + output.getPath());
+                    p.sendMessage(prefix() + tr("Revisa los avisos de metadatos avanzados.", "Review the advanced metadata warning."));
+                } catch (IOException ex) { p.sendMessage(prefix() + "§c" + ex.getMessage()); }
                 openProjectActions(p, h.project);
             } else if (slot == 40) {
                 try {
-                    if (projectService.undo(h.project)) p.sendMessage(PREFIX + tr("Copia restaurada.", "Backup restored."));
-                    else p.sendMessage(PREFIX + tr("No hay copias para restaurar.", "No backups are available."));
-                } catch (IOException ex) { p.sendMessage(PREFIX + "§c" + ex.getMessage()); }
+                    if (projectService.undo(h.project)) p.sendMessage(prefix() + tr("Copia restaurada.", "Backup restored."));
+                    else p.sendMessage(prefix() + tr("No hay copias para restaurar.", "No backups are available."));
+                } catch (IOException ex) { p.sendMessage(prefix() + "§c" + ex.getMessage()); }
                 openProjectActions(p, h.project);
             } else if (slot == 42) {
                 try {
-                    if (projectService.redo(h.project)) p.sendMessage(PREFIX + tr("Último cambio rehecho.", "Last change redone."));
-                    else p.sendMessage(PREFIX + tr("No hay una acción para rehacer.", "There is no action to redo."));
-                } catch (IOException ex) { p.sendMessage(PREFIX + "§c" + ex.getMessage()); }
+                    if (projectService.redo(h.project)) p.sendMessage(prefix() + tr("Último cambio rehecho.", "Last change redone."));
+                    else p.sendMessage(prefix() + tr("No hay una acción para rehacer.", "There is no action to redo."));
+                } catch (IOException ex) { p.sendMessage(prefix() + "§c" + ex.getMessage()); }
                 openProjectActions(p, h.project);
             } else if (slot == 34) promptInput(p, InputType.PUBLISH_PROJECT_CATEGORY, h.project, 0, -1,
                 "Escribe la categoría del kit (pvp, survival, rpg, utility, etc.):",
@@ -2748,9 +2827,9 @@ public final class IxKitsPlugin extends JavaPlugin implements Listener, CommandE
                 String id = h.entryBySlot.get(slot);
                 try {
                     String displayName = projectService.trashedProjectName(id);
-                    if (projectService.restoreFromTrash(id)) p.sendMessage(PREFIX + tr("Proyecto restaurado: §b", "Project restored: §b") + displayName);
-                    else p.sendMessage(PREFIX + tr("No se pudo restaurar porque el ID ya está ocupado o el proyecto no existe.", "Restore failed because the ID is occupied or the project is missing."));
-                } catch (IOException ex) { p.sendMessage(PREFIX + "§c" + ex.getMessage()); }
+                    if (projectService.restoreFromTrash(id)) p.sendMessage(prefix() + tr("Proyecto restaurado: §b", "Project restored: §b") + displayName);
+                    else p.sendMessage(prefix() + tr("No se pudo restaurar porque el ID ya está ocupado o el proyecto no existe.", "Restore failed because the ID is occupied or the project is missing."));
+                } catch (IOException ex) { p.sendMessage(prefix() + "§c" + ex.getMessage()); }
                 openTrash(p);
             }
         } else if (h.kind.equals("special-properties")) {
@@ -2824,7 +2903,7 @@ public final class IxKitsPlugin extends JavaPlugin implements Listener, CommandE
                         } else if (bannerMeta.numberOfPatterns() < 6) {
                             bannerMeta.addPattern(new Pattern(DyeColor.valueOf(h.query), type));
                         } else {
-                            p.sendMessage(PREFIX + tr("Un estandarte admite un máximo de seis patrones.", "A banner supports at most six patterns."));
+                            p.sendMessage(prefix() + tr("Un estandarte admite un máximo de seis patrones.", "A banner supports at most six patterns."));
                         }
                         target.setItemMeta(bannerMeta);
                         projectService.backupBeforeChange(file);
@@ -2903,12 +2982,12 @@ public final class IxKitsPlugin extends JavaPlugin implements Listener, CommandE
                 if (h.page > 1) openCatalog(p, h.query, h.page - 1);
                 else promptInput(p, InputType.CATALOG_SEARCH, null, h.page, -1, "Escribe un texto para buscar plantillas:", "Type a search query for templates:");
             } else if (slot == 51) openCatalog(p, h.query, h.page + 1);
-            else if (slot == 49) p.sendMessage(PREFIX + tr("Haz clic en una plantilla para descargarla.", "Click a template to download it."));
+            else if (slot == 49) p.sendMessage(prefix() + tr("Haz clic en una plantilla para descargarla.", "Click a template to download it."));
             else if (h.entryBySlot.containsKey(slot)) {
                 String id = h.entryBySlot.get(slot);
                 if (e.isRightClick()) {
                     catalogClient.toggleFavorite(id, p.getUniqueId().toString()).whenComplete((ignored, error) ->
-                        Bukkit.getScheduler().runTask(this, () -> p.sendMessage(PREFIX + (error == null
+                        Bukkit.getScheduler().runTask(this, () -> p.sendMessage(prefix() + (error == null
                             ? tr("Favorito actualizado.", "Favorite updated.")
                             : tr("No se pudo actualizar el favorito: ", "Could not update favorite: ") + rootMessage(error)))));
                 } else downloadCatalogTemplate(p, id);
@@ -2917,10 +2996,10 @@ public final class IxKitsPlugin extends JavaPlugin implements Listener, CommandE
             if (slot == 23 || slot == 45) openProjectActions(p, h.project);
             else if (slot == 21) {
                 try {
-                    if (projectService.moveToTrash(h.project)) p.sendMessage(PREFIX + tr("Proyecto movido a la papelera.", "Project moved to trash."));
-                    else p.sendMessage(PREFIX + tr("No existe ese proyecto.", "Project not found."));
+                    if (projectService.moveToTrash(h.project)) p.sendMessage(prefix() + tr("Proyecto movido a la papelera.", "Project moved to trash."));
+                    else p.sendMessage(prefix() + tr("No existe ese proyecto.", "Project not found."));
                     openProjects(p);
-                } catch (IOException ex) { p.sendMessage(PREFIX + "§c" + ex.getMessage()); }
+                } catch (IOException ex) { p.sendMessage(prefix() + "§c" + ex.getMessage()); }
             }
         } else if (h.kind.equals("community-hub")) {
             if (slot == 45) {
@@ -2931,12 +3010,12 @@ public final class IxKitsPlugin extends JavaPlugin implements Listener, CommandE
             else if (slot == 22) openCommunityResources(p, "lore", 1);
             else if (slot == 24) openCommunityResources(p, "enchantments", 1);
             else if (slot == 30) openCommunityResources(p, "palette", 1);
-            else if (slot == 32) p.sendMessage(PREFIX + tr("Para publicar, haz clic derecho sobre una plantilla local de lore, paleta o encantamientos. Para un kit, abre Herramientas del proyecto → Publicar en Community.", "To publish, right-click a local lore, palette or enchantment preset. To publish a kit, open Project Tools → Publish to Community."));
+            else if (slot == 32) p.sendMessage(prefix() + tr("Para publicar, haz clic derecho sobre una plantilla local de lore, paleta o encantamientos. Para un kit, abre Herramientas del proyecto → Publicar en Community.", "To publish, right-click a local lore, palette or enchantment preset. To publish a kit, open Project Tools → Publish to Community."));
         } else if (h.kind.equals("community-resources")) {
             if (slot == 45) openCommunityHub(p);
             else if (slot == 47) openCommunityResources(p, h.project, Math.max(1, h.page - 1));
             else if (slot == 51) openCommunityResources(p, h.project, h.page + 1);
-            else if (slot == 49) p.sendMessage(PREFIX + tr("En las bibliotecas locales, haz clic derecho en un recurso para publicarlo.", "In local libraries, right-click a resource to publish it."));
+            else if (slot == 49) p.sendMessage(prefix() + tr("En las bibliotecas locales, haz clic derecho en un recurso para publicarlo.", "In local libraries, right-click a resource to publish it."));
             else if (h.entryBySlot.containsKey(slot)) downloadCommunityResource(p, h.project, h.entryBySlot.get(slot), h.page);
         } else if (h.kind.equals("templates")) {
             if (slot == 45) {
@@ -2958,7 +3037,7 @@ public final class IxKitsPlugin extends JavaPlugin implements Listener, CommandE
                 if (e.isRightClick()) {
                     if (p.hasPermission("ixkits.admin") || p.hasPermission("ixkits.community.publish"))
                         publishLocalResource(p, "enchantments", h.entryBySlot.get(slot), null);
-                    else p.sendMessage(PREFIX + tr("Necesitas ixkits.community.publish para publicar recursos.", "You need ixkits.community.publish to publish resources."));
+                    else p.sendMessage(prefix() + tr("Necesitas ixkits.community.publish para publicar recursos.", "You need ixkits.community.publish to publish resources."));
                 } else applyEnchantPreset(p, h.entryBySlot.get(slot), h.project, h.page, h.targetSlot);
             }
         } else if (h.kind.equals("palette-templates")) {
@@ -2972,7 +3051,7 @@ public final class IxKitsPlugin extends JavaPlugin implements Listener, CommandE
                 if (e.isRightClick()) {
                     if (p.hasPermission("ixkits.admin") || p.hasPermission("ixkits.community.publish"))
                         publishLocalResource(p, "palette", h.entryBySlot.get(slot), null);
-                    else p.sendMessage(PREFIX + tr("Necesitas ixkits.community.publish para publicar recursos.", "You need ixkits.community.publish to publish resources."));
+                    else p.sendMessage(prefix() + tr("Necesitas ixkits.community.publish para publicar recursos.", "You need ixkits.community.publish to publish resources."));
                 } else applyPalettePreset(p, h.entryBySlot.get(slot), h.project, h.page, h.targetSlot);
             }
         } else if (h.kind.equals("lore-templates")) {
@@ -2987,7 +3066,7 @@ public final class IxKitsPlugin extends JavaPlugin implements Listener, CommandE
                 if (e.isRightClick()) {
                     if (p.hasPermission("ixkits.admin") || p.hasPermission("ixkits.community.publish"))
                         publishLocalResource(p, "lore", h.entryBySlot.get(slot), null);
-                    else p.sendMessage(PREFIX + tr("Necesitas ixkits.community.publish para publicar recursos.", "You need ixkits.community.publish to publish resources."));
+                    else p.sendMessage(prefix() + tr("Necesitas ixkits.community.publish para publicar recursos.", "You need ixkits.community.publish to publish resources."));
                 } else if (h.project == null) applyLoreTemplateToHand(p, h.entryBySlot.get(slot));
                 else applyLoreTemplateToProject(p, h.entryBySlot.get(slot), h.project, h.page, h.targetSlot);
             }
@@ -3036,8 +3115,8 @@ public final class IxKitsPlugin extends JavaPlugin implements Listener, CommandE
             else if (slot == 15) {
                 ItemStack source = getProjectItem(h.project, h.page, h.targetSlot);
                 if (source != null && !source.getType().isAir()) {
-                    itemClipboard.put(p.getUniqueId(), source.clone());
-                    p.sendMessage(PREFIX + tr("Objeto copiado. Haz clic izquierdo en una ranura vacía del proyecto para pegarlo.", "Item copied. Left-click an empty project slot to paste it."));
+                    setClipboard(p.getUniqueId(), source);
+                    p.sendMessage(prefix() + tr("Objeto copiado. Haz clic izquierdo en una ranura vacía del proyecto para pegarlo.", "Item copied. Left-click an empty project slot to paste it."));
                 }
                 openItemEditor(p, h.project, h.page, h.targetSlot);
             } else if (slot == 16) {
@@ -3064,14 +3143,14 @@ public final class IxKitsPlugin extends JavaPlugin implements Listener, CommandE
                     edit.setDamage(Math.max(0, Math.min(maximum, value)));
                     target.setItemMeta(meta);
                     saveProjectItem(h.project, h.page, h.targetSlot, target);
-                } else p.sendMessage(PREFIX + tr("Este objeto no tiene durabilidad.", "This item has no durability."));
+                } else p.sendMessage(prefix() + tr("Este objeto no tiene durabilidad.", "This item has no durability."));
                 openItemEditor(p, h.project, h.page, h.targetSlot);
             } else if (slot == 35) promptInput(p, InputType.MODEL_DATA, h.project, h.page, h.targetSlot, "Escribe el custom model data numérico o - para borrarlo:", "Type the numeric custom model data or - to clear it:");
             else if (slot == 37) openAttributes(p, h.project, h.page, h.targetSlot);
             else if (slot == 39) openFlags(p, h.project, h.page, h.targetSlot); else if (slot == 41) {
                 ItemStack target = getProjectItem(h.project, h.page, h.targetSlot);
                 if (target != null && target.getItemMeta() instanceof LeatherArmorMeta) promptInput(p, InputType.LEATHER_COLOR, h.project, h.page, h.targetSlot, "Escribe el color como #RRGGBB o R,G,B:", "Type a color as #RRGGBB or R,G,B:");
-                else p.sendMessage(PREFIX + tr("Solo disponible para armadura de cuero.", "Only available for leather armor."));
+                else p.sendMessage(prefix() + tr("Solo disponible para armadura de cuero.", "Only available for leather armor."));
             } else if (slot == 43) openPotionTypes(p, h.project, h.page, h.targetSlot, 0);
             else if (slot == 24) {
                 YamlConfiguration y = YamlConfiguration.loadConfiguration(projectFile(h.project));
@@ -3080,7 +3159,7 @@ public final class IxKitsPlugin extends JavaPlugin implements Listener, CommandE
                     for (Enchantment enchantment : new ArrayList<>(target.getEnchantments().keySet())) target.removeEnchantment(enchantment);
                     y.set(storagePath(h.page, h.targetSlot), target);
                     saveYaml(y, projectFile(h.project));
-                    p.sendMessage(PREFIX + tr("Se quitaron todos los encantamientos del objeto.", "All enchantments were removed from the item."));
+                    p.sendMessage(prefix() + tr("Se quitaron todos los encantamientos del objeto.", "All enchantments were removed from the item."));
                 }
                 openItemEditor(p, h.project, h.page, h.targetSlot);
             }
@@ -3176,7 +3255,7 @@ public final class IxKitsPlugin extends JavaPlugin implements Listener, CommandE
                     for (Enchantment enchantment : new ArrayList<>(target.getEnchantments().keySet())) target.removeEnchantment(enchantment);
                     y.set(storagePath(h.page, h.targetSlot), target);
                     saveYaml(y, projectFile(h.project));
-                    p.sendMessage(PREFIX + tr("Se quitaron todos los encantamientos del objeto.", "All enchantments were removed from the item."));
+                    p.sendMessage(prefix() + tr("Se quitaron todos los encantamientos del objeto.", "All enchantments were removed from the item."));
                 }
                 openEnchantments(p, h.project, h.page, h.targetSlot, h.subPage);
             } else if (h.entryBySlot.containsKey(slot)) {
@@ -3184,14 +3263,14 @@ public final class IxKitsPlugin extends JavaPlugin implements Listener, CommandE
                 NamespacedKey namespacedKey = NamespacedKey.fromString(rawKey);
                 Enchantment enchantment = namespacedKey == null ? null : Registry.ENCHANTMENT.get(namespacedKey);
                 if (enchantment == null) {
-                    p.sendMessage(PREFIX + tr("No se pudo cargar ese encantamiento.", "Could not load that enchantment."));
+                    p.sendMessage(prefix() + tr("No se pudo cargar ese encantamiento.", "Could not load that enchantment."));
                     return;
                 }
                 YamlConfiguration y = YamlConfiguration.loadConfiguration(projectFile(h.project));
                 String itemPath = storagePath(h.page, h.targetSlot);
                 ItemStack target = y.getItemStack(itemPath);
                 if (target == null || target.getType().isAir()) {
-                    p.sendMessage(PREFIX + tr("El objeto del proyecto ya no existe.", "The project item no longer exists."));
+                    p.sendMessage(prefix() + tr("El objeto del proyecto ya no existe.", "The project item no longer exists."));
                     openEditor(p, h.project, h.page);
                     return;
                 }
@@ -3432,7 +3511,7 @@ public final class IxKitsPlugin extends JavaPlugin implements Listener, CommandE
 
     private void exportProject(Player p, String project) {
         File f = projectFile(project);
-        if (!f.exists()) { p.sendMessage(PREFIX + tr("Proyecto no encontrado.", "Project not found.")); return; }
+        if (!f.exists()) { p.sendMessage(prefix() + tr("Proyecto no encontrado.", "Project not found.")); return; }
         File out = new File(exportsDir, project + ".ixkit.yml");
         YamlConfiguration y = YamlConfiguration.loadConfiguration(f);
         y.set("format-version", 2);
@@ -3462,59 +3541,59 @@ public final class IxKitsPlugin extends JavaPlugin implements Listener, CommandE
         y.set("ixkits-export.summary.lore-lines", loreLineCount);
         y.set("ixkits-export.generator", "IxKits by CS Studios");
         saveYaml(y, out);
-        p.sendMessage(PREFIX + tr("§a✓ EXPORTACIÓN COMPLETADA", "§a✓ EXPORT COMPLETE"));
-        p.sendMessage(PREFIX + tr("§7Archivo: §bplugins/IxKits/exports/", "§7File: §bplugins/IxKits/exports/") + out.getName());
-        p.sendMessage(PREFIX + tr("§7Objetos: §b", "§7Items: §b") + stackCount + " §8• §7" + tr("Piezas de equipo: §b", "Equipment pieces: §b") + equipmentCount);
-        p.sendMessage(PREFIX + tr("§7Encantamientos: §b", "§7Enchantments: §b") + enchantmentCount + " §8• §7" + tr("Líneas de lore: §b", "Lore lines: §b") + loreLineCount);
-        p.sendMessage(PREFIX + tr("§8Formato nativo: conserva objetos, metadatos y equipamiento serializados.", "§8Native format preserves serialized items, metadata and equipment."));
+        p.sendMessage(prefix() + tr("§a✓ EXPORTACIÓN COMPLETADA", "§a✓ EXPORT COMPLETE"));
+        p.sendMessage(prefix() + tr("§7Archivo: §bplugins/IxKits/exports/", "§7File: §bplugins/IxKits/exports/") + out.getName());
+        p.sendMessage(prefix() + tr("§7Objetos: §b", "§7Items: §b") + stackCount + " §8• §7" + tr("Piezas de equipo: §b", "Equipment pieces: §b") + equipmentCount);
+        p.sendMessage(prefix() + tr("§7Encantamientos: §b", "§7Enchantments: §b") + enchantmentCount + " §8• §7" + tr("Líneas de lore: §b", "Lore lines: §b") + loreLineCount);
+        p.sendMessage(prefix() + tr("§8Formato nativo: conserva objetos, metadatos y equipamiento serializados.", "§8Native format preserves serialized items, metadata and equipment."));
     }
 
     private void handleLore(Player p, String action, String name) {
         ItemStack item = p.getInventory().getItemInMainHand();
-        if (item.getType().isAir()) { p.sendMessage(PREFIX + tr("Sostén primero el objeto que quieres editar.", "Hold the item you want to edit first.")); return; }
+        if (item.getType().isAir()) { p.sendMessage(prefix() + tr("Sostén primero el objeto que quieres editar.", "Hold the item you want to edit first.")); return; }
         File file = new File(templatesDir, "lore.yml");
         YamlConfiguration y = YamlConfiguration.loadConfiguration(file);
         if (action.equalsIgnoreCase("guardar")) {
             List<String> lore = item.getItemMeta().getLore();
-            if (lore == null) { p.sendMessage(PREFIX + tr("El objeto no tiene lore.", "The item has no lore.")); return; }
+            if (lore == null) { p.sendMessage(prefix() + tr("El objeto no tiene lore.", "The item has no lore.")); return; }
             y.set(name + ".lore", lore); saveYaml(y, file);
-            p.sendMessage(PREFIX + tr("Lore guardado como §b", "Lore saved as §b") + name); return;
+            p.sendMessage(prefix() + tr("Lore guardado como §b", "Lore saved as §b") + name); return;
         }
         List<String> lore = y.getStringList(name + (isEnglish() ? ".lore_en" : ".lore"));
         if (lore.isEmpty()) lore = y.getStringList(name + ".lore");
-        if (lore.isEmpty()) { p.sendMessage(PREFIX + tr("No existe esa plantilla de lore.", "That lore template does not exist.")); return; }
+        if (lore.isEmpty()) { p.sendMessage(prefix() + tr("No existe esa plantilla de lore.", "That lore template does not exist.")); return; }
         ItemMeta meta = item.getItemMeta(); meta.lore(loreComponents(lore)); item.setItemMeta(meta);
-        p.sendMessage(PREFIX + tr("Plantilla aplicada: §b", "Template applied: §b") + name);
+        p.sendMessage(prefix() + tr("Plantilla aplicada: §b", "Template applied: §b") + name);
     }
 
     private void applyPalette(Player p, String name) {
         ItemStack item = p.getInventory().getItemInMainHand();
-        if (item.getType().isAir()) { p.sendMessage(PREFIX + tr("Sostén un objeto primero.", "Hold an item first.")); return; }
+        if (item.getType().isAir()) { p.sendMessage(prefix() + tr("Sostén un objeto primero.", "Hold an item first.")); return; }
         YamlConfiguration y = YamlConfiguration.loadConfiguration(new File(templatesDir, "palettes.yml"));
         String color = y.getString(name + ".color");
-        if (color == null) { p.sendMessage(PREFIX + tr("No existe esa paleta.", "That palette does not exist.")); return; }
+        if (color == null) { p.sendMessage(prefix() + tr("No existe esa paleta.", "That palette does not exist.")); return; }
         applyPaletteToItem(item, y, name);
-        p.sendMessage(PREFIX + tr("Paleta aplicada: §b", "Palette applied: §b") + y.getString(name + ".display", name));
+        p.sendMessage(prefix() + tr("Paleta aplicada: §b", "Palette applied: §b") + y.getString(name + ".display", name));
     }
 
     private void handleEnchantments(Player p, String action, String name) {
         ItemStack item = p.getInventory().getItemInMainHand();
-        if (item.getType().isAir()) { p.sendMessage(PREFIX + tr("Sostén un objeto primero.", "Hold an item first.")); return; }
+        if (item.getType().isAir()) { p.sendMessage(prefix() + tr("Sostén un objeto primero.", "Hold an item first.")); return; }
         File file = new File(templatesDir, "enchantments.yml");
         YamlConfiguration y = YamlConfiguration.loadConfiguration(file);
         if (action.equalsIgnoreCase("guardar")) {
             Map<String,Integer> enchants = new TreeMap<>();
             item.getEnchantments().forEach((ench, level) -> enchants.put(ench.getKey().getKey(), level));
             y.set(name, enchants); saveYaml(y, file);
-            p.sendMessage(PREFIX + tr("Preset de encantamientos guardado: §b", "Enchantment preset saved: §b") + name); return;
+            p.sendMessage(prefix() + tr("Preset de encantamientos guardado: §b", "Enchantment preset saved: §b") + name); return;
         }
         ConfigurationSection section = y.getConfigurationSection(name);
-        if (section == null) { p.sendMessage(PREFIX + tr("No existe ese preset.", "That preset does not exist.")); return; }
+        if (section == null) { p.sendMessage(prefix() + tr("No existe ese preset.", "That preset does not exist.")); return; }
         for (String key : section.getKeys(false)) {
             Enchantment ench = Enchantment.getByKey(NamespacedKey.minecraft(key.toLowerCase(Locale.ROOT)));
             if (ench != null) item.addUnsafeEnchantment(ench, Math.max(1, section.getInt(key, 1)));
         }
-        p.sendMessage(PREFIX + tr("Encantamientos aplicados: §b", "Enchantments applied: §b") + name);
+        p.sendMessage(prefix() + tr("Encantamientos aplicados: §b", "Enchantments applied: §b") + name);
     }
 
     private void initializeTemplates() {
@@ -3877,6 +3956,75 @@ public final class IxKitsPlugin extends JavaPlugin implements Listener, CommandE
             if (!lore.contains(key + ".description")) lore.set(key + ".description", "Plantilla editable de " + defaultLoreCategory(key) + ".");
             if (!lore.contains(key + ".description_en")) lore.set(key + ".description_en", "Editable " + defaultLoreCategory(key) + " template.");
         }
+        ensureLoreTemplate(lore, "aeris_blade_rgb", "&#67E8F9✦ &lEspada de Aeris", "&#67E8F9✦ &lAeris Blade",
+            List.of("<gradient:#0C4A6E:#38BDF8>━━━━━━━━━━━━━━━━━━━━</gradient>",
+                "<gradient:#BAE6FD:#38BDF8><bold>ESPADA DE AERIS</bold></gradient>",
+                "<#BAE6FD>El poder de las corrientes, convertido en arma.", "",
+                "<#38BDF8>✦ <#E0F2FE>Encantamientos", "{enchantments}", "",
+                "<gradient:#38BDF8:#BAE6FD>Consíguela reclamando el kit AERIS.</gradient>"),
+            List.of("<gradient:#0C4A6E:#38BDF8>━━━━━━━━━━━━━━━━━━━━</gradient>",
+                "<gradient:#BAE6FD:#38BDF8><bold>AERIS BLADE</bold></gradient>",
+                "<#BAE6FD>The power of the currents, forged into a weapon.", "",
+                "<#38BDF8>✦ <#E0F2FE>Enchantments", "{enchantments}", "",
+                "<gradient:#38BDF8:#BAE6FD>Claim the AERIS kit to obtain it.</gradient>"));
+        ensureLoreTemplate(lore, "armor_onyx_rgb", "&#A78BFA✦ &lArmadura de Ónix", "&#A78BFA✦ &lOnyx Armor",
+            List.of("<gradient:#18181B:#A78BFA>━━━━━━━━━━━━━━━━━━━━</gradient>",
+                "<gradient:#E4E4E7:#A78BFA><bold>SET DE ÓNIX</bold></gradient>",
+                "<#D4D4D8>Armadura tallada en piedra de las profundidades.", "",
+                "<#A78BFA>◆ <#F4F4F5>Encantamientos", "{enchantments}", "",
+                "<#C4B5FD>✦ Habilidades: <#A78BFA>{abilities}",
+                "<gradient:#18181B:#A78BFA>━━━━━━━━━━━━━━━━━━━━</gradient>"),
+            List.of("<gradient:#18181B:#A78BFA>━━━━━━━━━━━━━━━━━━━━</gradient>",
+                "<gradient:#E4E4E7:#A78BFA><bold>ONYX ARMOR SET</bold></gradient>",
+                "<#D4D4D8>Armor carved from the stone of the deep.", "",
+                "<#A78BFA>◆ <#F4F4F5>Enchantments", "{enchantments}", "",
+                "<#C4B5FD>✦ Abilities: <#A78BFA>{abilities}",
+                "<gradient:#18181B:#A78BFA>━━━━━━━━━━━━━━━━━━━━</gradient>"));
+        ensureLoreTemplate(lore, "soup_ignifuga_rgb", "&#F97316✦ &lSopa Ignífuga", "&#F97316✦ &lFireproof Soup",
+            List.of("<gradient:#7C2D12:#F97316>━━━━━━━━━━━━━━━━━━━━</gradient>",
+                "<gradient:#FDE68A:#F97316><bold>SOPA IGNÍFUGA</bold></gradient>",
+                "<#FED7AA>Un consumible especial para momentos críticos.", "",
+                "<#FBBF24>✦ <#FEF3C7>Efectos especiales:",
+                "<#F87171>• Fuerza <#FECACA>(1:00)",
+                "<#FB923C>• Ignífugo <#FFEDD5>(4:00)",
+                "<#F87171>• Daño instantáneo", "",
+                "<gradient:#FDBA74:#F97316>✦ ¡Clic para reclamar!</gradient>"),
+            List.of("<gradient:#7C2D12:#F97316>━━━━━━━━━━━━━━━━━━━━</gradient>",
+                "<gradient:#FDE68A:#F97316><bold>FIREPROOF SOUP</bold></gradient>",
+                "<#FED7AA>A special consumable for critical moments.", "",
+                "<#FBBF24>✦ <#FEF3C7>Special effects:",
+                "<#F87171>• Strength <#FECACA>(1:00)",
+                "<#FB923C>• Fire resistance <#FFEDD5>(4:00)",
+                "<#F87171>• Instant damage", "",
+                "<gradient:#FDBA74:#F97316>✦ Click to claim!</gradient>"));
+        ensureLoreTemplate(lore, "mineral_ancient_rgb", "&#22D3EE✦ &lMineral Ancestral", "&#22D3EE✦ &lAncient Mineral",
+            List.of("<gradient:#164E63:#22D3EE>━━━━━━━━━━━━━━━━━━━━</gradient>",
+                "<gradient:#CFFAFE:#22D3EE><bold>MINERAL ANCESTRAL</bold></gradient>",
+                "<#A5F3FC>Un recurso comercial de origen desconocido.", "",
+                "<#22D3EE>◆ <#ECFEFF>Calidad: <#67E8F9>Muy rara",
+                "<#22D3EE>◆ <#ECFEFF>Uso: <#67E8F9>Intercambios",
+                "<gradient:#22D3EE:#CFFAFE>Conserva este mineral para futuras mejoras.</gradient>"),
+            List.of("<gradient:#164E63:#22D3EE>━━━━━━━━━━━━━━━━━━━━</gradient>",
+                "<gradient:#CFFAFE:#22D3EE><bold>ANCIENT MINERAL</bold></gradient>",
+                "<#A5F3FC>A trade resource of unknown origin.", "",
+                "<#22D3EE>◆ <#ECFEFF>Quality: <#67E8F9>Very rare",
+                "<#22D3EE>◆ <#ECFEFF>Use: <#67E8F9>Trading",
+                "<gradient:#22D3EE:#CFFAFE>Keep this mineral for future upgrades.</gradient>"));
+        ensureLoreTemplate(lore, "token_koth_rgb", "&#EF4444✦ &lToken KOTH", "&#EF4444✦ &lKOTH Token",
+            List.of("<gradient:#450A0A:#EF4444>━━━━━━━━━━━━━━━━━━━━</gradient>",
+                "<gradient:#FCA5A5:#EF4444><bold>TOKEN · KOTH</bold></gradient>",
+                "<#FCA5A5>Un token obtenido en la zona de combate.", "",
+                "<#EF4444>◆ <#FECACA>Temporada: <#EF4444>I",
+                "<#EF4444>◆ <#FECACA>Calidad: <#EF4444>★★★★★", "",
+                "<#F87171>✔ Úsalo en /warp trades",
+                "<gradient:#450A0A:#EF4444>━━━━━━━━━━━━━━━━━━━━</gradient>"),
+            List.of("<gradient:#450A0A:#EF4444>━━━━━━━━━━━━━━━━━━━━</gradient>",
+                "<gradient:#FCA5A5:#EF4444><bold>KOTH TOKEN</bold></gradient>",
+                "<#FCA5A5>A token earned in the combat zone.", "",
+                "<#EF4444>◆ <#FECACA>Season: <#EF4444>I",
+                "<#EF4444>◆ <#FECACA>Quality: <#EF4444>★★★★★", "",
+                "<#F87171>✔ Use it at /warp trades",
+                "<gradient:#450A0A:#EF4444>━━━━━━━━━━━━━━━━━━━━</gradient>"));
         saveYaml(lore, loreFile);
 
         File paletteFile = new File(templatesDir, "palettes.yml");
@@ -3895,7 +4043,13 @@ public final class IxKitsPlugin extends JavaPlugin implements Listener, CommandE
         ensurePalette(palettes, "ice", "Hielo", "#5CE1E6", "#DDFBFF");
         ensurePalette(palettes, "ruby", "Rubí", "#FF334F", "#990018");
         ensurePalette(palettes, "sand", "Arena", "#D9B382", "#FFF0C2");
-        saveYaml(palettes, paletteFile);
+        ensurePalette(palettes, "aurora_rgb", "Aurora RGB", "#22D3EE", "#C084FC");
+        ensurePalette(palettes, "plasma_rgb", "Plasma RGB", "#F472B6", "#8B5CF6");
+        ensurePalette(palettes, "toxic_rgb", "Tóxico RGB", "#A3E635", "#22C55E");
+        ensurePalette(palettes, "glacier_rgb", "Glaciar RGB", "#BAE6FD", "#2563EB");
+        ensurePalette(palettes, "royal_flow_rgb", "Flujo Real RGB", "#FDE68A", "#A78BFA");
+        ensurePalette(palettes, "rose_gold_rgb", "Oro Rosado RGB", "#F9A8D4", "#FBBF24");
+                saveYaml(palettes, paletteFile);
 
         File enchantFile = new File(templatesDir, "enchantments.yml");
         YamlConfiguration enchants = YamlConfiguration.loadConfiguration(enchantFile);
@@ -4042,18 +4196,18 @@ public final class IxKitsPlugin extends JavaPlugin implements Listener, CommandE
         String itemPath = storagePath(projectPage, targetSlot);
         ItemStack target = yaml.getItemStack(itemPath);
         if (target == null || target.getType().isAir()) {
-            p.sendMessage(PREFIX + tr("No se encontró el objeto del proyecto.", "Could not find the project item."));
+            p.sendMessage(prefix() + tr("No se encontró el objeto del proyecto.", "Could not find the project item."));
             openEditor(p, project, projectPage);
             return;
         }
         List<String> lines = yamlListForLoreTemplate(key);
         if (lines.isEmpty()) {
-            p.sendMessage(PREFIX + tr("La plantilla no contiene líneas de lore.", "That template contains no lore lines."));
+            p.sendMessage(prefix() + tr("La plantilla no contiene líneas de lore.", "That template contains no lore lines."));
             return;
         }
         ItemMeta meta = target.getItemMeta();
         if (meta == null) {
-            p.sendMessage(PREFIX + tr("No se pudo editar ese objeto.", "Could not edit that item."));
+            p.sendMessage(prefix() + tr("No se pudo editar ese objeto.", "Could not edit that item."));
             return;
         }
         lines = resolveLorePlaceholders(lines, target);
@@ -4063,7 +4217,7 @@ public final class IxKitsPlugin extends JavaPlugin implements Listener, CommandE
         saveYaml(yaml, file);
         YamlConfiguration loreFile = YamlConfiguration.loadConfiguration(new File(templatesDir, "lore.yml"));
         String label = loreFile.getString(key + (isEnglish() ? ".display_en" : ".display"), loreFile.getString(key + ".display", prettyKey(key)));
-        p.sendMessage(PREFIX + tr("Plantilla aplicada al objeto del kit: §b", "Template applied to kit item: §b") + label);
+        p.sendMessage(prefix() + tr("Plantilla aplicada al objeto del kit: §b", "Template applied to kit item: §b") + label);
         openItemEditor(p, project, projectPage, targetSlot);
     }
 
@@ -4076,37 +4230,37 @@ public final class IxKitsPlugin extends JavaPlugin implements Listener, CommandE
     private void applyLoreTemplateToHand(Player p, String key) {
         ItemStack held = p.getInventory().getItemInMainHand();
         if (held.getType().isAir()) {
-            p.sendMessage(PREFIX + tr("Sostén el objeto al que quieras aplicar el lore.", "Hold the item you want to apply lore to."));
+            p.sendMessage(prefix() + tr("Sostén el objeto al que quieras aplicar el lore.", "Hold the item you want to apply lore to."));
             return;
         }
         YamlConfiguration yaml = YamlConfiguration.loadConfiguration(new File(templatesDir, "lore.yml"));
         List<String> lines = yaml.getStringList(key + (isEnglish() ? ".lore_en" : ".lore"));
         if (lines.isEmpty()) lines = yaml.getStringList(key + ".lore");
         if (lines.isEmpty()) {
-            p.sendMessage(PREFIX + tr("La plantilla no contiene líneas de lore.", "That template contains no lore lines."));
+            p.sendMessage(prefix() + tr("La plantilla no contiene líneas de lore.", "That template contains no lore lines."));
             return;
         }
         ItemMeta meta = held.getItemMeta();
         if (meta == null) {
-            p.sendMessage(PREFIX + tr("No se pudo editar ese objeto.", "Could not edit that item."));
+            p.sendMessage(prefix() + tr("No se pudo editar ese objeto.", "Could not edit that item."));
             return;
         }
         lines = resolveLorePlaceholders(lines, held);
         meta.lore(loreComponents(lines));
         held.setItemMeta(meta);
-        p.sendMessage(PREFIX + tr("Lore aplicado: §b", "Lore applied: §b") + yaml.getString(key + (isEnglish() ? ".display_en" : ".display"), yaml.getString(key + ".display", prettyKey(key))));
+        p.sendMessage(prefix() + tr("Lore aplicado: §b", "Lore applied: §b") + yaml.getString(key + (isEnglish() ? ".display_en" : ".display"), yaml.getString(key + ".display", prettyKey(key))));
     }
 
     private void setLanguage(Player p, String requested) {
         String language = requested.toLowerCase(Locale.ROOT);
         if (!language.equals("es") && !language.equals("en")) {
-            p.sendMessage(PREFIX + tr("Idiomas disponibles: §bes§7 y §ben§7.", "Available languages: §bes§7 and §ben§7."));
+            p.sendMessage(prefix() + tr("Idiomas disponibles: §bes§7 y §ben§7.", "Available languages: §bes§7 and §ben§7."));
             openLanguages(p);
             return;
         }
         getConfig().set("language", language);
         saveConfig();
-        p.sendMessage(PREFIX + tr("Idioma guardado: Español.", "Language saved: English."));
+        p.sendMessage(prefix() + tr("Idioma guardado: Español.", "Language saved: English."));
         openMain(p);
     }
 
