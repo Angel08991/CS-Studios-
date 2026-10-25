@@ -2410,6 +2410,13 @@ public final class IxKitsPlugin extends JavaPlugin implements Listener, CommandE
     }
 
 
+    private String itemDisplayName(ItemStack stack) {
+        if (stack == null || stack.getType().isAir()) return tr("Vacío", "Empty");
+        ItemMeta meta = stack.getItemMeta();
+        if (meta != null && meta.hasDisplayName()) return ChatColor.stripColor(meta.getDisplayName());
+        return prettyKey(stack.getType().name());
+    }
+
     private void sendHelp(Player player) {
         String divider = "§8§m━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━";
         player.sendMessage(divider);
@@ -4895,20 +4902,6 @@ public final class IxKitsPlugin extends JavaPlugin implements Listener, CommandE
             case "swift_sneak" -> tr("Sigilo veloz", "Swift Sneak");
             default -> prettyKey(key);
         };
-    }
-
-    private List<String> generatedAbilityLore(ItemStack stack) {
-        if (stack == null || stack.getType().isAir()) return List.of();
-        String format = getConfig().getString("lore.ability-line-format", "<#F87171>✦ <#FECACA>{name} <#9CA3AF>({cooldown})");
-        List<String> lines = new ArrayList<>();
-        if (isAbilityEnabled(stack, tntOnHitKey)) lines.add(format.replace("{name}", tr("TNT al golpear", "TNT on hit")).replace("{cooldown}", formatCooldown(getAbilityCooldown(stack, "tnt"))).replace("{key}", "tnt"));
-        if (isAbilityEnabled(stack, lightningOnHitKey)) lines.add(format.replace("{name}", tr("Rayo al golpear", "Lightning on hit")).replace("{cooldown}", formatCooldown(getAbilityCooldown(stack, "lightning"))).replace("{key}", "lightning"));
-        if (isAbilityEnabled(stack, lifeStealOnHitKey)) lines.add(format.replace("{name}", tr("Robo de vida", "Lifesteal")).replace("{cooldown}", formatCooldown(getAbilityCooldown(stack, "lifesteal"))).replace("{key}", "lifesteal"));
-        if (isAbilityEnabled(stack, poisonOnHitKey)) lines.add(format.replace("{name}", tr("Veneno", "Venom")).replace("{cooldown}", formatCooldown(getAbilityCooldown(stack, "poison"))).replace("{key}", "poison"));
-        if (isAbilityEnabled(stack, frostOnHitKey)) lines.add(format.replace("{name}", tr("Escarcha", "Frost")).replace("{cooldown}", formatCooldown(getAbilityCooldown(stack, "frost"))).replace("{key}", "frost"));
-        if (isAbilityEnabled(stack, flameOnHitKey)) lines.add(format.replace("{name}", tr("Llama", "Flame")).replace("{cooldown}", formatCooldown(getAbilityCooldown(stack, "flame"))).replace("{key}", "flame"));
-        if (isAbilityEnabled(stack, knockbackOnHitKey)) lines.add(format.replace("{name}", tr("Impacto reforzado", "Enhanced knockback")).replace("{cooldown}", formatCooldown(getAbilityCooldown(stack, "knockback"))).replace("{key}", "knockback"));
-        return lines;
     }
 
     private void applyLoreTemplateToProject(Player p, String key, String project, int projectPage, int targetSlot) {
