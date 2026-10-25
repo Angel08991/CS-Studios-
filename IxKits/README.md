@@ -13,10 +13,11 @@ La compilación de CI se ejecuta contra Paper API 1.21.11. La GUI debe probarse 
 - Editor de pociones para escoger el tipo base y añadir/quitar efectos personalizados o subir su nivel desde una GUI.
 - Diseñador de escudos y estandartes: modifica patrones, el color de cada patrón y el color base del diseño. También incluye trims de armadura, libros, cabezas y fuegos artificiales.
 - Papelera recuperable en la GUI del navegador de proyectos, con acciones para deshacer y rehacer.
-- Portapapeles visual para copiar el objeto actual, inspeccionar la copia guardada, reemplazar el objeto seleccionado, vaciar el portapapeles y pegar la copia en otra ranura vacía. Conserva los metadatos serializados de la copia.
+- Portapapeles persistente para copiar, inspeccionar, reemplazar y pegar objetos con metadatos serializados, incluso después de reiniciar el servidor; los datos se guardan por UUID en `plugins/IxKits/clipboard/`.
 - Biblioteca de lores organizada por categorías: armas, armaduras, objetos especiales, minerales/materiales, consumibles y otros diseños. Incluye estilos originales inspirados en armas AERIS/ONI, armaduras de conjunto, minerales ancestrales, consumibles y tokens de evento, además de las plantillas anteriores.
-- Las plantillas pueden añadir automáticamente las líneas reales de encantamientos y habilidades especiales del objeto usando `{enchantments}` y `{abilities}`; `{item}` inserta el nombre del tipo de objeto.
-- Editor de nombre y lore con MiniMessage; separa las líneas de lore usando el separador vertical. Las GUI muestran controles más explicativos, vistas previas mejoradas y una firma visual de CS Studios.
+- Las plantillas pueden añadir automáticamente encantamientos y habilidades reales usando `{enchantments}` y `{abilities}`; `{item}` inserta el nombre del objeto. Se agregan estilos para espada AERIS, armadura Ónix, sopa ignífuga, mineral ancestral y token KOTH.
+- Las paletas RGB aplican gradientes carácter por carácter al nombre y a cada línea de lore: Aurora, Plasma, Tóxico, Glaciar, Flujo Real y Oro Rosado.
+- Editor de nombre y lore con MiniMessage y códigos legacy/RGB combinados, incluidos formatos como `&#F2FF00&lU&#F4F300&lS`; separa las líneas de lore usando el separador vertical. Las GUI muestran controles más explicativos, vistas previas mejoradas y una firma visual de CS Studios.
 - Alternar irrompible, cambiar durabilidad, custom model data, flags, color de armadura de cuero y modificadores propios de atributos.
 - Editor de equipamiento separado para casco, peto, pantalones, botas y mano secundaria.
 - Biblioteca de proyectos con paginación y búsqueda: crear desde la GUI, abrir, duplicar, renombrar, eliminar moviendo a papelera, validar y restaurar una copia anterior.
@@ -51,6 +52,8 @@ En plugins/IxKits/config.yml:
     language: es # es = español | en = inglés
 
 También se cambia con /ixkits idioma. Para que el cambio manual del archivo se aplique en caliente, ejecuta /ixkits recargar.
+
+Edita `plugins/IxKits/messages.yml` para personalizar el prefijo y los mensajes principales de portapapeles, reclamación, importación y exportación. Admite `&` legacy y RGB `&#RRGGBB` en español e inglés.
 
 ## Comandos principales
 
