@@ -1461,6 +1461,13 @@ public final class IxKitsPlugin extends JavaPlugin implements Listener, CommandE
         File file = new File(getDataFolder(), "messages.yml");
         if (!file.isFile()) saveResource("messages.yml", false);
         messages = YamlConfiguration.loadConfiguration(file);
+        String oldDefault = "&8[&3✦ &bIxKits&8] &7";
+        String configuredPrefix = messages.getString("prefix", oldDefault);
+        // Upgrade only the old default. Preserve server owners' custom prefixes.
+        if (configuredPrefix.equals(oldDefault)) {
+            messages.set("prefix", "&8[&3✦ &bIxKits&8] &8» &7");
+            saveYaml(messages, file);
+        }
     }
 
     private String prefix() {
@@ -4859,27 +4866,48 @@ public final class IxKitsPlugin extends JavaPlugin implements Listener, CommandE
         String configured = getConfig().getString("lore.enchantment-icons." + key);
         if (configured != null && !configured.isBlank()) return configured;
         return switch (key) {
-            case "fire_aspect", "flame", "fire_protection" -> "🔥";
-            case "sharpness", "sweeping_edge", "smite", "bane_of_arthropods" -> "⚔";
-            case "protection", "blast_protection", "projectile_protection" -> "🛡";
-            case "unbreaking", "mending" -> "✨";
-            case "efficiency" -> "⛏";
-            case "fortune", "looting" -> "💎";
-            case "silk_touch" -> "🪄";
-            case "power", "punch" -> "🏹";
-            case "infinity" -> "♾";
-            case "quick_charge", "channeling" -> "⚡";
-            case "multishot" -> "➶";
+            case "fire_aspect" -> "🔥";
+            case "flame" -> "🏹🔥";
+            case "fire_protection" -> "🧯";
+            case "sharpness" -> "⚔️";
+            case "sweeping_edge" -> "🌪️";
+            case "smite" -> "☠️";
+            case "bane_of_arthropods" -> "🕷️";
+            case "protection" -> "🛡️";
+            case "blast_protection" -> "💣";
+            case "projectile_protection" -> "🎯";
+            case "unbreaking" -> "🔩";
+            case "mending" -> "🪄";
+            case "efficiency" -> "⚙️";
+            case "fortune" -> "🍀";
+            case "looting" -> "🎁";
+            case "silk_touch" -> "🧤";
+            case "power" -> "🏹";
+            case "punch" -> "👊";
+            case "infinity" -> "♾️";
+            case "quick_charge" -> "⏩";
+            case "channeling" -> "⚡";
+            case "multishot" -> "🏹🏹";
             case "piercing" -> "➤";
-            case "loyalty", "riptide", "impaling" -> "🌊";
-            case "density", "breach", "wind_burst" -> "💥";
-            case "feather_falling", "soul_speed", "swift_sneak" -> "🪽";
-            case "depth_strider", "frost_walker" -> "❄";
-            case "respiration", "aqua_affinity" -> "🌊";
+            case "loyalty" -> "🔗";
+            case "riptide" -> "🌊";
+            case "impaling" -> "🔱";
+            case "density" -> "🧱";
+            case "breach" -> "🪓";
+            case "wind_burst" -> "🌬️";
+            case "feather_falling" -> "🪽";
+            case "soul_speed" -> "👣";
+            case "swift_sneak" -> "🥷";
+            case "depth_strider" -> "🐬";
+            case "frost_walker" -> "❄️";
+            case "respiration" -> "🫧";
+            case "aqua_affinity" -> "🐚";
             case "thorns" -> "🌵";
             case "knockback" -> "💨";
-            case "binding_curse", "vanishing_curse" -> "☠";
-            case "luck_of_the_sea", "lure" -> "🎣";
+            case "binding_curse" -> "⛓️";
+            case "vanishing_curse" -> "👻";
+            case "luck_of_the_sea" -> "🐟";
+            case "lure" -> "🎣";
             default -> "✦";
         };
     }
