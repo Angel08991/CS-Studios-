@@ -2083,35 +2083,57 @@ public final class IxKitsPlugin extends JavaPlugin implements Listener, CommandE
     }
 
     private void openPaletteTemplates(Player p, int requestedPage, String project, int projectPage, int targetSlot) {
+        openPaletteTemplates(p, requestedPage, project, projectPage, targetSlot, "both");
+    }
+
+    private String normalizePaletteScope(String scope) {
+        return "name".equalsIgnoreCase(scope) || "lore".equalsIgnoreCase(scope) ? scope.toLowerCase(Locale.ROOT) : "both";
+    }
+
+    private String paletteScopeLabel(String scope) {
+        return switch (normalizePaletteScope(scope)) {
+            case "name" -> tr("Solo nombre", "Name only");
+            case "lore" -> tr("Solo lore", "Lore only");
+            default -> tr("Nombre + lore", "Name + lore");
+        };
+    }
+
+    private void openPaletteTemplates(Player p, int requestedPage, String project, int projectPage, int targetSlot, String requestedScope) {
         YamlConfiguration palettes = YamlConfiguration.loadConfiguration(new File(templatesDir, "palettes.yml"));
         List<String> keys = new ArrayList<>();
         for (String key : palettes.getKeys(false)) if (palettes.getString(key + ".color") != null) keys.add(key);
         Collections.sort(keys);
         int pages = Math.max(1, (int) Math.ceil(keys.size() / (double) EDIT_SLOTS.length));
         int page = Math.max(0, Math.min(requestedPage, pages - 1));
+        String scope = normalizePaletteScope(requestedScope);
         Inventory inv = project == null
-            ? menu("palette-templates", null, page, tr("§3✦ §bIxKits §8• §0Paletas de color", "§3✦ §bIxKits §8• §0Color palettes"))
+            ? menu("palette-templates", null, page, tr("§3✦ §bIXKITS §8» §0Paletas RGB", "§3✦ §bIXKITS §8» §0RGB palettes"))
             : menu("palette-templates", project, projectPage, targetSlot, page,
-                tr("§3✦ §bIxKits §8• §0Paletas de color", "§3✦ §bIxKits §8• §0Color palettes"));
+                tr("§3✦ §bIXKITS §8» §0Paletas RGB", "§3✦ §bIXKITS §8» §0RGB palettes"));
         border(inv);
         MenuHolder holder = (MenuHolder) inv.getHolder();
+        holder.query = scope;
         for (int i = page * EDIT_SLOTS.length; i < Math.min(keys.size(), (page + 1) * EDIT_SLOTS.length); i++) {
             String key = keys.get(i);
             String color = palettes.getString(key + ".color", "&b");
             String accent = palettes.getString(key + ".accent", color);
-            Material icon = paletteIcon(key, color);
             int slot = EDIT_SLOTS[i - page * EDIT_SLOTS.length];
-            inv.setItem(slot, item(icon, "§f" + palettes.getString(key + ".display", prettyKey(key)),
-                tr("§7Color principal: ", "§7Primary color: ") + color,
-                tr("§7Acento: ", "§7Accent: ") + accent, "",
-                project == null ? tr("§eClic para aplicar al objeto en mano", "§eClick to apply to held item")
-                    : tr("§eClic para aplicar al objeto del kit", "§eClick to apply to kit item")));
+            inv.setItem(slot, item(paletteIcon(key, color), "§f§l" + palettes.getString(key + ".display", prettyKey(key)),
+                tr("§7Color inicial: ", "§7Start color: ") + color,
+                tr("§7Color final: ", "§7End color: ") + accent, "",
+                tr("§7Destino actual: §b", "§7Current target: §b") + paletteScopeLabel(scope), "",
+                project == null ? tr("§eClic izquierdo: aplicar", "§eLeft-click: apply") : tr("§eClic izquierdo: aplicar al proyecto", "§eLeft-click: apply to project"),
+                tr("§dClic derecho: publicar paleta", "§dRight-click: publish palette")));
             holder.entryBySlot.put(slot, key);
         }
         if (keys.isEmpty()) inv.setItem(22, item(Material.PAPER, tr("§7No hay paletas guardadas.", "§7No saved palettes.")));
-        inv.setItem(45, item(Material.ARROW, tr("§7Volver", "§7Back")));
-        inv.setItem(47, item(Material.SPECTRAL_ARROW, tr("§bAnterior", "§bPrevious")));
-        inv.setItem(51, item(Material.SPECTRAL_ARROW, tr("§bSiguiente", "§bNext")));
+        inv.setItem(45, item(Material.ARROW, "§7← " + tr("Volver", "Back")));
+        inv.setItem(47, item(Material.SPECTRAL_ARROW, "§b" + tr("Anterior", "Previous")));
+        inv.setItem(49, item(Material.BOOK, "§d§l" + tr("Aplicar colores en", "Apply colors to"),
+            "§f" + paletteScopeLabel(scope), "",
+            tr("§7Clic para alternar el destino.", "§7Click to cycle the target."),
+            tr("§8Nombre → Lore → Ambos", "§8Name → Lore → Both")));
+        inv.setItem(51, item(Material.SPECTRAL_ARROW, "§b" + tr("Siguiente", "Next")));
         p.openInventory(inv);
     }
 
@@ -2143,15 +2165,22 @@ public final class IxKitsPlugin extends JavaPlugin implements Listener, CommandE
     }
 
     private void applyPaletteToItem(ItemStack target, YamlConfiguration palettes, String key) {
+        applyPaletteToItem(target, palettes, key, "both");
+    }
+
+    private void applyPaletteToItem(ItemStack target, YamlConfiguration palettes, String key, String requestedScope) {
         String color = palettes.getString(key + ".color");
         if (color == null || target == null || target.getType().isAir()) return;
+        String scope = normalizePaletteScope(requestedScope);
         String startHex = paletteHex(color);
         String endHex = paletteHex(palettes.getString(key + ".accent", color));
         ItemMeta meta = target.getItemMeta();
         if (meta == null) return;
-        String name = meta.hasDisplayName() ? meta.getDisplayName() : prettyKey(target.getType().name());
-        meta.displayName(gradientComponent(ChatColor.stripColor(name), startHex, endHex));
-        if (meta.lore() != null) {
+        if (scope.equals("name") || scope.equals("both")) {
+            String name = meta.hasDisplayName() ? meta.getDisplayName() : prettyKey(target.getType().name());
+            meta.displayName(gradientComponent(ChatColor.stripColor(name), startHex, endHex));
+        }
+        if ((scope.equals("lore") || scope.equals("both")) && meta.lore() != null) {
             var legacy = net.kyori.adventure.text.serializer.legacy.LegacyComponentSerializer.legacySection();
             List<Component> recolored = new ArrayList<>();
             for (Component line : meta.lore()) {
@@ -2164,152 +2193,28 @@ public final class IxKitsPlugin extends JavaPlugin implements Listener, CommandE
     }
 
     private void applyPalettePreset(Player p, String key, String project, int projectPage, int targetSlot) {
+        applyPalettePreset(p, key, project, projectPage, targetSlot, "both");
+    }
+
+    private void applyPalettePreset(Player p, String key, String project, int projectPage, int targetSlot, String requestedScope) {
         YamlConfiguration palettes = YamlConfiguration.loadConfiguration(new File(templatesDir, "palettes.yml"));
         if (!palettes.contains(key + ".color")) {
-            p.sendMessage(prefix() + tr("Esa paleta no existe.", "That palette does not exist."));
+            p.sendMessage(prefix() + tr("§cEsa paleta no existe.", "§cThat palette does not exist."));
             return;
         }
         ItemStack target = project == null ? p.getInventory().getItemInMainHand()
             : getProjectItem(project, projectPage, targetSlot);
         if (target == null || target.getType().isAir()) {
-            p.sendMessage(prefix() + tr("Selecciona primero un objeto.", "Select an item first."));
+            p.sendMessage(prefix() + tr("§eSelecciona primero un objeto.", "§eSelect an item first."));
             return;
         }
-        applyPaletteToItem(target, palettes, key);
+        String scope = normalizePaletteScope(requestedScope);
+        applyPaletteToItem(target, palettes, key, scope);
         if (project != null) saveProjectItem(project, projectPage, targetSlot, target);
-        p.sendMessage(prefix() + tr("Paleta aplicada: §b", "Palette applied: §b") + palettes.getString(key + ".display", prettyKey(key)));
+        p.sendMessage(prefix() + tr("§aPaleta aplicada: §b", "§aPalette applied: §b")
+            + palettes.getString(key + ".display", prettyKey(key)) + " §8· §7" + paletteScopeLabel(scope));
         if (project != null) openItemEditor(p, project, projectPage, targetSlot);
-        else openPaletteTemplates(p, 0, null, 0, -1);
-    }
-
-    private void openItemEditor(Player p, String project, int page, int targetSlot) {
-        YamlConfiguration y = YamlConfiguration.loadConfiguration(projectFile(project));
-        ItemStack target = y.getItemStack(storagePath(page, targetSlot));
-        if (target == null || target.getType().isAir()) {
-            p.sendMessage(prefix() + tr("Ese espacio no contiene ningún objeto.", "That slot does not contain an item."));
-            openEditor(p, project, page);
-            return;
-        }
-        ItemMeta targetMeta = target.getItemMeta();
-        String displayName = targetMeta != null && targetMeta.hasDisplayName() ? ChatColor.stripColor(targetMeta.getDisplayName()) : prettyKey(target.getType().name());
-        Inventory inv = menu("item-editor", project, page, targetSlot, 0, tr("§3✦ §bIxKits Studio §8• §0Taller de objetos", "§3✦ §bIxKits Studio §8• §0Item workshop"));
-        border(inv);
-        inv.setItem(4, target.clone());
-        inv.setItem(15, item(Material.PAPER, tr("§b✦ Copiar objeto", "§b✦ Copy item"),
-            tr("§7Guarda una copia exacta de este objeto.", "§7Keep an exact copy of this item."),
-            tr("§7Después haz clic en una ranura vacía.", "§7Then click an empty project slot."),
-            tr("§eAcción: guardar en el portapapeles", "§eAction: save to clipboard")));
-        inv.setItem(16, item(Material.CHEST, tr("§bPortapapeles", "§bClipboard"),
-            clipboardItem(p.getUniqueId()) != null ? tr("§a● Contiene un objeto", "§a● Contains an item") : tr("§8○ Sin objeto guardado", "§8○ No item saved"),
-            tr("§7Guarda una copia exacta para duplicarla.", "§7Keep an exact copy ready to duplicate."),
-            tr("§eClic para consultar su contenido", "§eClick to inspect its contents")));
-        inv.setItem(14, item(Material.NETHER_STAR, tr("§d§lPropiedades especiales", "§d§lSpecial properties"),
-            tr("§7Edita metadatos que distinguen", "§7Edit metadata that makes"),
-            tr("§7a cada pieza de tu proyecto.", "§7every item in your project unique."),
-            tr("§8• §7Libros, escudos y estandartes", "§8• §7Books, shields and banners"),
-            tr("§8• §7Adornos de armadura, cabezas y cohetes", "§8• §7Armor trims, heads and fireworks"),
-            tr("§eClic para abrir las herramientas", "§eClick to open the tools")));
-        inv.setItem(20, item(Material.ENCHANTED_BOOK, tr("§b✦ Encantamientos", "§b✦ Enchantments"),
-            tr("§7Control total sobre cada encantamiento.", "§7Full control over every enchantment."),
-            tr("§8• §7Clic: subir nivel", "§8• §7Click: raise level"),
-            tr("§8• §7Clic derecho: bajar nivel", "§8• §7Right-click: lower level"),
-            tr("§8• §7Mayús + clic: nivel exacto", "§8• §7Shift-click: exact level"),
-            tr("§eClic para editar", "§eClick to edit")));
-        List<String> enchantLore = new ArrayList<>();
-        enchantLore.add(tr("§7Objeto: §f", "§7Item: §f") + displayName);
-        enchantLore.add(tr("§7Tipo: §f", "§7Material: §f") + prettyKey(target.getType().name()));
-        enchantLore.add(tr("§7Líneas de lore: §b", "§7Lore lines: §b") + (targetMeta == null || targetMeta.lore() == null ? 0 : targetMeta.lore().size()));
-        if (target.getEnchantments().isEmpty()) enchantLore.add(tr("§8✧ Sin encantamientos aplicados", "§8✧ No enchantments applied"));
-        else {
-            enchantLore.add(tr("§6⚔ Encantamientos actuales:", "§6⚔ Current enchantments:"));
-            target.getEnchantments().entrySet().stream().sorted(Comparator.comparing(entry -> entry.getKey().getKey().toString())).forEach(entry ->
-                enchantLore.add("§b› §f" + enchantmentDisplayName(entry.getKey()) + " §e" + romanLevel(entry.getValue())));
-        }
-        enchantLore.add(targetMeta != null && targetMeta.isUnbreakable() ? tr("§a✓ Irrompible", "§a✓ Unbreakable") : tr("§8○ Durabilidad normal", "§8○ Normal durability"));
-        inv.setItem(22, item(Material.WRITABLE_BOOK, tr("§b✧ Plantillas de lore", "§b✧ Lore templates"),
-            tr("§7Estilos originales para armas y objetos.", "§7Original styles for weapons and items."),
-            tr("§7Algunos insertan encantamientos y habilidades.", "§7Some insert enchantments and abilities."),
-            tr("§eClic para explorar diseños", "§eClick to explore designs")));
-        inv.setItem(31, item(Material.PAPER, tr("§fDetalles del objeto", "§fItem details"), enchantLore.toArray(new String[0])));
-        inv.setItem(11, item(Material.NAME_TAG, tr("§b✎ Nombre del objeto", "§b✎ Item name"),
-            tr("§7Actual: §f" + displayName, "§7Current: §f" + displayName),
-            tr("§7Gradientes, estilos y colores RGB.", "§7Gradients, styles and RGB colors."),
-            tr("§eClic para editar el nombre", "§eClick to edit the name")));
-        inv.setItem(13, item(Material.WRITABLE_BOOK, tr("§b§lDiseñador de descripción", "§b§lLore designer"),
-            tr("§7Construye una descripción cuidada", "§7Build a polished description"),
-            tr("§7línea por línea con vista previa.", "§7line by line with a live preview."),
-            tr("§8• §7RGB hexadecimal y gradientes", "§8• §7Hex RGB and gradients"),
-            tr("§8• §7Ordenar, duplicar y quitar líneas", "§8• §7Reorder, duplicate and remove lines"),
-            tr("§eClic para abrir el diseñador", "§eClick to open the designer")));
-        inv.setItem(24, item(Material.BARRIER, tr("§cQuitar todos los encantamientos", "§cRemove all enchantments"), tr("§7Solo afecta a este objeto del proyecto.", "§7Only affects this project item."), tr("§eClic para confirmar al instante", "§eClick to apply immediately")));
-        inv.setItem(27, item(Material.ENCHANTED_BOOK, tr("§dPlantillas de encantamientos", "§dEnchantment presets"), tr("§7Aplicar una combinación guardada.", "§7Apply a saved combination."), tr("§eClic para elegir", "§eClick to choose")));
-        inv.setItem(32, item(Material.PAINTING, tr("§bPaleta de colores", "§bColor palette"), tr("§7Cambiar el estilo del nombre y el lore.", "§7Restyle the name and lore."), tr("§eClic para elegir", "§eClick to choose")));
-        inv.setItem(30, item(Material.TNT, tr("§c⚡ Habilidades especiales", "§c⚡ Special abilities"),
-            tr("§7Activa poderes de combate por objeto.", "§7Enable per-item combat abilities."),
-            tr("§8• §7TNT, rayo y robo de vida", "§8• §7TNT, lightning and lifesteal"),
-            tr("§8• §7Veneno, escarcha, llama e impacto", "§8• §7Venom, frost, flame and knockback"),
-            tr("§eClic para configurar los poderes", "§eClick to configure abilities")));
-        inv.setItem(29, item(Material.IRON_BLOCK, tr("§bIrrompible", "§bUnbreakable"), tr("§7Alternar la propiedad del objeto.", "§7Toggle the item's property."), tr("§eClic para cambiar", "§eClick to toggle")));
-        inv.setItem(33, item(Material.ANVIL, tr("§bDurabilidad", "§bDurability"), tr("§7Clic: +10 de daño", "§7Click: +10 damage"), tr("§7Derecho: -10; Mayús: reparar", "§7Right-click: -10; Shift: repair")));
-        inv.setItem(35, item(Material.CARVED_PUMPKIN, tr("§bModelo personalizado", "§bCustom model data"), tr("§7Define o borra el número de modelo.", "§7Set or clear the model number."), tr("§eClic para escribir", "§eClick to type")));
-        inv.setItem(37, item(Material.BRUSH, tr("§bAtributos", "§bAttributes"), tr("§7Salud, daño, armadura y más.", "§7Health, damage, armor and more."), tr("§eClic para abrir", "§eClick to open")));
-        inv.setItem(39, item(Material.GLASS, tr("§bFlags del objeto", "§bItem flags"), tr("§7Alternar ocultación de atributos.", "§7Toggle hidden attributes."), tr("§eClic para cambiar", "§eClick to toggle")));
-        inv.setItem(41, item(Material.LEATHER_CHESTPLATE, tr("§bColor de cuero", "§bLeather color"), tr("§7Para objetos de cuero.", "§7For leather items."), tr("§eEscribe #RRGGBB o R,G,B", "§eType #RRGGBB or R,G,B")));
-        inv.setItem(43, item(Material.POTION, tr("§bTipo de poción", "§bPotion type"), tr("§7Para pociones y flechas con efecto.", "§7For potions and tipped arrows."), tr("§eClic para editar", "§eClick to edit")));
-        inv.setItem(45, item(Material.ARROW, tr("§7Volver al proyecto", "§7Back to project")));
-        p.openInventory(inv);
-    }
-
-    private void openClipboard(Player p, String project, int page, int targetSlot) {
-        ItemStack current = getProjectItem(project, page, targetSlot);
-        ItemStack copied = clipboardItem(p.getUniqueId());
-        Inventory inv = menu("clipboard", project, page, targetSlot, 0,
-            tr("§3✦ §bIxKits Studio §8• §0Portapapeles", "§3✦ §bIxKits Studio §8• §0Clipboard"));
-        border(inv);
-        inv.setItem(4, item(Material.CHEST, tr("§b§lPortapapeles de objetos", "§b§lItem clipboard"),
-            tr("§7Copia, consulta, reemplaza y reutiliza objetos.", "§7Copy, inspect, replace and reuse items."),
-            tr("§8La copia se guarda en disco y sobrevive a los reinicios.", "§8The copy is saved to disk and survives restarts.")));
-        inv.setItem(20, item(current == null || current.getType().isAir() ? Material.BARRIER : current.getType(),
-            tr("§aCopiar objeto actual", "§aCopy current item"),
-            tr("§7Objeto: §f", "§7Item: §f") + itemDisplayName(current),
-            tr("§eClic para guardar una copia", "§eClick to save a copy")));
-        if (copied == null || copied.getType().isAir()) {
-            inv.setItem(22, item(Material.BARRIER, tr("§cPortapapeles vacío", "§cClipboard is empty"),
-                tr("§7Copia un objeto del proyecto para comenzar.", "§7Copy a project item to get started."),
-                tr("§8Se conserva nombre, lore, encantamientos y metadatos.", "§8Name, lore, enchantments and metadata are preserved.")));
-            inv.setItem(24, item(Material.GRAY_DYE, tr("§7Reemplazar objeto actual", "§7Replace current item"),
-                tr("§cCopia un objeto antes de usar esta acción.", "§cCopy an item before using this action.")));
-        } else {
-            ItemStack preview = copied.clone();
-            ItemMeta previewMeta = preview.getItemMeta();
-            List<String> statusLore = previewMeta.hasLore() ? new ArrayList<>(previewMeta.getLore()) : new ArrayList<>();
-            statusLore.add("");
-            statusLore.add(tr("§a✓ Copia disponible", "§a✓ Copy available"));
-            statusLore.add(tr("§7Cantidad: §f", "§7Amount: §f") + copied.getAmount());
-            previewMeta.setLore(statusLore);
-            preview.setItemMeta(previewMeta);
-            inv.setItem(22, preview);
-            inv.setItem(24, item(Material.LIME_DYE, tr("§aReemplazar objeto actual", "§aReplace current item"),
-                tr("§7Sustituye el objeto seleccionado por la copia.", "§7Replace the selected item with the saved copy."),
-                tr("§eClic para reemplazar", "§eClick to replace")));
-        }
-        inv.setItem(29, item(Material.LAVA_BUCKET, tr("§cVaciar portapapeles", "§cClear clipboard"),
-            tr("§7Eliminar la copia guardada en memoria.", "§7Remove the saved copy from memory."),
-            tr("§eClic para vaciar", "§eClick to clear")));
-        inv.setItem(31, item(Material.CHEST, tr("§bPegar en otra ranura", "§bPaste into another slot"),
-            tr("§7Vuelve al proyecto y haz clic izquierdo", "§7Return to the project and left-click"),
-            tr("§7en una ranura vacía para duplicar la copia.", "§7an empty slot to duplicate the copy.")));
-        inv.setItem(45, item(Material.ARROW, tr("§7Volver al editor", "§7Back to editor")));
-        inv.setItem(49, item(Material.PAPER, tr("§fResumen", "§fSummary"),
-            tr("§7Objeto actual: §f", "§7Current item: §f") + itemDisplayName(current),
-            tr("§7Portapapeles: §f", "§7Clipboard: §f") + itemDisplayName(copied)));
-        p.openInventory(inv);
-    }
-
-    private String itemDisplayName(ItemStack stack) {
-        if (stack == null || stack.getType().isAir()) return tr("Vacío", "Empty");
-        ItemMeta meta = stack.getItemMeta();
-        return meta != null && meta.hasDisplayName() ? ChatColor.stripColor(meta.getDisplayName()) : prettyKey(stack.getType().name());
+        else openPaletteTemplates(p, 0, null, 0, -1, scope);
     }
 
     private void claimProjectItems(Player player, String[] args) {
@@ -3051,14 +2956,21 @@ public final class IxKitsPlugin extends JavaPlugin implements Listener, CommandE
             if (slot == 45) {
                 if (h.project == null) openTemplates(p);
                 else openItemEditor(p, h.project, h.page, h.targetSlot);
-            } else if (slot == 47) openPaletteTemplates(p, Math.max(0, listPage - 1), h.project, h.page, h.targetSlot);
-            else if (slot == 51) openPaletteTemplates(p, listPage + 1, h.project, h.page, h.targetSlot);
-            else if (h.entryBySlot.containsKey(slot)) {
+            } else if (slot == 47) openPaletteTemplates(p, Math.max(0, listPage - 1), h.project, h.page, h.targetSlot, h.query);
+            else if (slot == 51) openPaletteTemplates(p, listPage + 1, h.project, h.page, h.targetSlot, h.query);
+            else if (slot == 49) {
+                String nextScope = switch (normalizePaletteScope(h.query)) {
+                    case "both" -> "name";
+                    case "name" -> "lore";
+                    default -> "both";
+                };
+                openPaletteTemplates(p, listPage, h.project, h.page, h.targetSlot, nextScope);
+            } else if (h.entryBySlot.containsKey(slot)) {
                 if (e.isRightClick()) {
                     if (p.hasPermission("ixkits.admin") || p.hasPermission("ixkits.community.publish"))
                         publishLocalResource(p, "palette", h.entryBySlot.get(slot), null);
                     else p.sendMessage(prefix() + tr("Necesitas ixkits.community.publish para publicar recursos.", "You need ixkits.community.publish to publish resources."));
-                } else applyPalettePreset(p, h.entryBySlot.get(slot), h.project, h.page, h.targetSlot);
+                } else applyPalettePreset(p, h.entryBySlot.get(slot), h.project, h.page, h.targetSlot, h.query);
             }
         } else if (h.kind.equals("lore-templates")) {
             int listPage = h.project == null ? h.page : h.subPage;
