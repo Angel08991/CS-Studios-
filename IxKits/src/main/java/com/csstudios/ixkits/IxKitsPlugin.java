@@ -1732,6 +1732,7 @@ public final class IxKitsPlugin extends JavaPlugin implements Listener, CommandE
             }
             target.addUnsafeEnchantment(enchantment, level);
             projectService.backupBeforeChange(file);
+            refreshLinkedLore(yaml, pending.page, pending.slot, target);
             yaml.set(itemPath, target);
             yaml.set("format-version", 2);
             yaml.set("updated", System.currentTimeMillis());
@@ -1799,6 +1800,7 @@ public final class IxKitsPlugin extends JavaPlugin implements Listener, CommandE
             loreMeta.lore(lines.isEmpty() ? null : lines);
             target.setItemMeta(loreMeta);
             projectService.backupBeforeChange(file);
+            yaml.set("lore-template." + itemPath, null);
             yaml.set(itemPath, target);
             yaml.set("format-version", 2);
             yaml.set("updated", System.currentTimeMillis());
@@ -2415,8 +2417,11 @@ public final class IxKitsPlugin extends JavaPlugin implements Listener, CommandE
         inv.setItem(47, item(Material.SPECTRAL_ARROW, tr("§bAnterior", "§bPrevious"), tr("§7Página anterior", "§7Previous page")));
         inv.setItem(48, item(Material.LIME_DYE, tr("§aAñadir línea", "§aAdd line"),
             tr("§7Escribe el contenido de la nueva línea.", "§7Type the new line's content.")));
-        inv.setItem(49, item(Material.BARRIER, tr("§cBorrar todo el lore", "§cClear all lore"),
+        inv.setItem(49, item(Material.BARRIER, "§c§l" + tr("Borrar todo el lore", "Clear all lore"),
             tr("§7Pide confirmación por chat.", "§7Requires confirmation in chat.")));
+        inv.setItem(50, item(Material.WHITE_STAINED_GLASS_PANE, "§f§l" + tr("Añadir línea vacía", "Add blank line"),
+            tr("§7Inserta un separador sin texto.", "§7Insert an empty spacer with no text."), "",
+            tr("§eClic para insertar espacio", "§eClick to insert a spacer")));
         inv.setItem(51, item(Material.SPECTRAL_ARROW, tr("§bSiguiente", "§bNext"), tr("§7Página siguiente", "§7Next page")));
         inv.setItem(53, item(Material.PAPER, tr("§fLíneas: ", "§fLines: ") + lines.size(),
             tr("§7Cada línea es independiente.", "§7Each line is independent.")));
@@ -2429,6 +2434,7 @@ public final class IxKitsPlugin extends JavaPlugin implements Listener, CommandE
         ItemMeta meta = target.getItemMeta();
         meta.lore(lines.isEmpty() ? null : new ArrayList<>(lines));
         target.setItemMeta(meta);
+        clearLinkedLoreTemplate(project, page, targetSlot);
         saveProjectItem(project, page, targetSlot, target);
         openLoreEditor(p, project, page, targetSlot, viewPage);
     }
@@ -3077,6 +3083,13 @@ public final class IxKitsPlugin extends JavaPlugin implements Listener, CommandE
                 "Escribe la nueva línea de lore (MiniMessage/RGB):", "Type the new lore line (MiniMessage/RGB):");
             else if (slot == 49) promptLoreInput(p, InputType.LORE_CLEAR_CONFIRM, h.project, h.page, h.targetSlot, -1,
                 "Escribe BORRAR para quitar todo el lore, o Cancelar para conservarlo:", "Type CLEAR to remove all lore, or Cancel to keep it:");
+            else if (slot == 50) {
+                ItemStack target = getProjectItem(h.project, h.page, h.targetSlot);
+                if (target == null || target.getType().isAir()) { openItemEditor(p, h.project, h.page, h.targetSlot); return; }
+                List<Component> lines = target.getItemMeta().lore() == null ? new ArrayList<>() : new ArrayList<>(target.getItemMeta().lore());
+                lines.add(Component.empty());
+                saveLoreLines(p, h.project, h.page, h.targetSlot, lines, h.subPage);
+            }
             else if (slot == 51) openLoreEditor(p, h.project, h.page, h.targetSlot, h.subPage + 1);
             else if (h.entryBySlot.containsKey(slot)) {
                 int lineIndex = Integer.parseInt(h.entryBySlot.get(slot));
@@ -3157,6 +3170,7 @@ public final class IxKitsPlugin extends JavaPlugin implements Listener, CommandE
                 ItemStack target = y.getItemStack(storagePath(h.page, h.targetSlot));
                 if (target != null) {
                     for (Enchantment enchantment : new ArrayList<>(target.getEnchantments().keySet())) target.removeEnchantment(enchantment);
+                    refreshLinkedLore(y, h.page, h.targetSlot, target);
                     y.set(storagePath(h.page, h.targetSlot), target);
                     saveYaml(y, projectFile(h.project));
                     p.sendMessage(prefix() + tr("Se quitaron todos los encantamientos del objeto.", "All enchantments were removed from the item."));
@@ -3253,6 +3267,7 @@ public final class IxKitsPlugin extends JavaPlugin implements Listener, CommandE
                 ItemStack target = y.getItemStack(storagePath(h.page, h.targetSlot));
                 if (target != null) {
                     for (Enchantment enchantment : new ArrayList<>(target.getEnchantments().keySet())) target.removeEnchantment(enchantment);
+                    refreshLinkedLore(y, h.page, h.targetSlot, target);
                     y.set(storagePath(h.page, h.targetSlot), target);
                     saveYaml(y, projectFile(h.project));
                     p.sendMessage(prefix() + tr("Se quitaron todos los encantamientos del objeto.", "All enchantments were removed from the item."));
@@ -3287,6 +3302,7 @@ public final class IxKitsPlugin extends JavaPlugin implements Listener, CommandE
                     int next = current <= 0 ? 1 : Math.min(32767, current + 1);
                     target.addUnsafeEnchantment(enchantment, next);
                 }
+                refreshLinkedLore(y, h.page, h.targetSlot, target);
                 y.set(itemPath, target);
                 saveYaml(y, projectFile(h.project));
                 openEnchantments(p, h.project, h.page, h.targetSlot, h.subPage);
@@ -3499,10 +3515,33 @@ public final class IxKitsPlugin extends JavaPlugin implements Listener, CommandE
         return YamlConfiguration.loadConfiguration(projectFile(project)).getItemStack(storagePath(page, slot));
     }
 
+    private void refreshLinkedLore(YamlConfiguration projectYaml, int page, int slot, ItemStack target) {
+        if (target == null || target.getType().isAir()) return;
+        String itemPath = storagePath(page, slot);
+        String templateKey = projectYaml.getString("lore-template." + itemPath);
+        if (templateKey == null || templateKey.isBlank()) return;
+        List<String> lines = yamlListForLoreTemplate(templateKey);
+        if (lines.isEmpty() || lines.stream().noneMatch(line ->
+            "{enchantments}".equalsIgnoreCase(line.trim()) || "{abilities}".equalsIgnoreCase(line.trim()))) return;
+        ItemMeta meta = target.getItemMeta();
+        if (meta == null) return;
+        meta.lore(loreComponents(resolveLorePlaceholders(lines, target)));
+        target.setItemMeta(meta);
+    }
+
+    private void clearLinkedLoreTemplate(String project, int page, int slot) {
+        File file = projectFile(project);
+        if (!file.isFile()) return;
+        YamlConfiguration yaml = YamlConfiguration.loadConfiguration(file);
+        yaml.set("lore-template." + storagePath(page, slot), null);
+        saveYaml(yaml, file);
+    }
+
     private void saveProjectItem(String project, int page, int slot, ItemStack item) {
         File file = projectFile(project);
         projectService.backupBeforeChange(file);
         YamlConfiguration yaml = YamlConfiguration.loadConfiguration(file);
+        refreshLinkedLore(yaml, page, slot, item);
         yaml.set(storagePath(page, slot), item);
         yaml.set("format-version", 2);
         yaml.set("updated", System.currentTimeMillis());
@@ -4127,14 +4166,79 @@ public final class IxKitsPlugin extends JavaPlugin implements Listener, CommandE
 
     private List<String> generatedEnchantmentLore(ItemStack stack) {
         if (stack == null || stack.getType().isAir() || stack.getEnchantments().isEmpty()) return List.of();
-        String format = getConfig().getString("lore.enchantment-line-format", "<#FBBF24>⚔ <#D1D5DB>{name} <#FDE68A>{level}");
+        String format = getConfig().getString("lore.enchantment-line-format",
+            "<#FBBF24>• {icon} <#D1D5DB>{name} <#FDE68A>{level}");
         List<String> lines = new ArrayList<>();
         stack.getEnchantments().entrySet().stream()
             .sorted(Comparator.comparing(entry -> entry.getKey().getKey().toString()))
-            .forEach(entry -> lines.add(format.replace("{name}", enchantmentDisplayName(entry.getKey()))
-                .replace("{level}", romanLevel(entry.getValue()))
-                .replace("{key}", entry.getKey().getKey().toString())));
+            .forEach(entry -> {
+                String icon = enchantmentIcon(entry.getKey());
+                String lineFormat = format;
+                if (!lineFormat.contains("{icon}")) {
+                    if (lineFormat.contains("⚔")) lineFormat = lineFormat.replace("⚔", icon);
+                    else lineFormat = icon + " " + lineFormat;
+                }
+                lines.add(lineFormat.replace("{icon}", icon)
+                    .replace("{name}", enchantmentDisplayName(entry.getKey()))
+                    .replace("{level}", romanLevel(entry.getValue()))
+                    .replace("{key}", entry.getKey().getKey().toString()));
+            });
         return lines;
+    }
+
+    private String enchantmentIcon(Enchantment enchantment) {
+        String key = enchantment.getKey().getKey().toLowerCase(Locale.ROOT);
+        String configured = getConfig().getString("lore.enchantment-icons." + key);
+        if (configured != null && !configured.isBlank()) return configured;
+        return switch (key) {
+            case "fire_aspect", "flame", "fire_protection" -> "🔥";
+            case "sharpness", "sweeping_edge", "smite", "bane_of_arthropods" -> "⚔";
+            case "protection", "blast_protection", "projectile_protection" -> "🛡";
+            case "unbreaking", "mending" -> "✨";
+            case "efficiency" -> "⛏";
+            case "fortune", "looting" -> "💎";
+            case "silk_touch" -> "🪄";
+            case "power", "punch" -> "🏹";
+            case "infinity" -> "♾";
+            case "quick_charge", "channeling" -> "⚡";
+            case "multishot" -> "➶";
+            case "piercing" -> "➤";
+            case "loyalty", "riptide", "impaling" -> "🌊";
+            case "density", "breach", "wind_burst" -> "💥";
+            case "feather_falling", "soul_speed", "swift_sneak" -> "🪽";
+            case "depth_strider", "frost_walker" -> "❄";
+            case "respiration", "aqua_affinity" -> "🌊";
+            case "thorns" -> "🌵";
+            case "knockback" -> "💨";
+            case "binding_curse", "vanishing_curse" -> "☠";
+            case "luck_of_the_sea", "lure" -> "🎣";
+            default -> "✦";
+        };
+    }
+
+    private List<String> generatedAbilityLore(ItemStack stack) {
+        if (stack == null || stack.getType().isAir()) return List.of();
+        String format = getConfig().getString("lore.ability-line-format",
+            "<#F87171>• {icon} <#FECACA>{name} <#9CA3AF>({cooldown})");
+        List<String> lines = new ArrayList<>();
+        if (isAbilityEnabled(stack, tntOnHitKey)) lines.add(abilityLoreLine(format, "💥", tr("TNT al golpear", "TNT on hit"), getAbilityCooldown(stack, "tnt"), "tnt"));
+        if (isAbilityEnabled(stack, lightningOnHitKey)) lines.add(abilityLoreLine(format, "⚡", tr("Rayo al golpear", "Lightning on hit"), getAbilityCooldown(stack, "lightning"), "lightning"));
+        if (isAbilityEnabled(stack, lifeStealOnHitKey)) lines.add(abilityLoreLine(format, "🩸", tr("Robo de vida", "Lifesteal"), getAbilityCooldown(stack, "lifesteal"), "lifesteal"));
+        if (isAbilityEnabled(stack, poisonOnHitKey)) lines.add(abilityLoreLine(format, "☠", tr("Veneno", "Venom"), getAbilityCooldown(stack, "poison"), "poison"));
+        if (isAbilityEnabled(stack, frostOnHitKey)) lines.add(abilityLoreLine(format, "❄", tr("Escarcha", "Frost"), getAbilityCooldown(stack, "frost"), "frost"));
+        if (isAbilityEnabled(stack, flameOnHitKey)) lines.add(abilityLoreLine(format, "🔥", tr("Llama", "Flame"), getAbilityCooldown(stack, "flame"), "flame"));
+        if (isAbilityEnabled(stack, knockbackOnHitKey)) lines.add(abilityLoreLine(format, "💨", tr("Impacto reforzado", "Enhanced knockback"), getAbilityCooldown(stack, "knockback"), "knockback"));
+        return lines;
+    }
+
+    private String abilityLoreLine(String format, String icon, String name, long cooldown, String key) {
+        String lineFormat = format;
+        if (!lineFormat.contains("{icon}")) {
+            if (lineFormat.contains("✦")) lineFormat = lineFormat.replace("✦", icon);
+            else lineFormat = icon + " " + lineFormat;
+        }
+        return lineFormat.replace("{icon}", icon).replace("{name}", name)
+            .replace("{cooldown}", formatCooldown(cooldown)).replace("{key}", key);
     }
 
     private String enchantmentDisplayName(Enchantment enchantment) {
@@ -4215,6 +4319,8 @@ public final class IxKitsPlugin extends JavaPlugin implements Listener, CommandE
         lines = resolveLorePlaceholders(lines, target);
         meta.lore(loreComponents(lines));
         target.setItemMeta(meta);
+        projectService.backupBeforeChange(file);
+        yaml.set("lore-template." + itemPath, key);
         yaml.set(itemPath, target);
         saveYaml(yaml, file);
         YamlConfiguration loreFile = YamlConfiguration.loadConfiguration(new File(templatesDir, "lore.yml"));
