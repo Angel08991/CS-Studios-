@@ -10,14 +10,18 @@ es:
     empty: "&eEl portapapeles está vacío. Copia un objeto primero."
     pasted: "&aCopia pegada correctamente."
   claim:
-    no-permission: "&cNo tienes permiso para reclamar proyectos."
+    disabled: "&cLa reclamación de proyectos está desactivada por la configuración."
+    no-permission: "&cNecesitas el permiso &f{permission} &7para reclamar proyectos."
     usage: "&eUso: /ixkits claim <proyecto>"
+    cooldown: "&eEspera &f{remaining} s &eantes de reclamar otro proyecto."
+    details: "&7Pilas de objetos entregadas: &b{count}"
     not-found: "&cNo existe el proyecto &f{project}&c."
     empty: "&eEl proyecto &b{project} &eno contiene objetos."
     success: "&aReclamaste &e{count} &aunidad(es) del proyecto &b{project}&a. El proyecto original no se modifica."
     overflow: "&eEl inventario estaba lleno: &f{count} &eunidad(es) se dejaron en el suelo."
   export:
-    success: "&aExportación creada: &b{file}"
+    success: "&a✓ EXPORTACIÓN COMPLETADA"
+    file: "&7Archivo: &bplugins/IxKits/exports/{file}"
     failed: "&cNo se pudo exportar el proyecto."
   import:
     success: "&aProyecto importado y validado."
@@ -32,14 +36,18 @@ en:
     empty: "&eThe clipboard is empty. Copy an item first."
     pasted: "&aCopy pasted successfully."
   claim:
-    no-permission: "&cYou do not have permission to claim projects."
+    disabled: "&cProject claiming is disabled by server configuration."
+    no-permission: "&cYou need permission &f{permission} &7to claim projects."
     usage: "&eUsage: /ixkits claim <project>"
+    cooldown: "&eWait &f{remaining}s &ebefore claiming another project."
+    details: "&7Item stacks delivered: &b{count}"
     not-found: "&cProject &f{project} &cdoes not exist."
     empty: "&eProject &b{project} &econtains no items."
     success: "&aClaimed &e{count} &aitem unit(s) from &b{project}&a. The original project stays unchanged."
     overflow: "&eYour inventory was full: &f{count} &eitem unit(s) were dropped."
   export:
-    success: "&aExport created: &b{file}"
+    success: "&a✓ EXPORT COMPLETE"
+    file: "&7File: &bplugins/IxKits/exports/{file}"
     failed: "&cCould not export the project."
   import:
     success: "&aProject imported and validated."
