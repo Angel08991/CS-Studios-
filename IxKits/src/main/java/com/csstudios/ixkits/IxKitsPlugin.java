@@ -2414,7 +2414,7 @@ public final class IxKitsPlugin extends JavaPlugin implements Listener, CommandE
         String divider = "§8§m━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━";
         player.sendMessage(divider);
         player.sendMessage("§8┃ §b§l✦ IXKITS §f/ §bKIT CREATION STUDIO");
-        player.sendMessage("§8┃ §7" + tr("Crea objetos, kits y conjuntos desde una sola GUI.", "Create items, kits and sets from one GUI."));
+        player.sendMessage("§8┃ " + configuredMessage("help.subtitle", "&7Crea objetos, kits y conjuntos desde una sola GUI.", "&7Create items, kits and sets from one GUI."));
         player.sendMessage(divider);
         player.sendMessage("§8┃ §b§l" + tr("ESTUDIO", "STUDIO"));
         player.sendMessage("§8┃ §f/ixkits §8— §7" + tr("Abrir el taller", "Open the workshop"));
@@ -3693,18 +3693,18 @@ public final class IxKitsPlugin extends JavaPlugin implements Listener, CommandE
 
     private void fillCompleteSet(Player player, String project, int page, int targetSlot) {
         if (!getConfig().getBoolean("set-fill.enabled", true)) {
-            player.sendMessage(prefix() + tr("§cLa generación de conjuntos está desactivada.", "§cSet generation is disabled."));
+            player.sendMessage(prefix() + configuredMessage("set-fill.disabled", "&cLa generación de conjuntos está desactivada.", "&cSet generation is disabled."));
             return;
         }
         File file = projectFile(project);
         if (!file.isFile()) {
-            player.sendMessage(prefix() + tr("§cNo se encontró el proyecto.", "§cProject not found."));
+            player.sendMessage(prefix() + configuredMessage("set-fill.project-missing", "&cNo se encontró el proyecto.", "&cProject not found."));
             return;
         }
         YamlConfiguration yaml = YamlConfiguration.loadConfiguration(file);
         ItemStack source = yaml.getItemStack(storagePath(page, targetSlot));
         if (source == null || source.getType().isAir()) {
-            player.sendMessage(prefix() + tr("§eSelecciona primero una espada, herramienta o pieza de armadura.", "§eSelect a sword, tool or armor piece first."));
+            player.sendMessage(prefix() + configuredMessage("set-fill.source-required", "&eSelecciona primero una espada, herramienta o pieza de armadura.", "&eSelect a sword, tool or armor piece first."));
             return;
         }
         String toolTier = tierForTools(source.getType().name());
@@ -3764,11 +3764,11 @@ public final class IxKitsPlugin extends JavaPlugin implements Listener, CommandE
             yaml.set("format-version", 2);
             yaml.set("updated", System.currentTimeMillis());
             saveYaml(yaml, file);
-            player.sendMessage(prefix() + tr("§a✓ Conjunto generado correctamente.", "§a✓ Set generated successfully."));
-            player.sendMessage(prefix() + tr("§7Objetos añadidos: §b", "§7Items added: §b") + created);
-            if (skipped > 0) player.sendMessage(prefix() + tr("§8Espacios ocupados o incompatibles omitidos: §7", "§8Occupied or incompatible slots skipped: §7") + skipped);
+            player.sendMessage(prefix() + configuredMessage("set-fill.success", "&a✓ Conjunto generado correctamente.", "&a✓ Set generated successfully."));
+            player.sendMessage(prefix() + configuredMessage("set-fill.added", "&7Objetos añadidos: &b{count}", "&7Items added: &b{count}", "{count}", String.valueOf(created)));
+            if (skipped > 0) player.sendMessage(prefix() + configuredMessage("set-fill.skipped", "&8Espacios ocupados o incompatibles omitidos: &7{count}", "&8Occupied or incompatible slots skipped: &7{count}", "{count}", String.valueOf(skipped)));
         } else {
-            player.sendMessage(prefix() + tr("§eNo había espacios compatibles que completar. No se sobrescribió ningún objeto.", "§eNo compatible empty slots were found. No items were overwritten."));
+            player.sendMessage(prefix() + configuredMessage("set-fill.no-room", "&eNo había espacios compatibles. No se sobrescribió ningún objeto.", "&eNo compatible empty slots were found. No items were overwritten."));
         }
         openItemEditor(player, project, page, targetSlot);
     }
@@ -4979,13 +4979,13 @@ public final class IxKitsPlugin extends JavaPlugin implements Listener, CommandE
     private void setLanguage(Player p, String requested) {
         String code = requested.toLowerCase(Locale.ROOT);
         if (!Set.of("es", "en", "pt", "fr", "de", "it", "zh", "ru").contains(code)) {
-            p.sendMessage(prefix() + tr("§eIdiomas disponibles: §bes, en, pt, fr, de, it, zh, ru§e.", "§eAvailable languages: §bes, en, pt, fr, de, it, zh, ru§e."));
+            p.sendMessage(prefix() + configuredMessage("language.invalid", "&eIdiomas disponibles: &bes, en, pt, fr, de, it, zh, ru.", "&eAvailable languages: &bes, en, pt, fr, de, it, zh, ru."));
             openLanguages(p);
             return;
         }
         getConfig().set("language", code);
         saveConfig();
-        p.sendMessage(prefix() + tr("§aIdioma guardado: §f", "§aLanguage saved: §f") + languageDisplayName(code) + "§7.");
+        p.sendMessage(prefix() + configuredMessage("language.saved", "&aIdioma guardado: &f{language}&a.", "&aLanguage saved: &f{language}&a.", "{language}", languageDisplayName(code)));
         openMain(p);
     }
 
