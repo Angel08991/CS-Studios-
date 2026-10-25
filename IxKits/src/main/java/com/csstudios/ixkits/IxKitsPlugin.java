@@ -3727,6 +3727,12 @@ public final class IxKitsPlugin extends JavaPlugin implements Listener, CommandE
                 "<#34D399>☣ <#D1FAE5>Healing: <#FCA5A5>None", "",
                 "{enchantments}", "{abilities}",
                 "<#064E3B>☣ ᴠᴇɴᴏᴍ ʀɪᴛᴜᴀʟ ☣"));
+        for (String key : lore.getKeys(false)) {
+            if (!lore.isConfigurationSection(key) || lore.getStringList(key + ".lore").isEmpty()) continue;
+            if (!lore.contains(key + ".category")) lore.set(key + ".category", defaultLoreCategory(key));
+            if (!lore.contains(key + ".description")) lore.set(key + ".description", "Plantilla editable de " + defaultLoreCategory(key) + ".");
+            if (!lore.contains(key + ".description_en")) lore.set(key + ".description_en", "Editable " + defaultLoreCategory(key) + " template.");
+        }
         saveYaml(lore, loreFile);
 
         File paletteFile = new File(templatesDir, "palettes.yml");
@@ -3781,11 +3787,24 @@ public final class IxKitsPlugin extends JavaPlugin implements Listener, CommandE
         }
     }
 
+    private String defaultLoreCategory(String key) {
+        String value = key == null ? "" : key.toLowerCase(Locale.ROOT);
+        if (value.matches(".*(armor|armadura|helmet|chestplate|leggings|boots).*")) return "armor";
+        if (value.matches(".*(soup|potion|elixir|consumable|food|ignifuga|drink).*")) return "consumables";
+        if (value.matches(".*(mineral|miner|ore|gem|emerald).*")) return "minerals";
+        if (value.matches(".*(blade|sword|weapon|soulreaper|fang|vanguard_pvp|ranger_marksman|pvp|katana).*")) return "weapons";
+        if (value.matches(".*(token|relic|cosmic|astral|abyss|demonic|legendary|special|resource|item|gladiator_badge).*")) return "items";
+        return "misc";
+    }
+
     private void ensureLoreTemplate(YamlConfiguration yaml, String key, String displayEs, String displayEn, List<String> loreEs, List<String> loreEn) {
         if (!yaml.contains(key + ".lore")) yaml.set(key + ".lore", loreEs);
         if (!yaml.contains(key + ".lore_en")) yaml.set(key + ".lore_en", loreEn);
         if (!yaml.contains(key + ".display")) yaml.set(key + ".display", displayEs);
         if (!yaml.contains(key + ".display_en")) yaml.set(key + ".display_en", displayEn);
+        if (!yaml.contains(key + ".category")) yaml.set(key + ".category", defaultLoreCategory(key));
+        if (!yaml.contains(key + ".description")) yaml.set(key + ".description", "Plantilla editable de " + defaultLoreCategory(key) + ".");
+        if (!yaml.contains(key + ".description_en")) yaml.set(key + ".description_en", "Editable " + defaultLoreCategory(key) + " template.");
     }
 
     /**
