@@ -1777,6 +1777,7 @@ public final class IxKitsPlugin extends JavaPlugin implements Listener, CommandE
             meta.getPersistentDataContainer().set(cooldownKey, PersistentDataType.LONG, cooldownMs);
             target.setItemMeta(meta);
             projectService.backupBeforeChange(file);
+            refreshLinkedLore(yaml, pending.page, pending.slot, target);
             yaml.set(itemPath, target);
             yaml.set("format-version", 2);
             yaml.set("updated", System.currentTimeMillis());
@@ -2238,7 +2239,21 @@ public final class IxKitsPlugin extends JavaPlugin implements Listener, CommandE
         }
         String scope = normalizePaletteScope(requestedScope);
         applyPaletteToItem(target, palettes, key, scope);
-        if (project != null) saveProjectItem(project, projectPage, targetSlot, target);
+        if (project != null) {
+            File file = projectFile(project);
+            projectService.backupBeforeChange(file);
+            YamlConfiguration projectYaml = YamlConfiguration.loadConfiguration(file);
+            String itemPath = storagePath(projectPage, targetSlot);
+            if (scope.equals("lore") || scope.equals("both")) projectYaml.set("palette-lore." + itemPath, key);
+            projectYaml.set(itemPath, target);
+            if (scope.equals("lore") || scope.equals("both")) {
+                refreshLinkedLore(projectYaml, projectPage, targetSlot, target);
+                projectYaml.set(itemPath, target);
+            }
+            projectYaml.set("format-version", 2);
+            projectYaml.set("updated", System.currentTimeMillis());
+            saveYaml(projectYaml, file);
+        }
         p.sendMessage(prefix() + tr("§aPaleta aplicada: §b", "§aPalette applied: §b")
             + palettes.getString(key + ".display", prettyKey(key)) + " §8· §7" + paletteScopeLabel(scope));
         if (project != null) openItemEditor(p, project, projectPage, targetSlot);
@@ -3693,6 +3708,11 @@ public final class IxKitsPlugin extends JavaPlugin implements Listener, CommandE
         if (meta == null) return;
         meta.lore(loreComponents(resolveLorePlaceholders(lines, target)));
         target.setItemMeta(meta);
+        String paletteKey = projectYaml.getString("palette-lore." + itemPath);
+        if (paletteKey != null && !paletteKey.isBlank()) {
+            YamlConfiguration palettes = YamlConfiguration.loadConfiguration(new File(templatesDir, "palettes.yml"));
+            if (palettes.contains(paletteKey + ".color")) applyPaletteToItem(target, palettes, paletteKey, "lore");
+        }
     }
 
     private void clearLinkedLoreTemplate(String project, int page, int slot) {
@@ -5004,6 +5024,8 @@ public final class IxKitsPlugin extends JavaPlugin implements Listener, CommandE
         projectService.backupBeforeChange(file);
         yaml.set("lore-template." + itemPath, key);
         yaml.set(itemPath, target);
+        refreshLinkedLore(yaml, projectPage, targetSlot, target);
+        yaml.set(itemPath, target);
         saveYaml(yaml, file);
         YamlConfiguration loreFile = YamlConfiguration.loadConfiguration(new File(templatesDir, "lore.yml"));
         String label = loreFile.getString(key + (isEnglish() ? ".display_en" : ".display"), loreFile.getString(key + ".display", prettyKey(key)));
@@ -5267,10 +5289,19 @@ public final class IxKitsPlugin extends JavaPlugin implements Listener, CommandE
         if (source != null) {
             for (String line : source) {
                 if (line == null) continue;
-                if (line.isBlank() && (lore.isEmpty() || lore.get(lore.size() - 1).isBlank())) continue;
+                if (line.isBlank()) {
+                    if (!lore.isEmpty() && !lore.get(lore.size() - 1).isBlank()) lore.add("");
+                    continue;
+                }
+                if (!lore.isEmpty() && lore.size() == 1 && !lore.get(0).isBlank()) lore.add("");
+                boolean actionLine = line.startsWith("§eClic") || line.startsWith("§aClic") || line.startsWith("§dClic")
+                    || line.startsWith("§eClick") || line.startsWith("§aClick") || line.startsWith("§dClick")
+                    || line.startsWith("§eEscribe") || line.startsWith("§eType");
+                if (actionLine && !lore.isEmpty() && !lore.get(lore.size() - 1).isBlank()) lore.add("");
                 lore.add(line);
             }
         }
+        while (!lore.isEmpty() && lore.get(lore.size() - 1).isBlank()) lore.remove(lore.size() - 1);
         boolean branded = lore.stream().anyMatch(line -> line.contains("IxKits Studio") || line.contains("CS Studios"));
         if (!lore.isEmpty() && !branded) {
             if (!lore.get(lore.size() - 1).isBlank()) lore.add("");
