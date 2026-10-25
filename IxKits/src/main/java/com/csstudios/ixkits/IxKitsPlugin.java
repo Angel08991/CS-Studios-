@@ -14,6 +14,7 @@ import org.bukkit.inventory.EquipmentSlotGroup;
 import org.bukkit.command.Command;
 import org.bukkit.command.CommandExecutor;
 import org.bukkit.command.CommandSender;
+import org.bukkit.command.TabCompleter;
 import org.bukkit.configuration.ConfigurationSection;
 import org.bukkit.configuration.file.YamlConfiguration;
 import org.bukkit.enchantments.Enchantment;
@@ -64,7 +65,7 @@ import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.UUID;
 
-public final class IxKitsPlugin extends JavaPlugin implements Listener, CommandExecutor {
+public final class IxKitsPlugin extends JavaPlugin implements Listener, CommandExecutor, TabCompleter {
     private File projectsDir, templatesDir, exportsDir;
     private ProjectService projectService;
     private CatalogClient catalogClient;
@@ -121,8 +122,37 @@ public final class IxKitsPlugin extends JavaPlugin implements Listener, CommandE
         knockbackCooldownKey = new NamespacedKey(this, "ability_knockback_cooldown_ms");
         initializeTemplates();
         Objects.requireNonNull(getCommand("ixkits")).setExecutor(this);
+        Objects.requireNonNull(getCommand("ixkits")).setTabCompleter(this);
         Bukkit.getPluginManager().registerEvents(this, this);
         getLogger().info("IxKits habilitado. Kit Creation Studio by CS Studios.");
+    }
+
+    @Override public List<String> onTabComplete(CommandSender sender, Command command, String alias, String[] args) {
+        if (!command.getName().equalsIgnoreCase("ixkits")) return List.of();
+        String prefix = args.length == 0 ? "" : args[args.length - 1].toLowerCase(Locale.ROOT);
+        List<String> suggestions = new ArrayList<>();
+        if (args.length == 1) {
+            suggestions.addAll(List.of("claim", "comunidad", "plantillas", "catalogo", "buscar", "idioma"));
+            if (sender.hasPermission("ixkits.admin")) suggestions.addAll(List.of("crear", "editar", "proyectos", "exportar", "exportar-essentials",
+                "importar", "importar-essentials", "importar-mano", "equipamiento", "validar", "duplicar", "renombrar",
+                "eliminar", "papelera", "restaurar-eliminado", "deshacer", "rehacer", "recargar", "paleta", "lore", "encantamientos"));
+            return suggestions.stream().distinct().filter(value -> value.toLowerCase(Locale.ROOT).startsWith(prefix)).sorted().toList();
+        }
+        if (args.length == 2 && (args[0].equalsIgnoreCase("claim") || sender.hasPermission("ixkits.admin")
+            && Set.of("editar", "exportar", "exportar-essentials", "equipamiento", "validar", "eliminar", "duplicar", "renombrar", "deshacer", "rehacer").contains(args[0].toLowerCase(Locale.ROOT)))) {
+            if (args[0].equalsIgnoreCase("claim")) {
+                if (!getConfig().getBoolean("claim.enabled", true)) return List.of();
+                String permission = getConfig().getString("claim.permission", "").trim();
+                if (!permission.isEmpty() && !sender.hasPermission(permission)) return List.of();
+            }
+            File[] files = projectsDir == null ? new File[0] : projectsDir.listFiles((dir, name) -> name.endsWith(".yml"));
+            if (files != null) for (File file : files) {
+                String id = file.getName().substring(0, file.getName().length() - 4);
+                if (id.toLowerCase(Locale.ROOT).startsWith(prefix)) suggestions.add(id);
+            }
+            return suggestions.stream().distinct().sorted().toList();
+        }
+        return List.of();
     }
 
     @Override public boolean onCommand(CommandSender sender, Command command, String label, String[] args) {
