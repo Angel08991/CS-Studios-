@@ -3329,8 +3329,6 @@ public final class IxKitsPlugin extends JavaPlugin implements Listener, CommandE
                 }
                 openItemEditor(p, h.project, h.page, h.targetSlot);
             }
-        }
-
         } else if (h.kind.equals("potion-types")) {
             if (slot == 45) openItemEditor(p, h.project, h.page, h.targetSlot);
             else if (slot == 47) openPotionTypes(p, h.project, h.page, h.targetSlot, Math.max(0, h.subPage - 1));
