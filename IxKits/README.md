@@ -8,22 +8,23 @@ IxKits es un estudio visual para diseñar, personalizar, organizar, validar, exp
 
 La compilación de CI se ejecuta contra Paper API 1.21.11. La GUI debe probarse también en un servidor Paper 1.21.11 real antes de producción.
 
-- GUI de estudio con bordes y editor de inventario en dos páginas.
+- GUI de estudio con bordes, editor de inventario en dos páginas y un Taller de objeto reorganizado con detalles, portapapeles, paletas y generación de conjuntos.
+- **Rellenar conjunto** genera herramientas, piezas de armadura, escudo y armas a distancia que falten, usando la calidad del objeto seleccionado. Solo usa ranuras vacías, conserva los objetos existentes y aplica encantamientos compatibles por tipo (no aplica Filo a picos o palas). Los valores predeterminados se configuran en `set-fill` dentro de `config.yml`.
 - Editor de encantamientos: clic izquierdo sube el nivel, clic derecho lo baja, Mayús + clic izquierdo permite escribir un nivel exacto (1–32767) y Mayús + clic derecho elimina el encantamiento. Incluye presets con niveles personalizados.
 - Editor de pociones para escoger el tipo base y añadir/quitar efectos personalizados o subir su nivel desde una GUI.
 - Diseñador de escudos y estandartes: modifica patrones, el color de cada patrón y el color base del diseño. También incluye trims de armadura, libros, cabezas y fuegos artificiales.
 - Papelera recuperable en la GUI del navegador de proyectos, con acciones para deshacer y rehacer.
 - Portapapeles persistente para copiar, inspeccionar, reemplazar y pegar objetos con metadatos serializados, incluso después de reiniciar el servidor; los datos se guardan por UUID en `plugins/IxKits/clipboard/`.
 - Biblioteca de lores organizada por categorías: armas, armaduras, objetos especiales, minerales/materiales, consumibles y otros diseños. Incluye estilos originales inspirados en armas AERIS/ONI, armaduras de conjunto, minerales ancestrales, consumibles y tokens de evento, además de las plantillas anteriores.
-- Las plantillas pueden añadir automáticamente encantamientos y habilidades reales usando `{enchantments}` y `{abilities}`; `{item}` inserta el nombre del objeto. Se agregan estilos para espada AERIS, armadura Ónix, sopa ignífuga, mineral ancestral y token KOTH.
-- Las paletas RGB aplican gradientes carácter por carácter al nombre y a cada línea de lore: Aurora, Plasma, Tóxico, Glaciar, Flujo Real y Oro Rosado.
-- Editor de nombre y lore con MiniMessage y códigos legacy/RGB combinados, incluidos formatos como `&#F2FF00&lU&#F4F300&lS`; separa las líneas de lore usando el separador vertical. Las GUI muestran controles más explicativos, vistas previas mejoradas y una firma visual de CS Studios.
+- Las plantillas pueden añadir automáticamente encantamientos y habilidades reales usando `{enchantments}` y `{abilities}`; `{item}` inserta el nombre del objeto. Al aplicar una plantilla enlazada, el lore se actualiza al cambiar encantamientos o habilidades; al editar el lore manualmente, se desvincula para proteger las modificaciones. Incluye estilos para espada AERIS, conjuntos Ónix/Vanguard, armadura dracónica, sopa ignífuga, mineral ancestral, token KOTH y más.
+- Las paletas RGB aplican gradientes carácter por carácter al nombre, al lore o a ambos: Aurora, Plasma, Tóxico, Glaciar, Flujo Real y Oro Rosado. El destino se selecciona en el menú de paletas.
+- Editor de nombre y lore con MiniMessage y códigos legacy/RGB combinados, incluidos formatos como `&#F2FF00&lU&#F4F300&lS`; separa las líneas usando `|`, y el editor visual permite insertar líneas vacías sin texto. Las GUI muestran controles más explicativos, vistas previas mejoradas y una firma visual de CS Studios.
 - Alternar irrompible, cambiar durabilidad, custom model data, flags, color de armadura de cuero y modificadores propios de atributos.
 - Editor de equipamiento separado para casco, peto, pantalones, botas y mano secundaria.
 - Biblioteca de proyectos con paginación y búsqueda: crear desde la GUI, abrir, duplicar, renombrar, eliminar moviendo a papelera, validar y restaurar una copia anterior.
 - Backups locales rotativos; importación y exportación del formato nativo.
 - Adaptador de EssentialsX en formato legible con avisos por posible pérdida de metadatos.
-- Selector de idioma en español e inglés.
+- Selector de idioma con español, inglés, portugués, francés, alemán, italiano, chino y ruso. Las pantallas principales tienen traducciones comunes; las frases no traducidas recurren al inglés.
 - Community Hub público para navegar kits/proyectos, lores, paletas RGB y presets de encantamientos; permite descargar recursos y guardarlos de forma segura en las bibliotecas locales.
 - Publicación comunitaria de kits con categoría y descripción elegidas desde la GUI; los recursos locales se comparten haciendo clic derecho sobre una plantilla de lore, una paleta o un preset.
 - Cooldown individual por objeto y habilidad: clic derecho sobre TNT, rayo o robo de vida abre el editor de segundos (0–86400); clic izquierdo sigue activando/desactivando la habilidad.
@@ -49,17 +50,20 @@ Con LuckPerms, el permiso `ixkits.community.publish` se puede otorgar por separa
 
 En plugins/IxKits/config.yml:
 
-    language: es # es = español | en = inglés
+    language: es # es, en, pt, fr, de, it, zh o ru
+
+`/ixkits idioma` abre el selector de idiomas. Los nombres y mensajes que aún no cuentan con una traducción concreta usan inglés como alternativa.
 
 También se cambia con /ixkits idioma. Para que el cambio manual del archivo se aplique en caliente, ejecuta /ixkits recargar.
 
-Edita `plugins/IxKits/messages.yml` para personalizar el prefijo y los mensajes principales de portapapeles, reclamación, importación y exportación. Admite `&` legacy y RGB `&#RRGGBB` en español e inglés.
+Edita `plugins/IxKits/messages.yml` para personalizar el prefijo y los mensajes de portapapeles, reclamación, importación/exportación, generación de conjuntos, idioma y ayuda. Admite `&` legacy y RGB `&#RRGGBB`; hay secciones de mensajes en varios idiomas.
 
 ## Comandos principales
 
 | Comando | Función |
 |---|---|
-| /ixkits | Abrir la GUI principal |
+| /ixkits | Abrir el taller principal |
+| /ixkits help o /ixkits ayuda | Mostrar la ayuda ordenada por secciones |
 | /ixkits crear <nombre> | Crear un proyecto |
 | /ixkits editar <proyecto> | Abrir un proyecto |
 | /ixkits proyectos | Abrir la biblioteca paginada y con búsqueda |
@@ -133,7 +137,7 @@ Ejemplo de estilo configurable en `config.yml`:
       enchantment-line-format: "<#FBBF24>⚔ <#D1D5DB>{name} <#FDE68A>{level}"
       ability-line-format: "<#F87171>✦ <#FECACA>{name} <#9CA3AF>({cooldown})"
 
-Puedes personalizar los colores y símbolos de estas líneas con MiniMessage/RGB. El contenido generado se guarda como parte del lore cuando aplicas la plantilla; si luego cambias encantamientos o habilidades, vuelve a aplicar la plantilla para actualizar las líneas generadas. En el editor de encantamientos, Mayús + clic izquierdo permite indicar el nivel exacto (1–32767), incluso superior al máximo normal del juego; usa niveles altos solo si encajan con el balance de tu servidor.
+Puedes personalizar los colores y símbolos de estas líneas con MiniMessage/RGB. El contenido generado se guarda como parte del lore cuando aplicas la plantilla; si luego cambias encantamientos o habilidades, vuelve a aplicar la plantilla para actualizar las líneas generadas. En el editor de encantamientos, cada encantamiento muestra un icono propio (por ejemplo, 🔥 para Aspecto ígneo); los iconos pueden personalizarse en `lore.enchantment-icons` en `config.yml`. Mayús + clic izquierdo permite indicar el nivel exacto (1–32767), incluso superior al máximo normal del juego; usa niveles altos solo si encajan con el balance de tu servidor.
 
 Al solicitar texto, pulsa Cancelar en el mensaje del chat o escribe cancelar. Ambas formas abandonan esa entrada sin guardar el cambio pendiente.
 
