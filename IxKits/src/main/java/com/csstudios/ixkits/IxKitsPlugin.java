@@ -1409,16 +1409,45 @@ public final class IxKitsPlugin extends JavaPlugin implements Listener, CommandE
 
     private net.kyori.adventure.text.Component deserializeLoreLine(String line) {
         if (line == null || line.isEmpty()) return net.kyori.adventure.text.Component.empty();
-        String trimmed = line.trim();
+        String normalized = translateLegacyMarkupToMiniMessage(line);
+        String trimmed = normalized.trim();
         if (trimmed.matches("(?is).*<(?:/?(?:gradient|rainbow|bold|italic|underlined|strikethrough|obfuscated|reset|newline|color|white|gray|grey|dark_gray|dark_grey|black|dark_blue|blue|dark_green|green|dark_aqua|aqua|dark_red|red|dark_purple|light_purple|gold|yellow)|#[0-9a-f]{6})(?::[^>]*)?>.*")) {
             try {
-                return MiniMessage.miniMessage().deserialize(line);
+                return MiniMessage.miniMessage().deserialize(normalized);
             } catch (RuntimeException ignored) {
-                // Fall back to legacy color translation for malformed MiniMessage.
+                // Fall back to legacy color translation for malformed formatting codes.
             }
         }
         return net.kyori.adventure.text.serializer.legacy.LegacyComponentSerializer.legacySection()
             .deserialize(translateLoreColors(line));
+    }
+
+    /** Supports legacy &#RRGGBB gradients mixed with normal & color/format codes. */
+    private String translateLegacyMarkupToMiniMessage(String input) {
+        java.util.regex.Matcher hex = java.util.regex.Pattern.compile("(?i)&#([0-9a-f]{6})").matcher(input);
+        StringBuffer rgbConverted = new StringBuffer();
+        while (hex.find()) hex.appendReplacement(rgbConverted, java.util.regex.Matcher.quoteReplacement("<#" + hex.group(1) + ">"));
+        hex.appendTail(rgbConverted);
+        java.util.Map<Character, String> tags = java.util.Map.ofEntries(
+            java.util.Map.entry('0', "black"), java.util.Map.entry('1', "dark_blue"),
+            java.util.Map.entry('2', "dark_green"), java.util.Map.entry('3', "dark_aqua"),
+            java.util.Map.entry('4', "dark_red"), java.util.Map.entry('5', "dark_purple"),
+            java.util.Map.entry('6', "gold"), java.util.Map.entry('7', "gray"),
+            java.util.Map.entry('8', "dark_gray"), java.util.Map.entry('9', "blue"),
+            java.util.Map.entry('a', "green"), java.util.Map.entry('b', "aqua"),
+            java.util.Map.entry('c', "red"), java.util.Map.entry('d', "light_purple"),
+            java.util.Map.entry('e', "yellow"), java.util.Map.entry('f', "white"),
+            java.util.Map.entry('k', "obfuscated"), java.util.Map.entry('l', "bold"),
+            java.util.Map.entry('m', "strikethrough"), java.util.Map.entry('n', "underlined"),
+            java.util.Map.entry('o', "italic"), java.util.Map.entry('r', "reset"));
+        java.util.regex.Matcher legacy = java.util.regex.Pattern.compile("(?i)[&§]([0-9a-fk-or])").matcher(rgbConverted.toString());
+        StringBuffer converted = new StringBuffer();
+        while (legacy.find()) {
+            String tag = tags.get(Character.toLowerCase(legacy.group(1).charAt(0)));
+            if (tag != null) legacy.appendReplacement(converted, java.util.regex.Matcher.quoteReplacement("<" + tag + ">"));
+        }
+        legacy.appendTail(converted);
+        return converted.toString();
     }
 
     private List<net.kyori.adventure.text.Component> loreComponents(List<String> lines) {
@@ -1835,7 +1864,7 @@ public final class IxKitsPlugin extends JavaPlugin implements Listener, CommandE
                 }
                 configured = samples;
             }
-            List<String> preview = new ArrayList<>(configured.stream().limit(5).toList());
+            List<String> preview = new ArrayList<>(configured.stream().limit(Math.max(1, getConfig().getInt("lore.template-preview-lines", 5))).toList());
             preview.add("");
             preview.add(tr("§eClic izquierdo: aplicar plantilla", "§eLeft-click: apply template"));
             preview.add(tr("§dClic derecho: publicar en Community", "§dRight-click: publish to Community"));
