@@ -7,6 +7,14 @@ settings:
   project-format-version: 2
   community-catalog-enabled: false
 
+# Project claiming. By default, every player can claim a project.
+# Set permission to a permission node (for example ixkits.claim) to restrict it.
+# cooldown-seconds applies per player across all projects; 0 disables the cooldown.
+claim:
+  enabled: true
+  permission: ""
+  cooldown-seconds: 0
+
 # Optional online catalog. Keep disabled until the API is deployed.
 catalog:
   enabled: false
@@ -40,6 +48,10 @@ abilities:
 # Put {enchantments} or {abilities} alone on a lore template line to expand it.
 # Supported enchantment placeholders: {name}, {level}, {key}.
 # Supported ability placeholders: {name}, {cooldown}, {key}.
+# Lore preview length and dynamic line formatting.
+# Supports MiniMessage plus legacy & / § codes and per-character hex such as:
+# "&#F2FF00&lU&#F4F300&lS&#F6E800&lU&#F9DC00&lA&#FBD000&lR&#FDC500&lI&#FFB900&lO"
 lore:
+  template-preview-lines: 5
   enchantment-line-format: "<#FBBF24>⚔ <#D1D5DB>{name} <#FDE68A>{level}"
   ability-line-format: "<#F87171>✦ <#FECACA>{name} <#9CA3AF>({cooldown})"
