@@ -3899,9 +3899,21 @@ public final class IxKitsPlugin extends JavaPlugin implements Listener, CommandE
         return shownTier.isBlank() ? itemName : (isEnglish() ? shownTier + " " + itemName : itemName + " de " + shownTier.toLowerCase(Locale.ROOT));
     }
 
+    private boolean hasConflictingEnchant(ItemStack target, Enchantment candidate) {
+        for (Enchantment existing : target.getEnchantments().keySet()) {
+            if (existing.equals(candidate)) continue;
+            if (existing.conflictsWith(candidate) || candidate.conflictsWith(existing)) return true;
+        }
+        return false;
+    }
+
     private void copyCompatibleSetEnchantments(ItemStack source, ItemStack target) {
-        for (Map.Entry<Enchantment, Integer> entry : source.getEnchantments().entrySet()) {
-            if (entry.getKey().canEnchantItem(target)) target.addUnsafeEnchantment(entry.getKey(), entry.getValue());
+        List<Map.Entry<Enchantment, Integer>> entries = new ArrayList<>(source.getEnchantments().entrySet());
+        entries.sort(Comparator.comparing(entry -> entry.getKey().getKey().toString()));
+        for (Map.Entry<Enchantment, Integer> entry : entries) {
+            Enchantment enchantment = entry.getKey();
+            if (enchantment.canEnchantItem(target) && !hasConflictingEnchant(target, enchantment))
+                target.addUnsafeEnchantment(enchantment, entry.getValue());
         }
     }
 
@@ -3932,7 +3944,8 @@ public final class IxKitsPlugin extends JavaPlugin implements Listener, CommandE
 
     private void addSetEnchantment(ItemStack target, String key, int level) {
         Enchantment enchantment = Registry.ENCHANTMENT.get(NamespacedKey.minecraft(key));
-        if (enchantment != null && enchantment.canEnchantItem(target) && target.getEnchantmentLevel(enchantment) == 0)
+        if (enchantment != null && enchantment.canEnchantItem(target)
+            && target.getEnchantmentLevel(enchantment) == 0 && !hasConflictingEnchant(target, enchantment))
             target.addUnsafeEnchantment(enchantment, Math.max(1, Math.min(32767, level)));
     }
 
@@ -4687,6 +4700,7 @@ public final class IxKitsPlugin extends JavaPlugin implements Listener, CommandE
                 "<#38BDF8>| <#BAE6FD>Properties",
                 "<#38BDF8>• <#E0F2FE>Blocking and resistance",
                 "<gradient:#0C4A6E:#38BDF8>━━━━━━━━━━━━━━━━━━━━</gradient>"));
+        normalizeBuiltInLoreSpacing(lore);
         saveYaml(lore, loreFile);
 
         File paletteFile = new File(templatesDir, "palettes.yml");
@@ -4756,6 +4770,38 @@ public final class IxKitsPlugin extends JavaPlugin implements Listener, CommandE
         if (value.matches(".*(blade|sword|weapon|soulreaper|fang|vanguard_pvp|ranger_marksman|pvp|katana).*")) return "weapons";
         if (value.matches(".*(token|relic|cosmic|astral|abyss|demonic|legendary|special|resource|item|gladiator_badge).*")) return "items";
         return "misc";
+    }
+
+    private void normalizeBuiltInLoreSpacing(YamlConfiguration lore) {
+        Set<String> builtIns = Set.of(
+            "clean_pvp", "legendary", "miner", "demonic", "cosmic", "frost", "emerald", "astral_rgb", "abyss_rgb",
+            "aeris_blade_rgb", "soup_ignifuga_rgb", "mineral_ancient_rgb", "token_koth_rgb",
+            "armor_onyx_rgb", "sword_rpg_sections", "armor_vanguard_sections", "armor_dragon_rgb",
+            "tool_miner_sections", "archer_bow_sections", "set_weapon_sections", "set_tool_sections",
+            "set_armor_sections", "set_ranged_sections", "set_shield_sections"
+        );
+        for (String key : builtIns) {
+            normalizeLoreSpacingAt(lore, key + ".lore");
+            normalizeLoreSpacingAt(lore, key + ".lore_en");
+        }
+    }
+
+    private void normalizeLoreSpacingAt(YamlConfiguration yaml, String path) {
+        List<String> original = yaml.getStringList(path);
+        if (original.isEmpty()) return;
+        List<String> normalized = new ArrayList<>();
+        for (String line : original) {
+            String value = line == null ? "" : line;
+            boolean section = value.matches("(?i).*\\b(encantamientos|habilidades|efectos especiales|atributos|enchantments|abilities|special effects|attributes|set abilities)\\b.*");
+            if (section && !normalized.isEmpty() && !normalized.get(normalized.size() - 1).isBlank()) normalized.add("");
+            if (value.isBlank()) {
+                if (!normalized.isEmpty() && !normalized.get(normalized.size() - 1).isBlank()) normalized.add("");
+            } else {
+                normalized.add(value);
+            }
+        }
+        while (!normalized.isEmpty() && normalized.get(normalized.size() - 1).isBlank()) normalized.remove(normalized.size() - 1);
+        if (!normalized.equals(original)) yaml.set(path, normalized);
     }
 
     private void ensureLoreTemplate(YamlConfiguration yaml, String key, String displayEs, String displayEn, List<String> loreEs, List<String> loreEn) {
