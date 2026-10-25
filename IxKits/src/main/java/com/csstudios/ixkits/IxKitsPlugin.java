@@ -276,8 +276,8 @@ public final class IxKitsPlugin extends JavaPlugin implements Listener, CommandE
             File input = new File(projectService.importsDirectory(), safeName);
             String requestedName = args.length >= 3 ? String.join(" ", Arrays.copyOfRange(args, 2, args.length)) : null;
             try {
-                if (projectService.importNative(input, requestedName)) player.sendMessage(prefix() + tr("Proyecto importado y validado desde la carpeta imports.", "Project imported and validated from the imports folder."));
-                else player.sendMessage(prefix() + tr("No se pudo importar. Usa un archivo IxKits YAML válido y un nombre nuevo.", "Import failed. Use a valid IxKits YAML file and a new project name."));
+                if (projectService.importNative(input, requestedName)) player.sendMessage(prefix() + configuredMessage("import.success", "&aProyecto importado y validado desde la carpeta imports.", "&aProject imported and validated from the imports folder."));
+                else player.sendMessage(prefix() + configuredMessage("import.failed", "&cNo se pudo importar. Usa un YAML IxKits válido y un nombre nuevo.", "&cImport failed. Use a valid IxKits YAML file and a new project name."));
             } catch (IOException ex) { player.sendMessage(prefix() + "§c" + ex.getMessage()); }
             return true;
         }
@@ -396,7 +396,7 @@ public final class IxKitsPlugin extends JavaPlugin implements Listener, CommandE
             else player.sendMessage(prefix() + tr("No existe ese proyecto.", "That project does not exist."));
             return true;
         }
-        if (sub.equals("recargar")) { reloadConfig(); loadMessages(); initializeTemplates(); player.sendMessage(prefix() + tr("Configuración y plantillas recargadas.", "Configuration and templates reloaded.")); return true; }
+        if (sub.equals("recargar")) { reloadConfig(); loadMessages(); initializeTemplates(); player.sendMessage(prefix() + configuredMessage("general.reload-success", "&aConfiguración, mensajes y plantillas recargados.", "&aConfiguration, messages and templates reloaded.")); return true; }
         player.sendMessage(tr("§bIxKits §7— comandos:", "§bIxKits §7— commands:"));
         player.sendMessage(tr("§f/ixkits §8| §7Abrir editor", "§f/ixkits §8| §7Open studio"));
         player.sendMessage(tr("§f/ixkits crear <nombre> §8| §7Crear proyecto", "§f/ixkits crear <name> §8| §7Create project"));
@@ -2312,23 +2312,23 @@ public final class IxKitsPlugin extends JavaPlugin implements Listener, CommandE
 
     private void claimProjectItems(Player player, String[] args) {
         if (!getConfig().getBoolean("claim.enabled", true)) {
-            player.sendMessage(prefix() + tr("La reclamación de proyectos está desactivada por la configuración del servidor.", "Project claiming is disabled in the server configuration."));
+            player.sendMessage(prefix() + configuredMessage("claim.disabled", "&cLa reclamación de proyectos está desactivada por la configuración.", "&cProject claiming is disabled by server configuration."));
             return;
         }
         if (args.length < 2) {
-            player.sendMessage(prefix() + tr("Uso: §f/ixkits claim <proyecto>", "Usage: §f/ixkits claim <project>"));
+            player.sendMessage(prefix() + configuredMessage("claim.usage", "&eUso: §f/ixkits claim <proyecto>", "&eUsage: §f/ixkits claim <project>"));
             player.sendMessage(prefix() + tr("§7Entrega los objetos de las dos páginas y del equipamiento del proyecto.", "§7Gives items from both project pages and its equipment."));
             return;
         }
         String permission = getConfig().getString("claim.permission", "").trim();
         if (!permission.isEmpty() && !player.hasPermission(permission)) {
-            player.sendMessage(prefix() + tr("Necesitas el permiso §f" + permission + " §7para reclamar proyectos.", "You need permission §f" + permission + " §7to claim projects."));
+            player.sendMessage(prefix() + configuredMessage("claim.no-permission", "&cNecesitas el permiso &f{permission} &7para reclamar proyectos.", "&cYou need permission &f{permission} &7to claim projects.", "{permission}", permission));
             return;
         }
         String project = slug(String.join("-", Arrays.copyOfRange(args, 1, args.length)));
         File file = projectFile(project);
         if (!file.isFile()) {
-            player.sendMessage(prefix() + tr("No existe el proyecto §f" + project + "§7. Comprueba el nombre con §f/ixkits proyectos§7.", "Project §f" + project + " §7does not exist. Check the name with §f/ixkits proyectos§7."));
+            player.sendMessage(prefix() + configuredMessage("claim.not-found", "&cNo existe el proyecto &f{project}&c. Comprueba /ixkits proyectos.", "&cProject &f{project} &cdoes not exist. Check /ixkits proyectos.", "{project}", project));
             return;
         }
         long cooldownSeconds = Math.max(0L, getConfig().getLong("claim.cooldown-seconds", 0L));
@@ -2336,7 +2336,7 @@ public final class IxKitsPlugin extends JavaPlugin implements Listener, CommandE
         long now = System.currentTimeMillis();
         if (cooldownSeconds > 0 && lastClaim != null && now - lastClaim < cooldownSeconds * 1000L) {
             long remaining = Math.max(1L, (cooldownSeconds * 1000L - (now - lastClaim) + 999L) / 1000L);
-            player.sendMessage(prefix() + tr("Espera §e" + remaining + " s §7antes de reclamar otro proyecto.", "Wait §e" + remaining + "s §7before claiming another project."));
+            player.sendMessage(prefix() + configuredMessage("claim.cooldown", "&eEspera &f{remaining} s &eantes de reclamar otro proyecto.", "&eWait &f{remaining}s &ebefore claiming another project.", "{remaining}", String.valueOf(remaining)));
             return;
         }
         YamlConfiguration yaml = YamlConfiguration.loadConfiguration(file);
@@ -2352,14 +2352,14 @@ public final class IxKitsPlugin extends JavaPlugin implements Listener, CommandE
             if (stack != null && !stack.getType().isAir()) rewards.add(stack.clone());
         }
         if (rewards.isEmpty()) {
-            player.sendMessage(prefix() + tr("Ese proyecto no contiene objetos para reclamar.", "That project has no items to claim."));
+            player.sendMessage(prefix() + configuredMessage("claim.empty", "&eEse proyecto no contiene objetos para reclamar.", "&eThat project has no items to claim."));
             return;
         }
         Map<Integer, ItemStack> overflow = player.getInventory().addItem(rewards.toArray(new ItemStack[0]));
         overflow.values().forEach(stack -> player.getWorld().dropItemNaturally(player.getLocation(), stack));
         if (cooldownSeconds > 0) claimCooldowns.put(player.getUniqueId(), now);
-        player.sendMessage(prefix() + tr("§a✓ Proyecto reclamado: §f", "§a✓ Project claimed: §f") + yaml.getString("name", project));
-        player.sendMessage(prefix() + tr("§7Pilas de objetos entregadas: §b", "§7Item stacks delivered: §b") + rewards.size()
+        player.sendMessage(prefix() + configuredMessage("claim.success", "&a✓ Proyecto reclamado: &f{project}", "&a✓ Project claimed: &f{project}", "{project}", yaml.getString("name", project)));
+        player.sendMessage(prefix() + configuredMessage("claim.details", "&7Pilas de objetos entregadas: &b{count}", "&7Item stacks delivered: &b{count}", "{count}", String.valueOf(rewards.size()))
             + (overflow.isEmpty() ? "" : tr(" §8• Los sobrantes se dejaron en el suelo.", " §8• Overflow items were dropped nearby.")));
         player.playSound(player.getLocation(), org.bukkit.Sound.ENTITY_ITEM_PICKUP, 0.7f, 1.1f);
     }
@@ -3541,8 +3541,8 @@ public final class IxKitsPlugin extends JavaPlugin implements Listener, CommandE
         y.set("ixkits-export.summary.lore-lines", loreLineCount);
         y.set("ixkits-export.generator", "IxKits by CS Studios");
         saveYaml(y, out);
-        p.sendMessage(prefix() + tr("§a✓ EXPORTACIÓN COMPLETADA", "§a✓ EXPORT COMPLETE"));
-        p.sendMessage(prefix() + tr("§7Archivo: §bplugins/IxKits/exports/", "§7File: §bplugins/IxKits/exports/") + out.getName());
+        p.sendMessage(prefix() + configuredMessage("export.success", "&a✓ EXPORTACIÓN COMPLETADA", "&a✓ EXPORT COMPLETE"));
+        p.sendMessage(prefix() + configuredMessage("export.file", "&7Archivo: &bplugins/IxKits/exports/{file}", "&7File: &bplugins/IxKits/exports/{file}", "{file}", out.getName()));
         p.sendMessage(prefix() + tr("§7Objetos: §b", "§7Items: §b") + stackCount + " §8• §7" + tr("Piezas de equipo: §b", "Equipment pieces: §b") + equipmentCount);
         p.sendMessage(prefix() + tr("§7Encantamientos: §b", "§7Enchantments: §b") + enchantmentCount + " §8• §7" + tr("Líneas de lore: §b", "Lore lines: §b") + loreLineCount);
         p.sendMessage(prefix() + tr("§8Formato nativo: conserva objetos, metadatos y equipamiento serializados.", "§8Native format preserves serialized items, metadata and equipment."));
@@ -3972,13 +3972,15 @@ public final class IxKitsPlugin extends JavaPlugin implements Listener, CommandE
                 "<gradient:#E4E4E7:#A78BFA><bold>SET DE ÓNIX</bold></gradient>",
                 "<#D4D4D8>Armadura tallada en piedra de las profundidades.", "",
                 "<#A78BFA>◆ <#F4F4F5>Encantamientos", "{enchantments}", "",
-                "<#C4B5FD>✦ Habilidades: <#A78BFA>{abilities}",
+                "<#C4B5FD>✦ Habilidades:",
+                "{abilities}",
                 "<gradient:#18181B:#A78BFA>━━━━━━━━━━━━━━━━━━━━</gradient>"),
             List.of("<gradient:#18181B:#A78BFA>━━━━━━━━━━━━━━━━━━━━</gradient>",
                 "<gradient:#E4E4E7:#A78BFA><bold>ONYX ARMOR SET</bold></gradient>",
                 "<#D4D4D8>Armor carved from the stone of the deep.", "",
                 "<#A78BFA>◆ <#F4F4F5>Enchantments", "{enchantments}", "",
-                "<#C4B5FD>✦ Abilities: <#A78BFA>{abilities}",
+                "<#C4B5FD>✦ Abilities:",
+                "{abilities}",
                 "<gradient:#18181B:#A78BFA>━━━━━━━━━━━━━━━━━━━━</gradient>"));
         ensureLoreTemplate(lore, "soup_ignifuga_rgb", "&#F97316✦ &lSopa Ignífuga", "&#F97316✦ &lFireproof Soup",
             List.of("<gradient:#7C2D12:#F97316>━━━━━━━━━━━━━━━━━━━━</gradient>",
