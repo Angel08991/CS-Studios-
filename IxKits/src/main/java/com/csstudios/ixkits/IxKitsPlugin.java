@@ -2219,6 +2219,178 @@ public final class IxKitsPlugin extends JavaPlugin implements Listener, CommandE
         else openPaletteTemplates(p, 0, null, 0, -1, scope);
     }
 
+    private void openItemEditor(Player p, String project, int page, int targetSlot) {
+        ItemStack target = getProjectItem(project, page, targetSlot);
+        if (target == null || target.getType().isAir()) {
+            p.sendMessage(prefix() + tr("§eEste espacio está vacío. Coloca un objeto antes de abrir el taller.", "§eThis slot is empty. Place an item before opening the workshop."));
+            if (targetSlot < 0) openEquipment(p, project, page); else openEditor(p, project, page);
+            return;
+        }
+        ItemMeta meta = target.getItemMeta();
+        String displayName = itemDisplayName(target);
+        Inventory inv = menu("item-editor", project, page, targetSlot, 0,
+            tr("§3✦ §bIXKITS §8» §0Taller de objeto", "§3✦ §bIXKITS §8» §0Item workshop"));
+        border(inv);
+        inv.setItem(4, target.clone());
+
+        inv.setItem(10, item(Material.NAME_TAG, "§b§l01  " + tr("Nombre del objeto", "Item name"),
+            tr("§8Actual: §f", "§8Current: §f") + displayName, "",
+            tr("§7MiniMessage · RGB · Gradientes", "§7MiniMessage · RGB · Gradients"), "",
+            tr("§eClic para editar el título", "§eClick to edit the title")));
+        inv.setItem(11, item(Material.WRITABLE_BOOK, "§b§l02  " + tr("Editor de lore", "Lore editor"),
+            tr("§7Diseña la descripción línea por línea.", "§7Build the description line by line."), "",
+            tr("§8• §7Editar, borrar y ordenar líneas", "§8• §7Edit, delete and reorder lines"),
+            tr("§8• §7Añadir separadores vacíos", "§8• §7Add blank spacer lines"),
+            tr("§8• §7Vista previa de RGB y gradientes", "§8• §7Preview RGB and gradients"), "",
+            tr("§eClic para editar el lore", "§eClick to edit lore")));
+        inv.setItem(12, item(Material.WRITABLE_BOOK, "§d§l03  " + tr("Plantillas de lore", "Lore templates"),
+            tr("§7Armas, armaduras, herramientas,", "§7Weapons, armor, tools,"),
+            tr("§7consumibles, minerales y tokens.", "§7consumables, minerals and tokens."), "",
+            tr("§a✓ §7Plantillas dinámicas disponibles", "§a✓ §7Dynamic templates available"),
+            tr("§7para encantamientos y habilidades.", "§7for enchantments and abilities."), "",
+            tr("§eClic para explorar categorías", "§eClick to browse categories")));
+        inv.setItem(13, item(Material.ENCHANTED_BOOK, "§b§l04  " + tr("Encantamientos", "Enchantments"),
+            tr("§7Clic: subir nivel", "§7Click: raise level"),
+            tr("§7Clic derecho: bajar nivel", "§7Right-click: lower level"),
+            tr("§7Mayús + clic: nivel exacto", "§7Shift-click: exact level"), "",
+            tr("§eClic para abrir el editor", "§eClick to open the editor")));
+        inv.setItem(14, item(Material.BOOKSHELF, "§d§l05  " + tr("Presets de encantamientos", "Enchantment presets"),
+            tr("§7Aplica combinaciones guardadas.", "§7Apply saved enchantment combinations."), "",
+            tr("§eClic para elegir preset", "§eClick to choose a preset")));
+        inv.setItem(15, item(Material.NETHER_STAR, "§c§l06  " + tr("Habilidades especiales", "Special abilities"),
+            tr("§7Poderes individuales por objeto.", "§7Per-item special powers."), "",
+            tr("§8• §7Fuego, escarcha, veneno y rayo", "§8• §7Flame, frost, poison and lightning"),
+            tr("§8• §7TNT, robo de vida e impacto", "§8• §7TNT, lifesteal and knockback"), "",
+            tr("§eClic para configurar", "§eClick to configure")));
+        inv.setItem(16, item(Material.SHIELD, "§d§l07  " + tr("Propiedades especiales", "Special properties"),
+            tr("§7Escudos, estandartes, libros,", "§7Shields, banners, books,"),
+            tr("§7adornos, cabezas y fuegos artificiales.", "§7trims, player heads and fireworks."), "",
+            tr("§eClic para abrir herramientas", "§eClick to open tools")));
+
+        inv.setItem(19, item(Material.CYAN_DYE, "§b§l08  " + tr("Paleta RGB", "RGB palette"),
+            tr("§7Aplica colores al nombre, al lore", "§7Apply colors to the name, the lore"),
+            tr("§7o a ambos de forma independiente.", "§7or both independently."), "",
+            tr("§eClic para elegir paleta y destino", "§eClick to choose palette and target")));
+        inv.setItem(20, item(Material.IRON_BLOCK, "§b§l09  " + tr("Irrompible", "Unbreakable"),
+            meta.isUnbreakable() ? tr("§a✓ Activado", "§a✓ Enabled") : tr("§8○ Desactivado", "§8○ Disabled"), "",
+            tr("§7Alterna la propiedad del objeto.", "§7Toggle the item's unbreakable property."), "",
+            tr("§eClic para cambiar", "§eClick to toggle")));
+        String durabilityText = target.getType().getMaxDurability() > 0 && meta instanceof Damageable damageable
+            ? Math.max(0, 100 - damageable.getDamage() * 100 / Math.max(1, target.getType().getMaxDurability())) + "%"
+            : tr("No aplica", "Not applicable");
+        inv.setItem(21, item(Material.ANVIL, "§b§l10  " + tr("Durabilidad", "Durability"),
+            tr("§7Estado actual: §f", "§7Current status: §f") + durabilityText, "",
+            tr("§7Clic: daño +10 · Derecho: -10", "§7Click: +10 damage · Right-click: -10"),
+            tr("§7Mayús + clic: reparar", "§7Shift-click: repair")));
+        inv.setItem(22, item(Material.CARVED_PUMPKIN, "§b§l11  " + tr("Modelo personalizado", "Custom model data"),
+            tr("§7Define o borra el modelo numérico.", "§7Set or clear the numeric model value."), "",
+            tr("§eClic para escribir", "§eClick to enter a value")));
+        inv.setItem(23, item(Material.BRUSH, "§b§l12  " + tr("Atributos", "Attributes"),
+            tr("§7Salud, daño, velocidad, armadura", "§7Health, damage, speed, armor"),
+            tr("§7y otros modificadores.", "§7and other modifiers."), "",
+            tr("§eClic para abrir atributos", "§eClick to open attributes")));
+        inv.setItem(24, item(Material.GLASS, "§b§l13  " + tr("Flags del objeto", "Item flags"),
+            tr("§7Muestra u oculta atributos y", "§7Show or hide attributes and"),
+            tr("§7propiedades en la descripción.", "§7properties in the tooltip."), "",
+            tr("§eClic para administrar flags", "§eClick to manage flags")));
+        inv.setItem(25, item(Material.LEATHER_CHESTPLATE, "§b§l14  " + tr("Color de cuero", "Leather color"),
+            tr("§7Solo disponible para cuero.", "§7Only available for leather armor."), "",
+            tr("§eClic y escribe #RRGGBB o R,G,B", "§eClick and type #RRGGBB or R,G,B")));
+
+        inv.setItem(28, item(Material.POTION, "§b§l15  " + tr("Poción y efectos", "Potion and effects"),
+            tr("§7Cambia tipo base y efectos", "§7Change the base type and"),
+            tr("§7personalizados de la poción.", "§7custom potion effects."), "",
+            tr("§eClic para editar", "§eClick to edit")));
+        inv.setItem(29, item(Material.PAPER, "§b§l16  " + tr("Copiar objeto", "Copy item"),
+            tr("§7Guarda una copia exacta con", "§7Save an exact copy with"),
+            tr("§7nombre, lore y metadatos.", "§7name, lore and metadata."), "",
+            tr("§eClic para copiar", "§eClick to copy")));
+        inv.setItem(30, item(Material.CHEST, "§b§l17  " + tr("Portapapeles", "Clipboard"),
+            clipboardItem(p.getUniqueId()) != null ? tr("§a● Hay una copia guardada", "§a● A copy is saved") : tr("§8○ Está vacío", "§8○ It is empty"), "",
+            tr("§7La copia persiste tras reiniciar.", "§7The copy survives restarts."), "",
+            tr("§eClic para ver, pegar o vaciar", "§eClick to inspect, paste or clear")));
+        List<String> details = new ArrayList<>();
+        details.add("§8§m━━━━━━━━━━━━━━━━━━━━");
+        details.add("§b§l" + tr("RESUMEN DEL OBJETO", "ITEM SUMMARY"));
+        details.add("");
+        details.add("§7" + tr("Tipo", "Type") + ": §f" + prettyKey(target.getType().name()));
+        details.add("§7" + tr("Cantidad", "Amount") + ": §f" + target.getAmount());
+        details.add("§7" + tr("Nombre", "Name") + ": §f" + displayName);
+        details.add("§7" + tr("Líneas de lore", "Lore lines") + ": §b" + (meta.lore() == null ? 0 : meta.lore().size()));
+        details.add("§7" + tr("Encantamientos", "Enchantments") + ": §b" + target.getEnchantments().size());
+        target.getEnchantments().entrySet().stream()
+            .sorted(Comparator.comparing(entry -> entry.getKey().getKey().toString()))
+            .forEach(entry -> details.add("§8• §f" + enchantmentIcon(entry.getKey()) + " " + enchantmentDisplayName(entry.getKey()) + " §e" + romanLevel(entry.getValue())));
+        details.add("");
+        List<String> activeAbilities = generatedAbilityLore(target);
+        details.add("§7" + tr("Habilidades activas", "Active abilities") + ": §d" + activeAbilities.size());
+        if (activeAbilities.isEmpty()) details.add("§8• " + tr("Sin habilidades", "No abilities enabled"));
+        else details.addAll(activeAbilities.stream().map(line -> "§8• " + translateLoreColors(line)).toList());
+        details.add("");
+        details.add(meta.isUnbreakable() ? "§a✓ " + tr("Irrompible", "Unbreakable") : "§8○ " + tr("Durabilidad normal", "Normal durability"));
+        details.add("§8§m━━━━━━━━━━━━━━━━━━━━");
+        inv.setItem(31, itemWithLore(Material.PAPER, "§f§l18  " + tr("Detalles del objeto", "Item details"), details));
+        inv.setItem(32, item(Material.CRAFTING_TABLE, "§a§l19  " + tr("Rellenar conjunto", "Fill complete set"),
+            tr("§7Genera herramientas y armaduras", "§7Generates tools and armor"),
+            tr("§7que falten en este proyecto.", "§7missing from this project."), "",
+            tr("§8• §7Solo completa espacios vacíos", "§8• §7Only fills empty slots"),
+            tr("§8• §7Adapta encantamientos por tipo", "§8• §7Chooses enchantments by item type"),
+            tr("§8• §7Nunca pone Filo en picos o palas", "§8• §7Never puts Sharpness on picks or shovels"), "",
+            tr("§eClic para generar el conjunto", "§eClick to generate the set")));
+        inv.setItem(33, item(Material.BARRIER, "§c§l20  " + tr("Quitar encantamientos", "Remove enchantments"),
+            tr("§7Quita los encantamientos de este", "§7Removes all enchantments from this"),
+            tr("§7objeto sin tocar los demás.", "§7item without affecting other items."), "",
+            tr("§eClic para limpiar", "§eClick to clear")));
+        inv.setItem(34, item(Material.REDSTONE, "§e§lGuardado automático",
+            "§7" + tr("Los cambios se guardan al aplicar.", "Changes save when applied."), "",
+            "§8✦ §7CS Studios"));
+        inv.setItem(45, item(Material.ARROW, "§7← " + tr("Volver al proyecto", "Back to project")));
+        inv.setItem(49, item(Material.BOOK, "§f§l" + tr("Guía rápida", "Quick guide"),
+            tr("§7Elige una herramienta en las filas", "§7Choose a tool in the rows"),
+            tr("§7superiores para personalizar el objeto.", "§7above to customize your item."), "",
+            tr("§8No se modifican otros objetos del kit.", "§8Other items in the kit are untouched.")));
+        p.openInventory(inv);
+    }
+
+    private void openClipboard(Player p, String project, int page, int targetSlot) {
+        ItemStack current = getProjectItem(project, page, targetSlot);
+        ItemStack copied = clipboardItem(p.getUniqueId());
+        Inventory inv = menu("clipboard", project, page, targetSlot, 0,
+            tr("§3✦ §bIXKits Studio §8• §0Portapapeles", "§3✦ §bIXKits Studio §8• §0Clipboard"));
+        border(inv);
+        inv.setItem(4, item(Material.CHEST, tr("§b§lPortapapeles de objetos", "§b§lItem clipboard"),
+            tr("§7Copia, consulta, reemplaza y reutiliza objetos.", "§7Copy, inspect, replace and reuse items."), "",
+            tr("§8La copia se guarda en disco y sobrevive a reinicios.", "§8The copy is saved to disk and survives restarts.")));
+        inv.setItem(20, item(current == null || current.getType().isAir() ? Material.BARRIER : current.getType(),
+            tr("§aCopiar objeto actual", "§aCopy current item"),
+            tr("§7Objeto: §f", "§7Item: §f") + itemDisplayName(current), "",
+            tr("§eClic para guardar una copia", "§eClick to save a copy")));
+        if (copied == null || copied.getType().isAir()) {
+            inv.setItem(22, item(Material.BARRIER, tr("§cPortapapeles vacío", "§cClipboard is empty"),
+                tr("§7Copia un objeto del proyecto para comenzar.", "§7Copy a project item to get started."), "",
+                tr("§8Conserva nombre, lore, encantamientos y metadatos.", "§8Preserves name, lore, enchantments and metadata.")));
+            inv.setItem(24, item(Material.GRAY_DYE, tr("§7Reemplazar objeto actual", "§7Replace current item"),
+                tr("§cCopia un objeto antes de usar esta acción.", "§cCopy an item before using this action.")));
+        } else {
+            inv.setItem(22, copied.clone());
+            inv.setItem(24, item(Material.LIME_DYE, tr("§aReemplazar objeto actual", "§aReplace current item"),
+                tr("§7Sustituye el objeto seleccionado por la copia.", "§7Replace the selected item with the saved copy."), "",
+                tr("§eClic para reemplazar", "§eClick to replace")));
+        }
+        inv.setItem(29, item(Material.LAVA_BUCKET, tr("§cVaciar portapapeles", "§cClear clipboard"),
+            tr("§7Eliminar la copia guardada en disco.", "§7Remove the saved copy from disk."), "",
+            tr("§eClic para vaciar", "§eClick to clear")));
+        inv.setItem(31, item(Material.CHEST, tr("§bPegar en otra ranura", "§bPaste into another slot"),
+            tr("§7Vuelve al proyecto y haz clic izquierdo", "§7Return to the project and left-click"),
+            tr("§7en una ranura vacía para duplicar la copia.", "§7an empty slot to duplicate the copy.")));
+        inv.setItem(45, item(Material.ARROW, tr("§7Volver al editor", "§7Back to editor")));
+        inv.setItem(49, item(Material.PAPER, tr("§fResumen", "§fSummary"),
+            tr("§7Objeto actual: §f", "§7Current item: §f") + itemDisplayName(current), "",
+            tr("§7Portapapeles: §f", "§7Clipboard: §f") + itemDisplayName(copied)));
+        p.openInventory(inv);
+    }
+
+
     private void claimProjectItems(Player player, String[] args) {
         if (!getConfig().getBoolean("claim.enabled", true)) {
             player.sendMessage(prefix() + configuredMessage("claim.disabled", "&cLa reclamación de proyectos está desactivada por la configuración.", "&cProject claiming is disabled by server configuration."));
