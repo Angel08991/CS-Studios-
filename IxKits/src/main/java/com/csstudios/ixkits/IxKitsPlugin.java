@@ -1893,8 +1893,8 @@ public final class IxKitsPlugin extends JavaPlugin implements Listener, CommandE
         border(inv);
         MenuHolder holder = (MenuHolder) inv.getHolder();
         YamlConfiguration lore = YamlConfiguration.loadConfiguration(new File(templatesDir, "lore.yml"));
-        String[] categories = {"weapons", "armor", "items", "minerals", "consumables", "misc", "all"};
-        int[] slots = {20, 22, 24, 29, 31, 33, 35};
+        String[] categories = {"weapons", "armor", "tools", "items", "minerals", "consumables", "misc", "all"};
+        int[] slots = {20, 22, 24, 29, 31, 33, 35, 37};
         for (int i = 0; i < categories.length; i++) {
             String category = categories[i];
             long count = lore.getKeys(false).stream().filter(key -> !lore.getStringList(key + ".lore").isEmpty())
@@ -1921,6 +1921,7 @@ public final class IxKitsPlugin extends JavaPlugin implements Listener, CommandE
         return switch (category) {
             case "weapons" -> tr("Armas", "Weapons");
             case "armor" -> tr("Armaduras", "Armor");
+            case "tools" -> tr("Herramientas", "Tools");
             case "items" -> tr("Objetos especiales", "Special items");
             case "minerals" -> tr("Minerales y materiales", "Minerals and materials");
             case "consumables" -> tr("Consumibles", "Consumables");
@@ -1933,6 +1934,7 @@ public final class IxKitsPlugin extends JavaPlugin implements Listener, CommandE
         return switch (category) {
             case "weapons" -> Material.DIAMOND_SWORD;
             case "armor" -> Material.NETHERITE_CHESTPLATE;
+            case "tools" -> Material.DIAMOND_PICKAXE;
             case "items" -> Material.NETHER_STAR;
             case "minerals" -> Material.DIAMOND;
             case "consumables" -> Material.GOLDEN_APPLE;
@@ -3978,6 +3980,156 @@ public final class IxKitsPlugin extends JavaPlugin implements Listener, CommandE
                 "<#EF4444>◆ <#FECACA>Quality: <#EF4444>★★★★★", "",
                 "<#F87171>✔ Use it at /warp trades",
                 "<gradient:#450A0A:#EF4444>━━━━━━━━━━━━━━━━━━━━</gradient>"));
+        ensureLoreTemplate(lore, "sword_rpg_sections", "&#FBBF24⚔ &lEspada de leyenda", "&#FBBF24⚔ &lLegendary Sword",
+            List.of("<gradient:#78350F:#FBBF24>━━━━━━━━━━━━━━━━━━━━</gradient>",
+                "<gradient:#FDE68A:#F59E0B><bold>ESPADA DE LEYENDA</bold></gradient>",
+                "<#D6D3D1>Un arma hecha para decidir la batalla.", "",
+                "<#FBBF24>| <#FDE68A>Encantamientos",
+                "{enchantments}", "",
+                "<#C084FC>| <#E9D5FF>Habilidades",
+                "{abilities}", "",
+                "<gradient:#FDE68A:#F59E0B>✦ Que comience la leyenda.</gradient>"),
+            List.of("<gradient:#78350F:#FBBF24>━━━━━━━━━━━━━━━━━━━━</gradient>",
+                "<gradient:#FDE68A:#F59E0B><bold>LEGENDARY SWORD</bold></gradient>",
+                "<#D6D3D1>A weapon made to decide the battle.", "",
+                "<#FBBF24>| <#FDE68A>Enchantments",
+                "{enchantments}", "",
+                "<#C084FC>| <#E9D5FF>Abilities",
+                "{abilities}", "",
+                "<gradient:#FDE68A:#F59E0B>✦ Let the legend begin.</gradient>"));
+        ensureLoreTemplate(lore, "armor_vanguard_sections", "&#38BDF8✦ &lArmadura Vanguard", "&#38BDF8✦ &lVanguard Armor",
+            List.of("<gradient:#0C4A6E:#38BDF8>━━━━━━━━━━━━━━━━━━━━</gradient>",
+                "<gradient:#BAE6FD:#38BDF8><bold>SET VANGUARD</bold></gradient>",
+                "<#CBD5E1>Protección equilibrada para el combate.", "",
+                "<#38BDF8>| <#BAE6FD>Encantamientos",
+                "{enchantments}", "",
+                "<#A78BFA>| <#DDD6FE>Habilidades del set",
+                "{abilities}", "",
+                "<gradient:#0C4A6E:#38BDF8>━━━━━━━━━━━━━━━━━━━━</gradient>"),
+            List.of("<gradient:#0C4A6E:#38BDF8>━━━━━━━━━━━━━━━━━━━━</gradient>",
+                "<gradient:#BAE6FD:#38BDF8><bold>VANGUARD SET</bold></gradient>",
+                "<#CBD5E1>Balanced protection for combat.", "",
+                "<#38BDF8>| <#BAE6FD>Enchantments",
+                "{enchantments}", "",
+                "<#A78BFA>| <#DDD6FE>Set abilities",
+                "{abilities}", "",
+                "<gradient:#0C4A6E:#38BDF8>━━━━━━━━━━━━━━━━━━━━</gradient>"));
+        ensureLoreTemplate(lore, "armor_dragon_rgb", "&#F87171✦ &lArmadura Dracónica", "&#F87171✦ &lDragon Armor",
+            List.of("<gradient:#450A0A:#F87171>━━━━━━━━━━━━━━━━━━━━</gradient>",
+                "<gradient:#FCA5A5:#FB7185><bold>ARMADURA DRACÓNICA</bold></gradient>",
+                "<#FECACA>Forjada bajo el aliento de un dragón.", "",
+                "<#FB7185>| <#FECACA>Encantamientos",
+                "{enchantments}", "",
+                "<#FBBF24>✦ <#FDE68A>Resistencia ancestral",
+                "<gradient:#450A0A:#F87171>━━━━━━━━━━━━━━━━━━━━</gradient>"),
+            List.of("<gradient:#450A0A:#F87171>━━━━━━━━━━━━━━━━━━━━</gradient>",
+                "<gradient:#FCA5A5:#FB7185><bold>DRAGON ARMOR</bold></gradient>",
+                "<#FECACA>Forged beneath a dragon's breath.", "",
+                "<#FB7185>| <#FECACA>Enchantments",
+                "{enchantments}", "",
+                "<#FBBF24>✦ <#FDE68A>Ancient resilience",
+                "<gradient:#450A0A:#F87171>━━━━━━━━━━━━━━━━━━━━</gradient>"));
+        ensureLoreTemplate(lore, "tool_miner_sections", "&#22D3EE⛏ &lHerramienta de minero", "&#22D3EE⛏ &lMiner's Tool",
+            List.of("<gradient:#164E63:#22D3EE>━━━━━━━━━━━━━━━━━━━━</gradient>",
+                "<gradient:#CFFAFE:#22D3EE><bold>HERRAMIENTA DE MINERO</bold></gradient>",
+                "<#A5F3FC>Diseñada para extraer recursos con eficiencia.", "",
+                "<#22D3EE>| <#CFFAFE>Encantamientos",
+                "{enchantments}", "",
+                "<#67E8F9>◆ Recolección · Precisión · Durabilidad",
+                "<gradient:#164E63:#22D3EE>━━━━━━━━━━━━━━━━━━━━</gradient>"),
+            List.of("<gradient:#164E63:#22D3EE>━━━━━━━━━━━━━━━━━━━━</gradient>",
+                "<gradient:#CFFAFE:#22D3EE><bold>MINER'S TOOL</bold></gradient>",
+                "<#A5F3FC>Designed for efficient resource gathering.", "",
+                "<#22D3EE>| <#CFFAFE>Enchantments",
+                "{enchantments}", "",
+                "<#67E8F9>◆ Gathering · Precision · Durability",
+                "<gradient:#164E63:#22D3EE>━━━━━━━━━━━━━━━━━━━━</gradient>"));
+        ensureLoreTemplate(lore, "archer_bow_sections", "&#F472B6➶ &lArco de tirador", "&#F472B6➶ &lMarksman's Bow",
+            List.of("<gradient:#831843:#F472B6>━━━━━━━━━━━━━━━━━━━━</gradient>",
+                "<gradient:#FBCFE8:#F472B6><bold>ARCO DEL TIRADOR</bold></gradient>",
+                "<#FCE7F3>Cada flecha encuentra su destino.", "",
+                "<#F472B6>| <#FBCFE8>Encantamientos",
+                "{enchantments}", "",
+                "<#C084FC>✦ <#E9D5FF>Habilidad: precisión absoluta",
+                "<gradient:#831843:#F472B6>━━━━━━━━━━━━━━━━━━━━</gradient>"),
+            List.of("<gradient:#831843:#F472B6>━━━━━━━━━━━━━━━━━━━━</gradient>",
+                "<gradient:#FBCFE8:#F472B6><bold>MARKSMAN'S BOW</bold></gradient>",
+                "<#FCE7F3>Every arrow finds its mark.", "",
+                "<#F472B6>| <#FBCFE8>Enchantments",
+                "{enchantments}", "",
+                "<#C084FC>✦ <#E9D5FF>Ability: absolute precision",
+                "<gradient:#831843:#F472B6>━━━━━━━━━━━━━━━━━━━━</gradient>"));
+
+        // Plantillas enlazadas para que el lore generado cambie con los encantamientos/habilidades.
+        ensureLoreTemplate(lore, "set_weapon_sections", "&#FBBF24⚔ &lArma de conjunto", "&#FBBF24⚔ &lSet Weapon",
+            List.of("<gradient:#334155:#94A3B8>━━━━━━━━━━━━━━━━━━━━</gradient>",
+                "<gradient:#F8FAFC:#94A3B8><bold>{item}</bold></gradient>",
+                "<#94A3B8>Personalizado por IxKits · CS Studios.", "",
+                "<#FBBF24>| <#FDE68A>Encantamientos",
+                "{enchantments}", "",
+                "<#C084FC>| <#DDD6FE>Habilidades",
+                "{abilities}", "",
+                "<gradient:#334155:#94A3B8>━━━━━━━━━━━━━━━━━━━━</gradient>"),
+            List.of("<gradient:#334155:#94A3B8>━━━━━━━━━━━━━━━━━━━━</gradient>",
+                "<gradient:#F8FAFC:#94A3B8><bold>{item}</bold></gradient>",
+                "<#94A3B8>Customized with IxKits · CS Studios.", "",
+                "<#FBBF24>| <#FDE68A>Enchantments",
+                "{enchantments}", "",
+                "<#C084FC>| <#DDD6FE>Abilities",
+                "{abilities}", "",
+                "<gradient:#334155:#94A3B8>━━━━━━━━━━━━━━━━━━━━</gradient>"));
+        ensureLoreTemplate(lore, "set_tool_sections", "&#22D3EE⛏ &lHerramienta de conjunto", "&#22D3EE⛏ &lSet Tool",
+            List.of("<gradient:#164E63:#22D3EE>━━━━━━━━━━━━━━━━━━━━</gradient>",
+                "<gradient:#CFFAFE:#22D3EE><bold>{item}</bold></gradient>",
+                "<#A5F3FC>Herramienta preparada para recolectar recursos.", "",
+                "<#22D3EE>| <#CFFAFE>Encantamientos",
+                "{enchantments}", "",
+                "<gradient:#164E63:#22D3EE>✦ Eficiencia · Durabilidad · Precisión</gradient>"),
+            List.of("<gradient:#164E63:#22D3EE>━━━━━━━━━━━━━━━━━━━━</gradient>",
+                "<gradient:#CFFAFE:#22D3EE><bold>{item}</bold></gradient>",
+                "<#A5F3FC>Tool prepared for efficient resource gathering.", "",
+                "<#22D3EE>| <#CFFAFE>Enchantments",
+                "{enchantments}", "",
+                "<gradient:#164E63:#22D3EE>✦ Efficiency · Durability · Precision</gradient>"));
+        ensureLoreTemplate(lore, "set_armor_sections", "&#A78BFA◆ &lArmadura de conjunto", "&#A78BFA◆ &lSet Armor",
+            List.of("<gradient:#312E81:#A78BFA>━━━━━━━━━━━━━━━━━━━━</gradient>",
+                "<gradient:#EDE9FE:#A78BFA><bold>{item}</bold></gradient>",
+                "<#C4B5FD>Protección equilibrada para tu conjunto.", "",
+                "<#A78BFA>| <#DDD6FE>Encantamientos",
+                "{enchantments}", "",
+                "<gradient:#312E81:#A78BFA>✦ Defensa · Resistencia · Equilibrio</gradient>"),
+            List.of("<gradient:#312E81:#A78BFA>━━━━━━━━━━━━━━━━━━━━</gradient>",
+                "<gradient:#EDE9FE:#A78BFA><bold>{item}</bold></gradient>",
+                "<#C4B5FD>Balanced protection for your armor set.", "",
+                "<#A78BFA>| <#DDD6FE>Enchantments",
+                "{enchantments}", "",
+                "<gradient:#312E81:#A78BFA>✦ Defense · Resistance · Balance</gradient>"));
+        ensureLoreTemplate(lore, "set_ranged_sections", "&#F472B6➶ &lArma a distancia", "&#F472B6➶ &lRanged Weapon",
+            List.of("<gradient:#831843:#F472B6>━━━━━━━━━━━━━━━━━━━━</gradient>",
+                "<gradient:#FCE7F3:#F472B6><bold>{item}</bold></gradient>",
+                "<#FBCFE8>Preparado para ataques a distancia.", "",
+                "<#F472B6>| <#FBCFE8>Encantamientos",
+                "{enchantments}", "",
+                "<gradient:#831843:#F472B6>✦ Precisión · Control · Alcance</gradient>"),
+            List.of("<gradient:#831843:#F472B6>━━━━━━━━━━━━━━━━━━━━</gradient>",
+                "<gradient:#FCE7F3:#F472B6><bold>{item}</bold></gradient>",
+                "<#FBCFE8>Ready for ranged combat.", "",
+                "<#F472B6>| <#FBCFE8>Enchantments",
+                "{enchantments}", "",
+                "<gradient:#831843:#F472B6>✦ Precision · Control · Range</gradient>"));
+        ensureLoreTemplate(lore, "set_shield_sections", "&#38BDF8⛨ &lEscudo de conjunto", "&#38BDF8⛨ &lSet Shield",
+            List.of("<gradient:#0C4A6E:#38BDF8>━━━━━━━━━━━━━━━━━━━━</gradient>",
+                "<gradient:#BAE6FD:#38BDF8><bold>{item}</bold></gradient>",
+                "<#CBD5E1>Defensa adicional para completar el conjunto.", "",
+                "<#38BDF8>| <#BAE6FD>Propiedades",
+                "<#38BDF8>• <#E0F2FE>Bloqueo y resistencia",
+                "<gradient:#0C4A6E:#38BDF8>━━━━━━━━━━━━━━━━━━━━</gradient>"),
+            List.of("<gradient:#0C4A6E:#38BDF8>━━━━━━━━━━━━━━━━━━━━</gradient>",
+                "<gradient:#BAE6FD:#38BDF8><bold>{item}</bold></gradient>",
+                "<#CBD5E1>Extra defense to complete the set.", "",
+                "<#38BDF8>| <#BAE6FD>Properties",
+                "<#38BDF8>• <#E0F2FE>Blocking and resistance",
+                "<gradient:#0C4A6E:#38BDF8>━━━━━━━━━━━━━━━━━━━━</gradient>"));
         saveYaml(lore, loreFile);
 
         File paletteFile = new File(templatesDir, "palettes.yml");
@@ -4042,6 +4194,7 @@ public final class IxKitsPlugin extends JavaPlugin implements Listener, CommandE
         String value = key == null ? "" : key.toLowerCase(Locale.ROOT);
         if (value.matches(".*(armor|armadura|helmet|chestplate|leggings|boots).*")) return "armor";
         if (value.matches(".*(soup|potion|elixir|consumable|food|ignifuga|drink).*")) return "consumables";
+        if (value.matches(".*(tool|pickaxe|shovel|hoe|miner_tool).*")) return "tools";
         if (value.matches(".*(mineral|miner|ore|gem|emerald).*")) return "minerals";
         if (value.matches(".*(blade|sword|weapon|soulreaper|fang|vanguard_pvp|ranger_marksman|pvp|katana).*")) return "weapons";
         if (value.matches(".*(token|relic|cosmic|astral|abyss|demonic|legendary|special|resource|item|gladiator_badge).*")) return "items";
