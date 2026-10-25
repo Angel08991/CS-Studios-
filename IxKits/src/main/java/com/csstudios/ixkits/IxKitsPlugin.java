@@ -3210,59 +3210,70 @@ public final class IxKitsPlugin extends JavaPlugin implements Listener, CommandE
             if (slot == 45) {
                 if (h.targetSlot < 0) openEquipment(p, h.project, h.page);
                 else openEditor(p, h.project, h.page);
-            }
-            else if (slot == 15) {
-                ItemStack source = getProjectItem(h.project, h.page, h.targetSlot);
-                if (source != null && !source.getType().isAir()) {
-                    setClipboard(p.getUniqueId(), source);
-                    p.sendMessage(prefix() + tr("Objeto copiado. Haz clic izquierdo en una ranura vacía del proyecto para pegarlo.", "Item copied. Left-click an empty project slot to paste it."));
+            } else if (slot == 10) promptInput(p, InputType.ITEM_NAME, h.project, h.page, h.targetSlot,
+                "Escribe el nombre con MiniMessage/RGB:", "Type the name with MiniMessage/RGB:");
+            else if (slot == 11) openLoreEditor(p, h.project, h.page, h.targetSlot, 0);
+            else if (slot == 12) openLoreTemplateCategories(p, h.project, h.page, h.targetSlot);
+            else if (slot == 13) openEnchantments(p, h.project, h.page, h.targetSlot, 0);
+            else if (slot == 14) openEnchantTemplates(p, 0, h.project, h.page, h.targetSlot);
+            else if (slot == 15) openAbilities(p, h.project, h.page, h.targetSlot);
+            else if (slot == 16) openSpecialProperties(p, h.project, h.page, h.targetSlot);
+            else if (slot == 19) openPaletteTemplates(p, 0, h.project, h.page, h.targetSlot);
+            else if (slot == 20) {
+                ItemStack target = getProjectItem(h.project, h.page, h.targetSlot);
+                if (target != null) {
+                    ItemMeta meta = target.getItemMeta();
+                    meta.setUnbreakable(!meta.isUnbreakable());
+                    target.setItemMeta(meta);
+                    saveProjectItem(h.project, h.page, h.targetSlot, target);
                 }
                 openItemEditor(p, h.project, h.page, h.targetSlot);
-            } else if (slot == 16) {
-                openClipboard(p, h.project, h.page, h.targetSlot);
-            } else if (slot == 14) openSpecialProperties(p, h.project, h.page, h.targetSlot);
-            else if (slot == 20) openEnchantments(p, h.project, h.page, h.targetSlot, 0);
-            else if (slot == 27) openEnchantTemplates(p, 0, h.project, h.page, h.targetSlot);
-            else if (slot == 32) openPaletteTemplates(p, 0, h.project, h.page, h.targetSlot);
-            else if (slot == 30) openAbilities(p, h.project, h.page, h.targetSlot);
-            else if (slot == 22) openLoreTemplateCategories(p, h.project, h.page, h.targetSlot);
-            else if (slot == 11) promptInput(p, InputType.ITEM_NAME, h.project, h.page, h.targetSlot, "Escribe el nombre MiniMessage del objeto:", "Type the item's MiniMessage name:");
-            else if (slot == 13) openLoreEditor(p, h.project, h.page, h.targetSlot, 0);
-            else if (slot == 29) {
+            } else if (slot == 21) {
                 ItemStack target = getProjectItem(h.project, h.page, h.targetSlot);
-                if (target != null) { ItemMeta meta = target.getItemMeta(); meta.setUnbreakable(!meta.isUnbreakable()); target.setItemMeta(meta); saveProjectItem(h.project, h.page, h.targetSlot, target); }
-                openItemEditor(p, h.project, h.page, h.targetSlot);
-            } else if (slot == 33) {
-                ItemStack target = getProjectItem(h.project, h.page, h.targetSlot);
-                if (target != null && target.getItemMeta() instanceof Damageable damageable) {
-                    ItemMeta meta = target.getItemMeta();
-                    Damageable edit = (Damageable) meta;
+                if (target != null && target.getItemMeta() instanceof Damageable) {
+                    Damageable edit = (Damageable) target.getItemMeta();
                     int maximum = Math.max(0, target.getType().getMaxDurability());
                     int value = e.isShiftClick() ? 0 : edit.getDamage() + (e.isRightClick() ? -10 : 10);
                     edit.setDamage(Math.max(0, Math.min(maximum, value)));
-                    target.setItemMeta(meta);
+                    target.setItemMeta((ItemMeta) edit);
                     saveProjectItem(h.project, h.page, h.targetSlot, target);
-                } else p.sendMessage(prefix() + tr("Este objeto no tiene durabilidad.", "This item has no durability."));
+                } else p.sendMessage(prefix() + tr("§eEste objeto no tiene durabilidad.", "§eThis item has no durability."));
                 openItemEditor(p, h.project, h.page, h.targetSlot);
-            } else if (slot == 35) promptInput(p, InputType.MODEL_DATA, h.project, h.page, h.targetSlot, "Escribe el custom model data numérico o - para borrarlo:", "Type the numeric custom model data or - to clear it:");
-            else if (slot == 37) openAttributes(p, h.project, h.page, h.targetSlot);
-            else if (slot == 39) openFlags(p, h.project, h.page, h.targetSlot); else if (slot == 41) {
+            } else if (slot == 22) promptInput(p, InputType.MODEL_DATA, h.project, h.page, h.targetSlot,
+                "Escribe el custom model data numérico o - para borrarlo:", "Type the numeric custom model data or - to clear it:");
+            else if (slot == 23) openAttributes(p, h.project, h.page, h.targetSlot);
+            else if (slot == 24) openFlags(p, h.project, h.page, h.targetSlot);
+            else if (slot == 25) {
                 ItemStack target = getProjectItem(h.project, h.page, h.targetSlot);
-                if (target != null && target.getItemMeta() instanceof LeatherArmorMeta) promptInput(p, InputType.LEATHER_COLOR, h.project, h.page, h.targetSlot, "Escribe el color como #RRGGBB o R,G,B:", "Type a color as #RRGGBB or R,G,B:");
-                else p.sendMessage(prefix() + tr("Solo disponible para armadura de cuero.", "Only available for leather armor."));
-            } else if (slot == 43) openPotionTypes(p, h.project, h.page, h.targetSlot, 0);
-            else if (slot == 24) {
-                YamlConfiguration y = YamlConfiguration.loadConfiguration(projectFile(h.project));
-                ItemStack target = y.getItemStack(storagePath(h.page, h.targetSlot));
+                if (target != null && target.getItemMeta() instanceof LeatherArmorMeta) {
+                    promptInput(p, InputType.LEATHER_COLOR, h.project, h.page, h.targetSlot,
+                        "Escribe el color como #RRGGBB o R,G,B:", "Type a color as #RRGGBB or R,G,B:");
+                } else p.sendMessage(prefix() + tr("§eSolo disponible para armadura de cuero.", "§eOnly available for leather armor."));
+            } else if (slot == 28) openPotionTypes(p, h.project, h.page, h.targetSlot, 0);
+            else if (slot == 29) {
+                ItemStack source = getProjectItem(h.project, h.page, h.targetSlot);
+                if (source != null && !source.getType().isAir()) {
+                    setClipboard(p.getUniqueId(), source);
+                    p.sendMessage(prefix() + configuredMessage("clipboard.saved", "&aObjeto copiado y guardado en disco.", "&aItem copied and saved to disk."));
+                }
+                openItemEditor(p, h.project, h.page, h.targetSlot);
+            } else if (slot == 30) openClipboard(p, h.project, h.page, h.targetSlot);
+            else if (slot == 32) fillCompleteSet(p, h.project, h.page, h.targetSlot);
+            else if (slot == 33) {
+                YamlConfiguration yaml = YamlConfiguration.loadConfiguration(projectFile(h.project));
+                ItemStack target = yaml.getItemStack(storagePath(h.page, h.targetSlot));
                 if (target != null) {
                     for (Enchantment enchantment : new ArrayList<>(target.getEnchantments().keySet())) target.removeEnchantment(enchantment);
-                    refreshLinkedLore(y, h.page, h.targetSlot, target);
-                    y.set(storagePath(h.page, h.targetSlot), target);
-                    saveYaml(y, projectFile(h.project));
-                    p.sendMessage(prefix() + tr("Se quitaron todos los encantamientos del objeto.", "All enchantments were removed from the item."));
+                    refreshLinkedLore(yaml, h.page, h.targetSlot, target);
+                    projectService.backupBeforeChange(projectFile(h.project));
+                    yaml.set(storagePath(h.page, h.targetSlot), target);
+                    saveYaml(yaml, projectFile(h.project));
+                    p.sendMessage(prefix() + tr("§aEncantamientos eliminados de este objeto.", "§aEnchantments removed from this item."));
                 }
                 openItemEditor(p, h.project, h.page, h.targetSlot);
             }
+        }
+
         } else if (h.kind.equals("potion-types")) {
             if (slot == 45) openItemEditor(p, h.project, h.page, h.targetSlot);
             else if (slot == 47) openPotionTypes(p, h.project, h.page, h.targetSlot, Math.max(0, h.subPage - 1));
@@ -3621,6 +3632,318 @@ public final class IxKitsPlugin extends JavaPlugin implements Listener, CommandE
         YamlConfiguration yaml = YamlConfiguration.loadConfiguration(file);
         yaml.set("lore-template." + storagePath(page, slot), null);
         saveYaml(yaml, file);
+    }
+
+    private void fillCompleteSet(Player player, String project, int page, int targetSlot) {
+        if (!getConfig().getBoolean("set-fill.enabled", true)) {
+            player.sendMessage(prefix() + tr("§cLa generación de conjuntos está desactivada.", "§cSet generation is disabled."));
+            return;
+        }
+        File file = projectFile(project);
+        if (!file.isFile()) {
+            player.sendMessage(prefix() + tr("§cNo se encontró el proyecto.", "§cProject not found."));
+            return;
+        }
+        YamlConfiguration yaml = YamlConfiguration.loadConfiguration(file);
+        ItemStack source = yaml.getItemStack(storagePath(page, targetSlot));
+        if (source == null || source.getType().isAir()) {
+            player.sendMessage(prefix() + tr("§eSelecciona primero una espada, herramienta o pieza de armadura.", "§eSelect a sword, tool or armor piece first."));
+            return;
+        }
+        String toolTier = tierForTools(source.getType().name());
+        String armorTier = tierForArmor(source.getType().name(), toolTier);
+        String startHex = setPaletteStart(toolTier);
+        String endHex = setPaletteEnd(toolTier);
+        int created = 0;
+        int skipped = 0;
+        projectService.backupBeforeChange(file);
+
+        // Tools are inserted only into free slots. Existing project items are never replaced.
+        for (String suffix : List.of("SWORD", "PICKAXE", "AXE", "SHOVEL", "HOE")) {
+            Material material = Material.matchMaterial(toolTier + "_" + suffix);
+            if (material == null || projectContainsMaterial(yaml, material)) { skipped++; continue; }
+            String templateKey = suggestSetLore(material);
+            ItemStack generated = createGeneratedSetItem(source, material, templateKey, startHex, endHex);
+            if (placeGeneratedItem(yaml, generated, templateKey)) created++; else skipped++;
+        }
+
+        // Armor goes into the appropriate equipment slot whenever possible.
+        for (String suffix : List.of("HELMET", "CHESTPLATE", "LEGGINGS", "BOOTS")) {
+            Material material = Material.matchMaterial(armorTier + "_" + suffix);
+            if (material == null || projectContainsMaterial(yaml, material)) { skipped++; continue; }
+            String equipmentKey = switch (suffix) {
+                case "HELMET" -> "helmet";
+                case "CHESTPLATE" -> "chestplate";
+                case "LEGGINGS" -> "leggings";
+                default -> "boots";
+            };
+            ItemStack current = yaml.getItemStack("equipment." + equipmentKey);
+            if (current != null && !current.getType().isAir()) { skipped++; continue; }
+            ItemStack generated = createGeneratedSetItem(source, material, "set_armor_sections", startHex, endHex);
+            yaml.set("equipment." + equipmentKey, generated);
+            yaml.set("lore-template.equipment." + equipmentKey, "set_armor_sections");
+            created++;
+        }
+
+        if (!projectContainsMaterial(yaml, Material.SHIELD)) {
+            ItemStack shield = createGeneratedSetItem(source, Material.SHIELD, "set_shield_sections", startHex, endHex);
+            ItemStack currentOffhand = yaml.getItemStack("equipment.offhand");
+            if (currentOffhand == null || currentOffhand.getType().isAir()) {
+                yaml.set("equipment.offhand", shield);
+                yaml.set("lore-template.equipment.offhand", "set_shield_sections");
+                created++;
+            } else if (placeGeneratedItem(yaml, shield, "set_shield_sections")) created++;
+            else skipped++;
+        } else skipped++;
+
+        for (Material material : List.of(Material.BOW, Material.CROSSBOW)) {
+            if (projectContainsMaterial(yaml, material)) { skipped++; continue; }
+            String templateKey = "set_ranged_sections";
+            ItemStack ranged = createGeneratedSetItem(source, material, templateKey, startHex, endHex);
+            if (placeGeneratedItem(yaml, ranged, templateKey)) created++; else skipped++;
+        }
+
+        if (created > 0) {
+            yaml.set("format-version", 2);
+            yaml.set("updated", System.currentTimeMillis());
+            saveYaml(yaml, file);
+            player.sendMessage(prefix() + tr("§a✓ Conjunto generado correctamente.", "§a✓ Set generated successfully."));
+            player.sendMessage(prefix() + tr("§7Objetos añadidos: §b", "§7Items added: §b") + created);
+            if (skipped > 0) player.sendMessage(prefix() + tr("§8Espacios ocupados o incompatibles omitidos: §7", "§8Occupied or incompatible slots skipped: §7") + skipped);
+        } else {
+            player.sendMessage(prefix() + tr("§eNo había espacios compatibles que completar. No se sobrescribió ningún objeto.", "§eNo compatible empty slots were found. No items were overwritten."));
+        }
+        openItemEditor(player, project, page, targetSlot);
+    }
+
+    private String tierForTools(String materialName) {
+        for (String tier : List.of("NETHERITE", "DIAMOND", "GOLDEN", "IRON", "STONE", "WOODEN")) {
+            if (materialName.startsWith(tier + "_")) return tier;
+        }
+        String configured = getConfig().getString("set-fill.default-tool-tier", "DIAMOND").toUpperCase(Locale.ROOT);
+        return Set.of("NETHERITE", "DIAMOND", "GOLDEN", "IRON", "STONE", "WOODEN").contains(configured) ? configured : "DIAMOND";
+    }
+
+    private String tierForArmor(String materialName, String toolTier) {
+        for (String tier : List.of("NETHERITE", "DIAMOND", "GOLDEN", "IRON", "CHAINMAIL", "LEATHER")) {
+            if (materialName.startsWith(tier + "_")
+                && (materialName.endsWith("_HELMET") || materialName.endsWith("_CHESTPLATE")
+                || materialName.endsWith("_LEGGINGS") || materialName.endsWith("_BOOTS"))) return tier;
+        }
+        if (Set.of("NETHERITE", "DIAMOND", "GOLDEN", "IRON").contains(toolTier)) return toolTier;
+        if (toolTier.equals("STONE")) return "CHAINMAIL";
+        if (toolTier.equals("WOODEN")) return "LEATHER";
+        String configured = getConfig().getString("set-fill.default-armor-tier", "DIAMOND").toUpperCase(Locale.ROOT);
+        return Set.of("NETHERITE", "DIAMOND", "GOLDEN", "IRON", "CHAINMAIL", "LEATHER").contains(configured) ? configured : "DIAMOND";
+    }
+
+    private String setPaletteStart(String tier) {
+        return switch (tier) {
+            case "NETHERITE" -> "#A78BFA";
+            case "DIAMOND" -> "#22D3EE";
+            case "GOLDEN" -> "#FBBF24";
+            case "IRON", "CHAINMAIL" -> "#CBD5E1";
+            case "LEATHER", "WOODEN" -> "#86EFAC";
+            default -> "#94A3B8";
+        };
+    }
+
+    private String setPaletteEnd(String tier) {
+        return switch (tier) {
+            case "NETHERITE" -> "#6366F1";
+            case "DIAMOND" -> "#2563EB";
+            case "GOLDEN" -> "#F97316";
+            case "IRON", "CHAINMAIL" -> "#64748B";
+            case "LEATHER", "WOODEN" -> "#16A34A";
+            default -> "#475569";
+        };
+    }
+
+    private String suggestSetLore(Material material) {
+        String name = material.name();
+        if (name.endsWith("_SWORD") || name.endsWith("_AXE")) return "set_weapon_sections";
+        if (name.endsWith("_PICKAXE") || name.endsWith("_SHOVEL") || name.endsWith("_HOE")) return "set_tool_sections";
+        if (name.equals("BOW") || name.equals("CROSSBOW") || name.equals("TRIDENT")) return "set_ranged_sections";
+        if (name.equals("SHIELD")) return "set_shield_sections";
+        if (name.endsWith("_HELMET") || name.endsWith("_CHESTPLATE") || name.endsWith("_LEGGINGS") || name.endsWith("_BOOTS")) return "set_armor_sections";
+        return "set_tool_sections";
+    }
+
+    private boolean projectContainsMaterial(YamlConfiguration yaml, Material material) {
+        for (int page = 0; page < 2; page++) {
+            for (int slot : EDIT_SLOTS) {
+                ItemStack item = yaml.getItemStack("pages." + page + "." + slot);
+                if (item != null && item.getType() == material) return true;
+            }
+        }
+        for (String key : EQUIPMENT_KEYS) {
+            ItemStack item = yaml.getItemStack("equipment." + key);
+            if (item != null && item.getType() == material) return true;
+        }
+        return false;
+    }
+
+    private ItemStack createGeneratedSetItem(ItemStack source, Material material, String templateKey, String startHex, String endHex) {
+        ItemStack target = new ItemStack(material);
+        ItemMeta targetMeta = target.getItemMeta();
+        if (targetMeta == null) return target;
+        ItemMeta sourceMeta = source.getItemMeta();
+        if (sourceMeta != null) {
+            targetMeta.setUnbreakable(sourceMeta.isUnbreakable());
+            for (ItemFlag flag : sourceMeta.getItemFlags()) targetMeta.addItemFlags(flag);
+            if (targetMeta instanceof LeatherArmorMeta targetLeather && sourceMeta instanceof LeatherArmorMeta sourceLeather)
+                targetLeather.setColor(sourceLeather.getColor());
+        }
+        targetMeta.displayName(gradientComponent(setItemDisplayName(material), startHex, endHex));
+        target.setItemMeta(targetMeta);
+        copyCompatibleSetEnchantments(source, target);
+        copySetAbilities(source, target);
+        applyDefaultSetEnchantments(source, target);
+        applySetLore(target, templateKey);
+        return target;
+    }
+
+    private String setItemDisplayName(Material material) {
+        String name = material.name();
+        String shownTier = "";
+        String[] tiers = {"NETHERITE", "DIAMOND", "GOLDEN", "IRON", "STONE", "WOODEN", "CHAINMAIL", "LEATHER"};
+        String[] tierEs = {"Netherita", "Diamante", "Oro", "Hierro", "Piedra", "Madera", "Cota de malla", "Cuero"};
+        String[] tierEn = {"Netherite", "Diamond", "Golden", "Iron", "Stone", "Wooden", "Chainmail", "Leather"};
+        for (int i = 0; i < tiers.length; i++) {
+            if (name.startsWith(tiers[i] + "_")) {
+                shownTier = isEnglish() ? tierEn[i] : tierEs[i];
+                name = name.substring(tiers[i].length() + 1);
+                break;
+            }
+        }
+        String enName;
+        String esName;
+        switch (name) {
+            case "SWORD" -> { enName = "Sword"; esName = "Espada"; }
+            case "PICKAXE" -> { enName = "Pickaxe"; esName = "Pico"; }
+            case "AXE" -> { enName = "Axe"; esName = "Hacha"; }
+            case "SHOVEL" -> { enName = "Shovel"; esName = "Pala"; }
+            case "HOE" -> { enName = "Hoe"; esName = "Azada"; }
+            case "HELMET" -> { enName = "Helmet"; esName = "Casco"; }
+            case "CHESTPLATE" -> { enName = "Chestplate"; esName = "Peto"; }
+            case "LEGGINGS" -> { enName = "Leggings"; esName = "Pantalones"; }
+            case "BOOTS" -> { enName = "Boots"; esName = "Botas"; }
+            case "SHIELD" -> { enName = "Shield"; esName = "Escudo"; }
+            case "BOW" -> { enName = "Bow"; esName = "Arco"; }
+            case "CROSSBOW" -> { enName = "Crossbow"; esName = "Ballesta"; }
+            default -> { enName = prettyKey(name); esName = prettyKey(name); }
+        }
+        String itemName = isEnglish() ? enName : esName;
+        return shownTier.isBlank() ? itemName : (isEnglish() ? shownTier + " " + itemName : itemName + " de " + shownTier.toLowerCase(Locale.ROOT));
+    }
+
+    private void copyCompatibleSetEnchantments(ItemStack source, ItemStack target) {
+        for (Map.Entry<Enchantment, Integer> entry : source.getEnchantments().entrySet()) {
+            if (entry.getKey().canEnchantItem(target)) target.addUnsafeEnchantment(entry.getKey(), entry.getValue());
+        }
+    }
+
+    private void copySetAbilities(ItemStack source, ItemStack target) {
+        String name = target.getType().name();
+        if (!(name.endsWith("_SWORD") || name.endsWith("_AXE"))) return;
+        ItemMeta sourceMeta = source.getItemMeta();
+        ItemMeta targetMeta = target.getItemMeta();
+        if (sourceMeta == null || targetMeta == null) return;
+        var from = sourceMeta.getPersistentDataContainer();
+        var to = targetMeta.getPersistentDataContainer();
+        for (NamespacedKey key : List.of(tntOnHitKey, lightningOnHitKey, lifeStealOnHitKey, poisonOnHitKey, frostOnHitKey, flameOnHitKey, knockbackOnHitKey)) {
+            if (key != null && from.has(key, PersistentDataType.BYTE)) to.set(key, PersistentDataType.BYTE, from.get(key, PersistentDataType.BYTE));
+        }
+        for (NamespacedKey key : List.of(tntCooldownKey, lightningCooldownKey, lifeStealCooldownKey, poisonCooldownKey, frostCooldownKey, flameCooldownKey, knockbackCooldownKey)) {
+            if (key != null && from.has(key, PersistentDataType.LONG)) to.set(key, PersistentDataType.LONG, from.get(key, PersistentDataType.LONG));
+        }
+        target.setItemMeta(targetMeta);
+    }
+
+    private boolean hasAnyEnchant(ItemStack stack, String... keys) {
+        for (String key : keys) {
+            Enchantment enchantment = Registry.ENCHANTMENT.get(NamespacedKey.minecraft(key));
+            if (enchantment != null && stack.getEnchantmentLevel(enchantment) > 0) return true;
+        }
+        return false;
+    }
+
+    private void addSetEnchantment(ItemStack target, String key, int level) {
+        Enchantment enchantment = Registry.ENCHANTMENT.get(NamespacedKey.minecraft(key));
+        if (enchantment != null && enchantment.canEnchantItem(target) && target.getEnchantmentLevel(enchantment) == 0)
+            target.addUnsafeEnchantment(enchantment, Math.max(1, Math.min(32767, level)));
+    }
+
+    private int sourceEnchantLevel(ItemStack source, String key, int fallback) {
+        Enchantment enchantment = Registry.ENCHANTMENT.get(NamespacedKey.minecraft(key));
+        if (enchantment == null) return fallback;
+        int level = source.getEnchantmentLevel(enchantment);
+        return level > 0 ? level : fallback;
+    }
+
+    private void applyDefaultSetEnchantments(ItemStack source, ItemStack target) {
+        String name = target.getType().name();
+        boolean armor = name.endsWith("_HELMET") || name.endsWith("_CHESTPLATE") || name.endsWith("_LEGGINGS") || name.endsWith("_BOOTS");
+        boolean tool = name.endsWith("_PICKAXE") || name.endsWith("_SHOVEL") || name.endsWith("_HOE");
+        boolean melee = name.endsWith("_SWORD") || name.endsWith("_AXE");
+        if (armor) {
+            if (!hasAnyEnchant(target, "protection", "fire_protection", "blast_protection", "projectile_protection"))
+                addSetEnchantment(target, "protection", sourceEnchantLevel(source, "protection", 4));
+            addSetEnchantment(target, "unbreaking", sourceEnchantLevel(source, "unbreaking", 3));
+            addSetEnchantment(target, "mending", sourceEnchantLevel(source, "mending", 1));
+            if (name.endsWith("_BOOTS")) addSetEnchantment(target, "feather_falling", sourceEnchantLevel(source, "feather_falling", 4));
+            if (name.endsWith("_HELMET")) {
+                addSetEnchantment(target, "respiration", sourceEnchantLevel(source, "respiration", 3));
+                addSetEnchantment(target, "aqua_affinity", sourceEnchantLevel(source, "aqua_affinity", 1));
+            }
+        } else if (tool) {
+            addSetEnchantment(target, "efficiency", sourceEnchantLevel(source, "efficiency", 5));
+            addSetEnchantment(target, "unbreaking", sourceEnchantLevel(source, "unbreaking", 3));
+            addSetEnchantment(target, "mending", sourceEnchantLevel(source, "mending", 1));
+            if (!hasAnyEnchant(target, "fortune", "silk_touch"))
+                addSetEnchantment(target, "fortune", sourceEnchantLevel(source, "fortune", 3));
+        } else if (melee) {
+            if (!hasAnyEnchant(target, "sharpness", "smite", "bane_of_arthropods"))
+                addSetEnchantment(target, "sharpness", sourceEnchantLevel(source, "sharpness", 5));
+            addSetEnchantment(target, "unbreaking", sourceEnchantLevel(source, "unbreaking", 3));
+            addSetEnchantment(target, "mending", sourceEnchantLevel(source, "mending", 1));
+        } else if (name.equals("BOW")) {
+            addSetEnchantment(target, "power", sourceEnchantLevel(source, "power", 5));
+            addSetEnchantment(target, "unbreaking", sourceEnchantLevel(source, "unbreaking", 3));
+            addSetEnchantment(target, "flame", sourceEnchantLevel(source, "flame", 1));
+            addSetEnchantment(target, "infinity", sourceEnchantLevel(source, "infinity", 1));
+        } else if (name.equals("CROSSBOW")) {
+            addSetEnchantment(target, "quick_charge", sourceEnchantLevel(source, "quick_charge", 3));
+            addSetEnchantment(target, "unbreaking", sourceEnchantLevel(source, "unbreaking", 3));
+            if (hasAnyEnchant(source, "multishot")) addSetEnchantment(target, "multishot", sourceEnchantLevel(source, "multishot", 1));
+            else addSetEnchantment(target, "piercing", sourceEnchantLevel(source, "piercing", 4));
+        } else if (name.equals("SHIELD")) {
+            addSetEnchantment(target, "unbreaking", sourceEnchantLevel(source, "unbreaking", 3));
+            addSetEnchantment(target, "mending", sourceEnchantLevel(source, "mending", 1));
+        }
+    }
+
+    private void applySetLore(ItemStack target, String templateKey) {
+        List<String> lines = yamlListForLoreTemplate(templateKey);
+        ItemMeta meta = target.getItemMeta();
+        if (meta == null || lines.isEmpty()) return;
+        meta.lore(loreComponents(resolveLorePlaceholders(lines, target)));
+        target.setItemMeta(meta);
+    }
+
+    private boolean placeGeneratedItem(YamlConfiguration yaml, ItemStack item, String templateKey) {
+        for (int page = 0; page < 2; page++) {
+            for (int slot : EDIT_SLOTS) {
+                String itemPath = "pages." + page + "." + slot;
+                ItemStack current = yaml.getItemStack(itemPath);
+                if (current == null || current.getType().isAir()) {
+                    yaml.set(itemPath, item);
+                    yaml.set("lore-template." + itemPath, templateKey);
+                    return true;
+                }
+            }
+        }
+        return false;
     }
 
     private void saveProjectItem(String project, int page, int slot, ItemStack item) {
