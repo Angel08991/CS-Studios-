@@ -1,7 +1,7 @@
 # IxKits — mensajes editables
 # Usa colores legacy (&a, &l) o RGB (&#F2FF00). Los marcadores entre llaves se reemplazan automáticamente.
 # Ejecuta /ixkits recargar para aplicar los cambios.
-prefix: "&8[&3✦ &bIxKits&8] &7"
+prefix: "&8[&b✦ &fIxKits&8] &8» &7"
 
 es:
   clipboard:
@@ -28,6 +28,19 @@ es:
     failed: "&cNo se pudo importar. Revisa el formato del archivo."
   general:
     reload-success: "&aConfiguración, mensajes y plantillas recargados."
+  set-fill:
+    disabled: "&cLa generación de conjuntos está desactivada en config.yml."
+    source-required: "&eSelecciona primero una espada, herramienta o pieza de armadura."
+    success: "&a✓ Conjunto generado correctamente."
+    added: "&7Objetos añadidos: &b{count}"
+    skipped: "&8Espacios ocupados o incompatibles omitidos: &7{count}"
+    no-room: "&eNo había espacios compatibles. No se sobrescribió ningún objeto."
+  language:
+    invalid: "&eIdiomas disponibles: &bes, en, pt, fr, de, it, zh, ru."
+    saved: "&aIdioma guardado: &f{language}&a."
+  help:
+    subtitle: "&7Diseña objetos, kits y conjuntos desde una sola GUI."
+
 
 en:
   clipboard:
@@ -54,3 +67,100 @@ en:
     failed: "&cImport failed. Check the file format."
   general:
     reload-success: "&aConfiguration, messages and templates reloaded."
+  set-fill:
+    disabled: "&cSet generation is disabled in config.yml."
+    source-required: "&eSelect a sword, tool or armor piece first."
+    success: "&a✓ Set generated successfully."
+    added: "&7Items added: &b{count}"
+    skipped: "&8Occupied or incompatible slots skipped: &7{count}"
+    no-room: "&eNo compatible empty slots were found. No items were overwritten."
+  language:
+    invalid: "&eAvailable languages: &bes, en, pt, fr, de, it, zh, ru."
+    saved: "&aLanguage saved: &f{language}&a."
+  help:
+    subtitle: "&7Create items, kits and sets from one GUI."
+
+
+pt:
+  set-fill:
+    disabled: "&cA geração de conjuntos está desativada em config.yml."
+    source-required: "&eSelecione primeiro uma espada, ferramenta ou peça de armadura."
+    success: "&a✓ Conjunto gerado com sucesso."
+    added: "&7Itens adicionados: &b{count}"
+    skipped: "&8Espaços ocupados ou incompatíveis ignorados: &7{count}"
+    no-room: "&eNão havia espaços vazios compatíveis. Nenhum item foi substituído."
+  language:
+    invalid: "&eIdiomas disponíveis: &bes, en, pt, fr, de, it, zh, ru."
+    saved: "&aIdioma salvo: &f{language}&a."
+  general:
+    reload-success: "&aConfiguração, mensagens e modelos recarregados."
+
+fr:
+  set-fill:
+    disabled: "&cLa génération d'ensemble est désactivée dans config.yml."
+    source-required: "&eSélectionnez d'abord une épée, un outil ou une pièce d'armure."
+    success: "&a✓ Ensemble généré avec succès."
+    added: "&7Objets ajoutés : &b{count}"
+    skipped: "&8Emplacements occupés ou incompatibles ignorés : &7{count}"
+    no-room: "&eAucun emplacement vide compatible. Aucun objet n'a été remplacé."
+  language:
+    invalid: "&eLangues disponibles : &bes, en, pt, fr, de, it, zh, ru."
+    saved: "&aLangue enregistrée : &f{language}&a."
+  general:
+    reload-success: "&aConfiguration, messages et modèles rechargés."
+
+de:
+  set-fill:
+    disabled: "&cDie Set-Erstellung ist in config.yml deaktiviert."
+    source-required: "&eWähle zuerst ein Schwert, Werkzeug oder Rüstungsteil."
+    success: "&a✓ Set erfolgreich erstellt."
+    added: "&7Hinzugefügte Gegenstände: &b{count}"
+    skipped: "&8Belegte oder inkompatible Plätze übersprungen: &7{count}"
+    no-room: "&eKeine passenden leeren Plätze. Es wurde nichts überschrieben."
+  language:
+    invalid: "&eVerfügbare Sprachen: &bes, en, pt, fr, de, it, zh, ru."
+    saved: "&aSprache gespeichert: &f{language}&a."
+  general:
+    reload-success: "&aKonfiguration, Nachrichten und Vorlagen neu geladen."
+
+it:
+  set-fill:
+    disabled: "&cLa generazione del set è disattivata in config.yml."
+    source-required: "&eSeleziona prima una spada, uno strumento o un pezzo d'armatura."
+    success: "&a✓ Set generato correttamente."
+    added: "&7Oggetti aggiunti: &b{count}"
+    skipped: "&8Slot occupati o incompatibili ignorati: &7{count}"
+    no-room: "&eNessuno slot vuoto compatibile. Nessun oggetto è stato sovrascritto."
+  language:
+    invalid: "&eLingue disponibili: &bes, en, pt, fr, de, it, zh, ru."
+    saved: "&aLingua salvata: &f{language}&a."
+  general:
+    reload-success: "&aConfigurazione, messaggi e modelli ricaricati."
+
+zh:
+  set-fill:
+    disabled: "&c套装生成已在 config.yml 中禁用。"
+    source-required: "&e请先选择剑、工具或盔甲部件。"
+    success: "&a✓ 套装已生成。"
+    added: "&7新增物品：&b{count}"
+    skipped: "&8跳过已占用或不兼容的槽位：&7{count}"
+    no-room: "&e没有可用的兼容空槽。未覆盖任何物品。"
+  language:
+    invalid: "&e可用语言：&bes、en、pt、fr、de、it、zh、ru。"
+    saved: "&a已保存语言：&f{language}&a。"
+  general:
+    reload-success: "&a配置、消息和模板已重新加载。"
+
+ru:
+  set-fill:
+    disabled: "&cСоздание набора отключено в config.yml."
+    source-required: "&eСначала выберите меч, инструмент или часть брони."
+    success: "&a✓ Набор успешно создан."
+    added: "&7Добавлено предметов: &b{count}"
+    skipped: "&8Пропущено занятых или несовместимых слотов: &7{count}"
+    no-room: "&eНет подходящих свободных слотов. Предметы не перезаписаны."
+  language:
+    invalid: "&eДоступные языки: &bes, en, pt, fr, de, it, zh, ru."
+    saved: "&aЯзык сохранён: &f{language}&a."
+  general:
+    reload-success: "&aКонфигурация, сообщения и шаблоны перезагружены."
