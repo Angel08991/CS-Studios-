@@ -38,6 +38,7 @@ import org.bukkit.inventory.meta.LeatherArmorMeta;
 import org.bukkit.inventory.meta.PotionMeta;
 import org.bukkit.inventory.meta.BookMeta;
 import org.bukkit.inventory.meta.BannerMeta;
+import org.bukkit.inventory.meta.ShieldMeta;
 import org.bukkit.inventory.meta.ArmorMeta;
 import org.bukkit.inventory.meta.SkullMeta;
 import org.bukkit.inventory.meta.FireworkMeta;
@@ -1066,6 +1067,14 @@ public final class IxKitsPlugin extends JavaPlugin implements Listener, CommandE
         p.openInventory(inv);
     }
 
+    private DyeColor bannerMaterialBaseColor(Material material) {
+        if (material != null && material.name().endsWith("_BANNER")) {
+            String dyeName = material.name().substring(0, material.name().length() - "_BANNER".length());
+            try { return DyeColor.valueOf(dyeName); } catch (IllegalArgumentException ignored) { }
+        }
+        return DyeColor.WHITE;
+    }
+
     private void openBannerEditor(Player p, String project, int projectPage, int targetSlot, int requestedPage, String requestedColor) {
         ItemStack target = getProjectItem(project, projectPage, targetSlot);
         if (target == null || !(target.getItemMeta() instanceof BannerMeta bannerMeta)) {
@@ -1103,10 +1112,12 @@ public final class IxKitsPlugin extends JavaPlugin implements Listener, CommandE
             tr("§7Máximo seis patrones", "§7Maximum six patterns"),
             tr("§7Patrones actuales: ", "§7Current patterns: ") + bannerMeta.numberOfPatterns()));
         inv.setItem(51, item(Material.SPECTRAL_ARROW, tr("§bSiguiente", "§bNext")));
-        inv.setItem(53, item(target.getType() == Material.SHIELD ? Material.SHIELD : Material.WHITE_BANNER,
-            tr("§bColor base: ", "§bBase color: ") + prettyKey(bannerMeta.getBaseColor() == null ? "WHITE" : bannerMeta.getBaseColor().name()),
-            tr("§7Clic para cambiar el fondo del diseño.", "§7Click to change the design background."),
-            tr("§eSe guarda en el escudo o estandarte.", "§eSaved to the shield or banner.")));
+        DyeColor baseColor = target.getItemMeta() instanceof ShieldMeta shieldMeta && shieldMeta.getBaseColor() != null
+            ? shieldMeta.getBaseColor() : bannerMaterialBaseColor(target.getType());
+        inv.setItem(53, item(target.getType() == Material.SHIELD ? Material.SHIELD : Material.valueOf(baseColor.name() + "_DYE"),
+            (target.getType() == Material.SHIELD ? tr("§bFondo del escudo: ", "§bShield base: ") : tr("§bColor del estandarte: ", "§bBanner color: ")) + prettyKey(baseColor.name()),
+            tr("§7Clic para recorrer los 16 colores base.", "§7Click to cycle through all 16 base colors."),
+            target.getType() == Material.SHIELD ? tr("§8También conserva todos los patrones.", "§8All patterns are preserved.") : tr("§8El tipo de estandarte se adapta al color.", "§8The banner material changes to match the color.")));
         p.openInventory(inv);
     }
 
@@ -2741,11 +2752,21 @@ public final class IxKitsPlugin extends JavaPlugin implements Listener, CommandE
                 ItemStack target = yaml.getItemStack(itemPath);
                 if (target != null && target.getItemMeta() instanceof BannerMeta bannerMeta) {
                     DyeColor[] colors = DyeColor.values();
-                    DyeColor currentBase = bannerMeta.getBaseColor();
+                    DyeColor currentBase = target.getItemMeta() instanceof ShieldMeta shieldMeta && shieldMeta.getBaseColor() != null
+                        ? shieldMeta.getBaseColor() : bannerMaterialBaseColor(target.getType());
                     int index = 0;
                     for (int i = 0; i < colors.length; i++) if (colors[i] == currentBase) { index = i; break; }
-                    bannerMeta.setBaseColor(colors[(index + 1) % colors.length]);
-                    target.setItemMeta(bannerMeta);
+                    DyeColor nextBase = colors[(index + 1) % colors.length];
+                    if (target.getType() == Material.SHIELD && bannerMeta instanceof ShieldMeta shieldMeta) {
+                        shieldMeta.setBaseColor(nextBase);
+                        target.setItemMeta(shieldMeta);
+                    } else {
+                        Material nextMaterial = Material.matchMaterial(nextBase.name() + "_BANNER");
+                        if (nextMaterial != null) {
+                            target.setType(nextMaterial);
+                            target.setItemMeta(bannerMeta);
+                        }
+                    }
                     projectService.backupBeforeChange(file);
                     yaml.set(itemPath, target);
                     saveYaml(yaml, file);
