@@ -135,7 +135,7 @@ public final class IxKitsPlugin extends JavaPlugin implements Listener, CommandE
         String prefix = args.length == 0 ? "" : args[args.length - 1].toLowerCase(Locale.ROOT);
         List<String> suggestions = new ArrayList<>();
         if (args.length == 1) {
-            suggestions.addAll(List.of("claim", "comunidad", "plantillas", "catalogo", "buscar", "idioma"));
+            suggestions.addAll(List.of("help", "ayuda", "claim", "comunidad", "plantillas", "catalogo", "buscar", "idioma"));
             if (sender.hasPermission("ixkits.admin")) suggestions.addAll(List.of("crear", "editar", "proyectos", "exportar", "exportar-essentials",
                 "importar", "importar-essentials", "importar-mano", "equipamiento", "validar", "duplicar", "renombrar",
                 "eliminar", "papelera", "restaurar-eliminado", "deshacer", "rehacer", "recargar", "paleta", "lore", "encantamientos"));
@@ -170,7 +170,7 @@ public final class IxKitsPlugin extends JavaPlugin implements Listener, CommandE
             return true;
         }
         String sub = args[0].toLowerCase(Locale.ROOT);
-        boolean communityCommand = Set.of("comunidad", "community", "catalogo", "catálogo", "buscar", "descargar", "valorar", "favorito", "versiones", "versions", "plantillas", "cancelar", "cancel", "claim").contains(sub)
+        boolean communityCommand = Set.of("help", "ayuda", "comunidad", "community", "catalogo", "catálogo", "buscar", "descargar", "valorar", "favorito", "versiones", "versions", "plantillas", "cancelar", "cancel", "claim").contains(sub)
             || (sub.equals("lore") && args.length >= 3 && args[1].equalsIgnoreCase("aplicar"))
             || (sub.equals("paleta") && args.length >= 3 && args[1].equalsIgnoreCase("aplicar"))
             || (sub.equals("encantamientos") && args.length >= 3 && args[1].equalsIgnoreCase("aplicar"));
@@ -179,6 +179,7 @@ public final class IxKitsPlugin extends JavaPlugin implements Listener, CommandE
             player.sendMessage(prefix() + tr("No tienes permiso para administrar IxKits. Puedes navegar la comunidad con /ixkits comunidad.", "You do not have permission to administer IxKits. You can browse Community with /ixkits comunidad."));
             return true;
         }
+        if (sub.equals("help") || sub.equals("ayuda")) { sendHelp(player); return true; }
         if (sub.equals("claim")) { claimProjectItems(player, args); return true; }
         if (sub.equals("cancelar") || sub.equals("cancel")) { cancelPendingInput(player); return true; }
         if (sub.equals("comunidad") || sub.equals("community")) { openCommunityHub(player); return true; }
@@ -1475,7 +1476,11 @@ public final class IxKitsPlugin extends JavaPlugin implements Listener, CommandE
 
     private String configuredMessage(String key, String spanish, String english, String... replacements) {
         String fallback = isEnglish() ? english : spanish;
-        String raw = messages == null ? fallback : messages.getString((isEnglish() ? "en." : "es.") + key, fallback);
+        String raw = fallback;
+        if (messages != null) {
+            raw = messages.getString(language() + "." + key,
+                messages.getString((isEnglish() ? "en." : "es.") + key, fallback));
+        }
         raw = translateLoreColors(raw);
         for (int i = 0; i + 1 < replacements.length; i += 2) raw = raw.replace(replacements[i], replacements[i + 1]);
         return raw;
@@ -1732,6 +1737,7 @@ public final class IxKitsPlugin extends JavaPlugin implements Listener, CommandE
             }
             target.addUnsafeEnchantment(enchantment, level);
             projectService.backupBeforeChange(file);
+            refreshLinkedLore(yaml, pending.page, pending.slot, target);
             yaml.set(itemPath, target);
             yaml.set("format-version", 2);
             yaml.set("updated", System.currentTimeMillis());
@@ -1799,6 +1805,7 @@ public final class IxKitsPlugin extends JavaPlugin implements Listener, CommandE
             loreMeta.lore(lines.isEmpty() ? null : lines);
             target.setItemMeta(loreMeta);
             projectService.backupBeforeChange(file);
+            yaml.set("lore-template." + itemPath, null);
             yaml.set(itemPath, target);
             yaml.set("format-version", 2);
             yaml.set("updated", System.currentTimeMillis());
@@ -1877,10 +1884,24 @@ public final class IxKitsPlugin extends JavaPlugin implements Listener, CommandE
     private void openLanguages(Player p) {
         Inventory inv = menu("language", null, 0, tr("§3✦ §bIxKits §8• §0Idioma", "§3✦ §bIxKits §8• §0Language"));
         border(inv);
-        inv.setItem(21, item(Material.WRITABLE_BOOK, "§bEnglish", tr("§7Idioma inglés", "§7English language"), isEnglish() ? "§a✓ " + tr("Seleccionado", "Selected") : "§e" + tr("Clic para elegir", "Click to select")));
-        inv.setItem(23, item(Material.WRITABLE_BOOK, "§eEspañol", tr("§7Idioma español", "§7Spanish language"), !isEnglish() ? "§a✓ " + tr("Seleccionado", "Selected") : "§e" + tr("Clic para elegir", "Click to select")));
-        inv.setItem(31, item(Material.MAP, tr("§fConfiguración guardada", "§fSaved setting"), tr("§7Se aplica a todo el plugin.", "§7Applies to the whole plugin."), tr("§7También puedes editar config.yml", "§7You can also edit config.yml"), "§b language: en / es"));
-        inv.setItem(45, item(Material.ARROW, tr("§7Volver", "§7Back"), tr("§8Menú principal", "§8Main menu")));
+        String[] codes = {"es", "en", "pt", "fr", "de", "it", "zh", "ru"};
+        String[] names = {"§eEspañol", "§bEnglish", "§aPortuguês", "§9Français", "§fDeutsch", "§6Italiano", "§d中文", "§cРусский"};
+        String[] localized = {"Idioma español", "English language", "Idioma português", "Langue française", "Deutsche Sprache", "Lingua italiana", "中文语言", "Русский язык"};
+        int[] slots = {10, 12, 14, 16, 28, 30, 32, 34};
+        for (int i = 0; i < codes.length; i++) {
+            boolean selected = language().equals(codes[i]);
+            inv.setItem(slots[i], item(Material.WRITABLE_BOOK, names[i],
+                "§7" + localized[i], "",
+                selected ? "§a✓ " + tr("Idioma actual", "Current language") : "§e" + tr("Clic para seleccionar", "Click to select"),
+                "§8" + codes[i]));
+        }
+        inv.setItem(22, item(Material.MAP, "§f§l" + tr("Idioma del plugin", "Plugin language"),
+            tr("§7Los menús y mensajes principales", "§7Common menus and messages"),
+            tr("§7usan el idioma seleccionado cuando", "§7use the selected language where"),
+            tr("§7hay una traducción disponible.", "§7a translation is available."), "",
+            "§8es · en · pt · fr · de · it · zh · ru",
+            tr("§eTambién puedes usar /ixkits idioma <código>", "§eYou can also use /ixkits idioma <code>")));
+        inv.setItem(45, item(Material.ARROW, "§7← " + tr("Volver", "Back"), tr("§8Menú principal", "§8Main menu")));
         p.openInventory(inv);
     }
 
@@ -1891,8 +1912,8 @@ public final class IxKitsPlugin extends JavaPlugin implements Listener, CommandE
         border(inv);
         MenuHolder holder = (MenuHolder) inv.getHolder();
         YamlConfiguration lore = YamlConfiguration.loadConfiguration(new File(templatesDir, "lore.yml"));
-        String[] categories = {"weapons", "armor", "items", "minerals", "consumables", "misc", "all"};
-        int[] slots = {20, 22, 24, 29, 31, 33, 35};
+        String[] categories = {"weapons", "armor", "tools", "items", "minerals", "consumables", "misc", "all"};
+        int[] slots = {20, 22, 24, 29, 31, 33, 35, 37};
         for (int i = 0; i < categories.length; i++) {
             String category = categories[i];
             long count = lore.getKeys(false).stream().filter(key -> !lore.getStringList(key + ".lore").isEmpty())
@@ -1919,6 +1940,7 @@ public final class IxKitsPlugin extends JavaPlugin implements Listener, CommandE
         return switch (category) {
             case "weapons" -> tr("Armas", "Weapons");
             case "armor" -> tr("Armaduras", "Armor");
+            case "tools" -> tr("Herramientas", "Tools");
             case "items" -> tr("Objetos especiales", "Special items");
             case "minerals" -> tr("Minerales y materiales", "Minerals and materials");
             case "consumables" -> tr("Consumibles", "Consumables");
@@ -1931,6 +1953,7 @@ public final class IxKitsPlugin extends JavaPlugin implements Listener, CommandE
         return switch (category) {
             case "weapons" -> Material.DIAMOND_SWORD;
             case "armor" -> Material.NETHERITE_CHESTPLATE;
+            case "tools" -> Material.DIAMOND_PICKAXE;
             case "items" -> Material.NETHER_STAR;
             case "minerals" -> Material.DIAMOND;
             case "consumables" -> Material.GOLDEN_APPLE;
@@ -2081,35 +2104,57 @@ public final class IxKitsPlugin extends JavaPlugin implements Listener, CommandE
     }
 
     private void openPaletteTemplates(Player p, int requestedPage, String project, int projectPage, int targetSlot) {
+        openPaletteTemplates(p, requestedPage, project, projectPage, targetSlot, "both");
+    }
+
+    private String normalizePaletteScope(String scope) {
+        return "name".equalsIgnoreCase(scope) || "lore".equalsIgnoreCase(scope) ? scope.toLowerCase(Locale.ROOT) : "both";
+    }
+
+    private String paletteScopeLabel(String scope) {
+        return switch (normalizePaletteScope(scope)) {
+            case "name" -> tr("Solo nombre", "Name only");
+            case "lore" -> tr("Solo lore", "Lore only");
+            default -> tr("Nombre + lore", "Name + lore");
+        };
+    }
+
+    private void openPaletteTemplates(Player p, int requestedPage, String project, int projectPage, int targetSlot, String requestedScope) {
         YamlConfiguration palettes = YamlConfiguration.loadConfiguration(new File(templatesDir, "palettes.yml"));
         List<String> keys = new ArrayList<>();
         for (String key : palettes.getKeys(false)) if (palettes.getString(key + ".color") != null) keys.add(key);
         Collections.sort(keys);
         int pages = Math.max(1, (int) Math.ceil(keys.size() / (double) EDIT_SLOTS.length));
         int page = Math.max(0, Math.min(requestedPage, pages - 1));
+        String scope = normalizePaletteScope(requestedScope);
         Inventory inv = project == null
-            ? menu("palette-templates", null, page, tr("§3✦ §bIxKits §8• §0Paletas de color", "§3✦ §bIxKits §8• §0Color palettes"))
+            ? menu("palette-templates", null, page, tr("§3✦ §bIXKITS §8» §0Paletas RGB", "§3✦ §bIXKITS §8» §0RGB palettes"))
             : menu("palette-templates", project, projectPage, targetSlot, page,
-                tr("§3✦ §bIxKits §8• §0Paletas de color", "§3✦ §bIxKits §8• §0Color palettes"));
+                tr("§3✦ §bIXKITS §8» §0Paletas RGB", "§3✦ §bIXKITS §8» §0RGB palettes"));
         border(inv);
         MenuHolder holder = (MenuHolder) inv.getHolder();
+        holder.query = scope;
         for (int i = page * EDIT_SLOTS.length; i < Math.min(keys.size(), (page + 1) * EDIT_SLOTS.length); i++) {
             String key = keys.get(i);
             String color = palettes.getString(key + ".color", "&b");
             String accent = palettes.getString(key + ".accent", color);
-            Material icon = paletteIcon(key, color);
             int slot = EDIT_SLOTS[i - page * EDIT_SLOTS.length];
-            inv.setItem(slot, item(icon, "§f" + palettes.getString(key + ".display", prettyKey(key)),
-                tr("§7Color principal: ", "§7Primary color: ") + color,
-                tr("§7Acento: ", "§7Accent: ") + accent, "",
-                project == null ? tr("§eClic para aplicar al objeto en mano", "§eClick to apply to held item")
-                    : tr("§eClic para aplicar al objeto del kit", "§eClick to apply to kit item")));
+            inv.setItem(slot, item(paletteIcon(key, color), "§f§l" + palettes.getString(key + ".display", prettyKey(key)),
+                tr("§7Color inicial: ", "§7Start color: ") + color,
+                tr("§7Color final: ", "§7End color: ") + accent, "",
+                tr("§7Destino actual: §b", "§7Current target: §b") + paletteScopeLabel(scope), "",
+                project == null ? tr("§eClic izquierdo: aplicar", "§eLeft-click: apply") : tr("§eClic izquierdo: aplicar al proyecto", "§eLeft-click: apply to project"),
+                tr("§dClic derecho: publicar paleta", "§dRight-click: publish palette")));
             holder.entryBySlot.put(slot, key);
         }
         if (keys.isEmpty()) inv.setItem(22, item(Material.PAPER, tr("§7No hay paletas guardadas.", "§7No saved palettes.")));
-        inv.setItem(45, item(Material.ARROW, tr("§7Volver", "§7Back")));
-        inv.setItem(47, item(Material.SPECTRAL_ARROW, tr("§bAnterior", "§bPrevious")));
-        inv.setItem(51, item(Material.SPECTRAL_ARROW, tr("§bSiguiente", "§bNext")));
+        inv.setItem(45, item(Material.ARROW, "§7← " + tr("Volver", "Back")));
+        inv.setItem(47, item(Material.SPECTRAL_ARROW, "§b" + tr("Anterior", "Previous")));
+        inv.setItem(49, item(Material.BOOK, "§d§l" + tr("Aplicar colores en", "Apply colors to"),
+            "§f" + paletteScopeLabel(scope), "",
+            tr("§7Clic para alternar el destino.", "§7Click to cycle the target."),
+            tr("§8Nombre → Lore → Ambos", "§8Name → Lore → Both")));
+        inv.setItem(51, item(Material.SPECTRAL_ARROW, "§b" + tr("Siguiente", "Next")));
         p.openInventory(inv);
     }
 
@@ -2141,15 +2186,22 @@ public final class IxKitsPlugin extends JavaPlugin implements Listener, CommandE
     }
 
     private void applyPaletteToItem(ItemStack target, YamlConfiguration palettes, String key) {
+        applyPaletteToItem(target, palettes, key, "both");
+    }
+
+    private void applyPaletteToItem(ItemStack target, YamlConfiguration palettes, String key, String requestedScope) {
         String color = palettes.getString(key + ".color");
         if (color == null || target == null || target.getType().isAir()) return;
+        String scope = normalizePaletteScope(requestedScope);
         String startHex = paletteHex(color);
         String endHex = paletteHex(palettes.getString(key + ".accent", color));
         ItemMeta meta = target.getItemMeta();
         if (meta == null) return;
-        String name = meta.hasDisplayName() ? meta.getDisplayName() : prettyKey(target.getType().name());
-        meta.displayName(gradientComponent(ChatColor.stripColor(name), startHex, endHex));
-        if (meta.lore() != null) {
+        if (scope.equals("name") || scope.equals("both")) {
+            String name = meta.hasDisplayName() ? meta.getDisplayName() : prettyKey(target.getType().name());
+            meta.displayName(gradientComponent(ChatColor.stripColor(name), startHex, endHex));
+        }
+        if ((scope.equals("lore") || scope.equals("both")) && meta.lore() != null) {
             var legacy = net.kyori.adventure.text.serializer.legacy.LegacyComponentSerializer.legacySection();
             List<Component> recolored = new ArrayList<>();
             for (Component line : meta.lore()) {
@@ -2162,99 +2214,160 @@ public final class IxKitsPlugin extends JavaPlugin implements Listener, CommandE
     }
 
     private void applyPalettePreset(Player p, String key, String project, int projectPage, int targetSlot) {
+        applyPalettePreset(p, key, project, projectPage, targetSlot, "both");
+    }
+
+    private void applyPalettePreset(Player p, String key, String project, int projectPage, int targetSlot, String requestedScope) {
         YamlConfiguration palettes = YamlConfiguration.loadConfiguration(new File(templatesDir, "palettes.yml"));
         if (!palettes.contains(key + ".color")) {
-            p.sendMessage(prefix() + tr("Esa paleta no existe.", "That palette does not exist."));
+            p.sendMessage(prefix() + tr("§cEsa paleta no existe.", "§cThat palette does not exist."));
             return;
         }
         ItemStack target = project == null ? p.getInventory().getItemInMainHand()
             : getProjectItem(project, projectPage, targetSlot);
         if (target == null || target.getType().isAir()) {
-            p.sendMessage(prefix() + tr("Selecciona primero un objeto.", "Select an item first."));
+            p.sendMessage(prefix() + tr("§eSelecciona primero un objeto.", "§eSelect an item first."));
             return;
         }
-        applyPaletteToItem(target, palettes, key);
+        String scope = normalizePaletteScope(requestedScope);
+        applyPaletteToItem(target, palettes, key, scope);
         if (project != null) saveProjectItem(project, projectPage, targetSlot, target);
-        p.sendMessage(prefix() + tr("Paleta aplicada: §b", "Palette applied: §b") + palettes.getString(key + ".display", prettyKey(key)));
+        p.sendMessage(prefix() + tr("§aPaleta aplicada: §b", "§aPalette applied: §b")
+            + palettes.getString(key + ".display", prettyKey(key)) + " §8· §7" + paletteScopeLabel(scope));
         if (project != null) openItemEditor(p, project, projectPage, targetSlot);
-        else openPaletteTemplates(p, 0, null, 0, -1);
+        else openPaletteTemplates(p, 0, null, 0, -1, scope);
     }
 
     private void openItemEditor(Player p, String project, int page, int targetSlot) {
-        YamlConfiguration y = YamlConfiguration.loadConfiguration(projectFile(project));
-        ItemStack target = y.getItemStack(storagePath(page, targetSlot));
+        ItemStack target = getProjectItem(project, page, targetSlot);
         if (target == null || target.getType().isAir()) {
-            p.sendMessage(prefix() + tr("Ese espacio no contiene ningún objeto.", "That slot does not contain an item."));
-            openEditor(p, project, page);
+            p.sendMessage(prefix() + tr("§eEste espacio está vacío. Coloca un objeto antes de abrir el taller.", "§eThis slot is empty. Place an item before opening the workshop."));
+            if (targetSlot < 0) openEquipment(p, project, page); else openEditor(p, project, page);
             return;
         }
-        ItemMeta targetMeta = target.getItemMeta();
-        String displayName = targetMeta != null && targetMeta.hasDisplayName() ? ChatColor.stripColor(targetMeta.getDisplayName()) : prettyKey(target.getType().name());
-        Inventory inv = menu("item-editor", project, page, targetSlot, 0, tr("§3✦ §bIxKits Studio §8• §0Taller de objetos", "§3✦ §bIxKits Studio §8• §0Item workshop"));
+        ItemMeta meta = target.getItemMeta();
+        String displayName = itemDisplayName(target);
+        Inventory inv = menu("item-editor", project, page, targetSlot, 0,
+            tr("§3✦ §bIXKITS §8» §0Taller de objeto", "§3✦ §bIXKITS §8» §0Item workshop"));
         border(inv);
         inv.setItem(4, target.clone());
-        inv.setItem(15, item(Material.PAPER, tr("§b✦ Copiar objeto", "§b✦ Copy item"),
-            tr("§7Guarda una copia exacta de este objeto.", "§7Keep an exact copy of this item."),
-            tr("§7Después haz clic en una ranura vacía.", "§7Then click an empty project slot."),
-            tr("§eAcción: guardar en el portapapeles", "§eAction: save to clipboard")));
-        inv.setItem(16, item(Material.CHEST, tr("§bPortapapeles", "§bClipboard"),
-            clipboardItem(p.getUniqueId()) != null ? tr("§a● Contiene un objeto", "§a● Contains an item") : tr("§8○ Sin objeto guardado", "§8○ No item saved"),
-            tr("§7Guarda una copia exacta para duplicarla.", "§7Keep an exact copy ready to duplicate."),
-            tr("§eClic para consultar su contenido", "§eClick to inspect its contents")));
-        inv.setItem(14, item(Material.NETHER_STAR, tr("§d§lPropiedades especiales", "§d§lSpecial properties"),
-            tr("§7Edita metadatos que distinguen", "§7Edit metadata that makes"),
-            tr("§7a cada pieza de tu proyecto.", "§7every item in your project unique."),
-            tr("§8• §7Libros, escudos y estandartes", "§8• §7Books, shields and banners"),
-            tr("§8• §7Adornos de armadura, cabezas y cohetes", "§8• §7Armor trims, heads and fireworks"),
-            tr("§eClic para abrir las herramientas", "§eClick to open the tools")));
-        inv.setItem(20, item(Material.ENCHANTED_BOOK, tr("§b✦ Encantamientos", "§b✦ Enchantments"),
-            tr("§7Control total sobre cada encantamiento.", "§7Full control over every enchantment."),
-            tr("§8• §7Clic: subir nivel", "§8• §7Click: raise level"),
-            tr("§8• §7Clic derecho: bajar nivel", "§8• §7Right-click: lower level"),
-            tr("§8• §7Mayús + clic: nivel exacto", "§8• §7Shift-click: exact level"),
+
+        inv.setItem(10, item(Material.NAME_TAG, "§b§l01  " + tr("Nombre del objeto", "Item name"),
+            tr("§8Actual: §f", "§8Current: §f") + displayName, "",
+            tr("§7MiniMessage · RGB · Gradientes", "§7MiniMessage · RGB · Gradients"), "",
+            tr("§eClic para editar el título", "§eClick to edit the title")));
+        inv.setItem(11, item(Material.WRITABLE_BOOK, "§b§l02  " + tr("Editor de lore", "Lore editor"),
+            tr("§7Diseña la descripción línea por línea.", "§7Build the description line by line."), "",
+            tr("§8• §7Editar, borrar y ordenar líneas", "§8• §7Edit, delete and reorder lines"),
+            tr("§8• §7Añadir separadores vacíos", "§8• §7Add blank spacer lines"),
+            tr("§8• §7Vista previa de RGB y gradientes", "§8• §7Preview RGB and gradients"), "",
+            tr("§eClic para editar el lore", "§eClick to edit lore")));
+        inv.setItem(12, item(Material.WRITABLE_BOOK, "§d§l03  " + tr("Plantillas de lore", "Lore templates"),
+            tr("§7Armas, armaduras, herramientas,", "§7Weapons, armor, tools,"),
+            tr("§7consumibles, minerales y tokens.", "§7consumables, minerals and tokens."), "",
+            tr("§a✓ §7Plantillas dinámicas disponibles", "§a✓ §7Dynamic templates available"),
+            tr("§7para encantamientos y habilidades.", "§7for enchantments and abilities."), "",
+            tr("§eClic para explorar categorías", "§eClick to browse categories")));
+        inv.setItem(13, item(Material.ENCHANTED_BOOK, "§b§l04  " + tr("Encantamientos", "Enchantments"),
+            tr("§7Clic: subir nivel", "§7Click: raise level"),
+            tr("§7Clic derecho: bajar nivel", "§7Right-click: lower level"),
+            tr("§7Mayús + clic: nivel exacto", "§7Shift-click: exact level"), "",
+            tr("§eClic para abrir el editor", "§eClick to open the editor")));
+        inv.setItem(14, item(Material.BOOKSHELF, "§d§l05  " + tr("Presets de encantamientos", "Enchantment presets"),
+            tr("§7Aplica combinaciones guardadas.", "§7Apply saved enchantment combinations."), "",
+            tr("§eClic para elegir preset", "§eClick to choose a preset")));
+        inv.setItem(15, item(Material.NETHER_STAR, "§c§l06  " + tr("Habilidades especiales", "Special abilities"),
+            tr("§7Poderes individuales por objeto.", "§7Per-item special powers."), "",
+            tr("§8• §7Fuego, escarcha, veneno y rayo", "§8• §7Flame, frost, poison and lightning"),
+            tr("§8• §7TNT, robo de vida e impacto", "§8• §7TNT, lifesteal and knockback"), "",
+            tr("§eClic para configurar", "§eClick to configure")));
+        inv.setItem(16, item(Material.SHIELD, "§d§l07  " + tr("Propiedades especiales", "Special properties"),
+            tr("§7Escudos, estandartes, libros,", "§7Shields, banners, books,"),
+            tr("§7adornos, cabezas y fuegos artificiales.", "§7trims, player heads and fireworks."), "",
+            tr("§eClic para abrir herramientas", "§eClick to open tools")));
+
+        inv.setItem(19, item(Material.CYAN_DYE, "§b§l08  " + tr("Paleta RGB", "RGB palette"),
+            tr("§7Aplica colores al nombre, al lore", "§7Apply colors to the name, the lore"),
+            tr("§7o a ambos de forma independiente.", "§7or both independently."), "",
+            tr("§eClic para elegir paleta y destino", "§eClick to choose palette and target")));
+        inv.setItem(20, item(Material.IRON_BLOCK, "§b§l09  " + tr("Irrompible", "Unbreakable"),
+            meta.isUnbreakable() ? tr("§a✓ Activado", "§a✓ Enabled") : tr("§8○ Desactivado", "§8○ Disabled"), "",
+            tr("§7Alterna la propiedad del objeto.", "§7Toggle the item's unbreakable property."), "",
+            tr("§eClic para cambiar", "§eClick to toggle")));
+        String durabilityText = target.getType().getMaxDurability() > 0 && meta instanceof Damageable damageable
+            ? Math.max(0, 100 - damageable.getDamage() * 100 / Math.max(1, target.getType().getMaxDurability())) + "%"
+            : tr("No aplica", "Not applicable");
+        inv.setItem(21, item(Material.ANVIL, "§b§l10  " + tr("Durabilidad", "Durability"),
+            tr("§7Estado actual: §f", "§7Current status: §f") + durabilityText, "",
+            tr("§7Clic: daño +10 · Derecho: -10", "§7Click: +10 damage · Right-click: -10"),
+            tr("§7Mayús + clic: reparar", "§7Shift-click: repair")));
+        inv.setItem(22, item(Material.CARVED_PUMPKIN, "§b§l11  " + tr("Modelo personalizado", "Custom model data"),
+            tr("§7Define o borra el modelo numérico.", "§7Set or clear the numeric model value."), "",
+            tr("§eClic para escribir", "§eClick to enter a value")));
+        inv.setItem(23, item(Material.BRUSH, "§b§l12  " + tr("Atributos", "Attributes"),
+            tr("§7Salud, daño, velocidad, armadura", "§7Health, damage, speed, armor"),
+            tr("§7y otros modificadores.", "§7and other modifiers."), "",
+            tr("§eClic para abrir atributos", "§eClick to open attributes")));
+        inv.setItem(24, item(Material.GLASS, "§b§l13  " + tr("Flags del objeto", "Item flags"),
+            tr("§7Muestra u oculta atributos y", "§7Show or hide attributes and"),
+            tr("§7propiedades en la descripción.", "§7properties in the tooltip."), "",
+            tr("§eClic para administrar flags", "§eClick to manage flags")));
+        inv.setItem(25, item(Material.LEATHER_CHESTPLATE, "§b§l14  " + tr("Color de cuero", "Leather color"),
+            tr("§7Solo disponible para cuero.", "§7Only available for leather armor."), "",
+            tr("§eClic y escribe #RRGGBB o R,G,B", "§eClick and type #RRGGBB or R,G,B")));
+
+        inv.setItem(28, item(Material.POTION, "§b§l15  " + tr("Poción y efectos", "Potion and effects"),
+            tr("§7Cambia tipo base y efectos", "§7Change the base type and"),
+            tr("§7personalizados de la poción.", "§7custom potion effects."), "",
             tr("§eClic para editar", "§eClick to edit")));
-        List<String> enchantLore = new ArrayList<>();
-        enchantLore.add(tr("§7Objeto: §f", "§7Item: §f") + displayName);
-        enchantLore.add(tr("§7Tipo: §f", "§7Material: §f") + prettyKey(target.getType().name()));
-        enchantLore.add(tr("§7Líneas de lore: §b", "§7Lore lines: §b") + (targetMeta == null || targetMeta.lore() == null ? 0 : targetMeta.lore().size()));
-        if (target.getEnchantments().isEmpty()) enchantLore.add(tr("§8✧ Sin encantamientos aplicados", "§8✧ No enchantments applied"));
-        else {
-            enchantLore.add(tr("§6⚔ Encantamientos actuales:", "§6⚔ Current enchantments:"));
-            target.getEnchantments().entrySet().stream().sorted(Comparator.comparing(entry -> entry.getKey().getKey().toString())).forEach(entry ->
-                enchantLore.add("§b› §f" + enchantmentDisplayName(entry.getKey()) + " §e" + romanLevel(entry.getValue())));
-        }
-        enchantLore.add(targetMeta != null && targetMeta.isUnbreakable() ? tr("§a✓ Irrompible", "§a✓ Unbreakable") : tr("§8○ Durabilidad normal", "§8○ Normal durability"));
-        inv.setItem(22, item(Material.WRITABLE_BOOK, tr("§b✧ Plantillas de lore", "§b✧ Lore templates"),
-            tr("§7Estilos originales para armas y objetos.", "§7Original styles for weapons and items."),
-            tr("§7Algunos insertan encantamientos y habilidades.", "§7Some insert enchantments and abilities."),
-            tr("§eClic para explorar diseños", "§eClick to explore designs")));
-        inv.setItem(31, item(Material.PAPER, tr("§fDetalles del objeto", "§fItem details"), enchantLore.toArray(new String[0])));
-        inv.setItem(11, item(Material.NAME_TAG, tr("§b✎ Nombre del objeto", "§b✎ Item name"),
-            tr("§7Actual: §f" + displayName, "§7Current: §f" + displayName),
-            tr("§7Gradientes, estilos y colores RGB.", "§7Gradients, styles and RGB colors."),
-            tr("§eClic para editar el nombre", "§eClick to edit the name")));
-        inv.setItem(13, item(Material.WRITABLE_BOOK, tr("§b§lDiseñador de descripción", "§b§lLore designer"),
-            tr("§7Construye una descripción cuidada", "§7Build a polished description"),
-            tr("§7línea por línea con vista previa.", "§7line by line with a live preview."),
-            tr("§8• §7RGB hexadecimal y gradientes", "§8• §7Hex RGB and gradients"),
-            tr("§8• §7Ordenar, duplicar y quitar líneas", "§8• §7Reorder, duplicate and remove lines"),
-            tr("§eClic para abrir el diseñador", "§eClick to open the designer")));
-        inv.setItem(24, item(Material.BARRIER, tr("§cQuitar todos los encantamientos", "§cRemove all enchantments"), tr("§7Solo afecta a este objeto del proyecto.", "§7Only affects this project item."), tr("§eClic para confirmar al instante", "§eClick to apply immediately")));
-        inv.setItem(27, item(Material.ENCHANTED_BOOK, tr("§dPlantillas de encantamientos", "§dEnchantment presets"), tr("§7Aplicar una combinación guardada.", "§7Apply a saved combination."), tr("§eClic para elegir", "§eClick to choose")));
-        inv.setItem(32, item(Material.PAINTING, tr("§bPaleta de colores", "§bColor palette"), tr("§7Cambiar el estilo del nombre y el lore.", "§7Restyle the name and lore."), tr("§eClic para elegir", "§eClick to choose")));
-        inv.setItem(30, item(Material.TNT, tr("§c⚡ Habilidades especiales", "§c⚡ Special abilities"),
-            tr("§7Activa poderes de combate por objeto.", "§7Enable per-item combat abilities."),
-            tr("§8• §7TNT, rayo y robo de vida", "§8• §7TNT, lightning and lifesteal"),
-            tr("§8• §7Veneno, escarcha, llama e impacto", "§8• §7Venom, frost, flame and knockback"),
-            tr("§eClic para configurar los poderes", "§eClick to configure abilities")));
-        inv.setItem(29, item(Material.IRON_BLOCK, tr("§bIrrompible", "§bUnbreakable"), tr("§7Alternar la propiedad del objeto.", "§7Toggle the item's property."), tr("§eClic para cambiar", "§eClick to toggle")));
-        inv.setItem(33, item(Material.ANVIL, tr("§bDurabilidad", "§bDurability"), tr("§7Clic: +10 de daño", "§7Click: +10 damage"), tr("§7Derecho: -10; Mayús: reparar", "§7Right-click: -10; Shift: repair")));
-        inv.setItem(35, item(Material.CARVED_PUMPKIN, tr("§bModelo personalizado", "§bCustom model data"), tr("§7Define o borra el número de modelo.", "§7Set or clear the model number."), tr("§eClic para escribir", "§eClick to type")));
-        inv.setItem(37, item(Material.BRUSH, tr("§bAtributos", "§bAttributes"), tr("§7Salud, daño, armadura y más.", "§7Health, damage, armor and more."), tr("§eClic para abrir", "§eClick to open")));
-        inv.setItem(39, item(Material.GLASS, tr("§bFlags del objeto", "§bItem flags"), tr("§7Alternar ocultación de atributos.", "§7Toggle hidden attributes."), tr("§eClic para cambiar", "§eClick to toggle")));
-        inv.setItem(41, item(Material.LEATHER_CHESTPLATE, tr("§bColor de cuero", "§bLeather color"), tr("§7Para objetos de cuero.", "§7For leather items."), tr("§eEscribe #RRGGBB o R,G,B", "§eType #RRGGBB or R,G,B")));
-        inv.setItem(43, item(Material.POTION, tr("§bTipo de poción", "§bPotion type"), tr("§7Para pociones y flechas con efecto.", "§7For potions and tipped arrows."), tr("§eClic para editar", "§eClick to edit")));
-        inv.setItem(45, item(Material.ARROW, tr("§7Volver al proyecto", "§7Back to project")));
+        inv.setItem(29, item(Material.PAPER, "§b§l16  " + tr("Copiar objeto", "Copy item"),
+            tr("§7Guarda una copia exacta con", "§7Save an exact copy with"),
+            tr("§7nombre, lore y metadatos.", "§7name, lore and metadata."), "",
+            tr("§eClic para copiar", "§eClick to copy")));
+        inv.setItem(30, item(Material.CHEST, "§b§l17  " + tr("Portapapeles", "Clipboard"),
+            clipboardItem(p.getUniqueId()) != null ? tr("§a● Hay una copia guardada", "§a● A copy is saved") : tr("§8○ Está vacío", "§8○ It is empty"), "",
+            tr("§7La copia persiste tras reiniciar.", "§7The copy survives restarts."), "",
+            tr("§eClic para ver, pegar o vaciar", "§eClick to inspect, paste or clear")));
+        List<String> details = new ArrayList<>();
+        details.add("§8§m━━━━━━━━━━━━━━━━━━━━");
+        details.add("§b§l" + tr("RESUMEN DEL OBJETO", "ITEM SUMMARY"));
+        details.add("");
+        details.add("§7" + tr("Tipo", "Type") + ": §f" + prettyKey(target.getType().name()));
+        details.add("§7" + tr("Cantidad", "Amount") + ": §f" + target.getAmount());
+        details.add("§7" + tr("Nombre", "Name") + ": §f" + displayName);
+        details.add("§7" + tr("Líneas de lore", "Lore lines") + ": §b" + (meta.lore() == null ? 0 : meta.lore().size()));
+        details.add("§7" + tr("Encantamientos", "Enchantments") + ": §b" + target.getEnchantments().size());
+        target.getEnchantments().entrySet().stream()
+            .sorted(Comparator.comparing(entry -> entry.getKey().getKey().toString()))
+            .forEach(entry -> details.add("§8• §f" + enchantmentIcon(entry.getKey()) + " " + enchantmentDisplayName(entry.getKey()) + " §e" + romanLevel(entry.getValue())));
+        details.add("");
+        List<String> activeAbilities = generatedAbilityLore(target);
+        details.add("§7" + tr("Habilidades activas", "Active abilities") + ": §d" + activeAbilities.size());
+        if (activeAbilities.isEmpty()) details.add("§8• " + tr("Sin habilidades", "No abilities enabled"));
+        else details.addAll(activeAbilities.stream().map(line -> "§8• " + translateLoreColors(line)).toList());
+        details.add("");
+        details.add(meta.isUnbreakable() ? "§a✓ " + tr("Irrompible", "Unbreakable") : "§8○ " + tr("Durabilidad normal", "Normal durability"));
+        details.add("§8§m━━━━━━━━━━━━━━━━━━━━");
+        inv.setItem(31, itemWithLore(Material.PAPER, "§f§l18  " + tr("Detalles del objeto", "Item details"), details));
+        inv.setItem(32, item(Material.CRAFTING_TABLE, "§a§l19  " + tr("Rellenar conjunto", "Fill complete set"),
+            tr("§7Genera herramientas y armaduras", "§7Generates tools and armor"),
+            tr("§7que falten en este proyecto.", "§7missing from this project."), "",
+            tr("§8• §7Solo completa espacios vacíos", "§8• §7Only fills empty slots"),
+            tr("§8• §7Adapta encantamientos por tipo", "§8• §7Chooses enchantments by item type"),
+            tr("§8• §7Nunca pone Filo en picos o palas", "§8• §7Never puts Sharpness on picks or shovels"), "",
+            tr("§eClic para generar el conjunto", "§eClick to generate the set")));
+        inv.setItem(33, item(Material.BARRIER, "§c§l20  " + tr("Quitar encantamientos", "Remove enchantments"),
+            tr("§7Quita los encantamientos de este", "§7Removes all enchantments from this"),
+            tr("§7objeto sin tocar los demás.", "§7item without affecting other items."), "",
+            tr("§eClic para limpiar", "§eClick to clear")));
+        inv.setItem(34, item(Material.REDSTONE, "§e§lGuardado automático",
+            "§7" + tr("Los cambios se guardan al aplicar.", "Changes save when applied."), "",
+            "§8✦ §7CS Studios"));
+        inv.setItem(45, item(Material.ARROW, "§7← " + tr("Volver al proyecto", "Back to project")));
+        inv.setItem(49, item(Material.BOOK, "§f§l" + tr("Guía rápida", "Quick guide"),
+            tr("§7Elige una herramienta en las filas", "§7Choose a tool in the rows"),
+            tr("§7superiores para personalizar el objeto.", "§7above to customize your item."), "",
+            tr("§8No se modifican otros objetos del kit.", "§8Other items in the kit are untouched.")));
         p.openInventory(inv);
     }
 
@@ -2262,52 +2375,78 @@ public final class IxKitsPlugin extends JavaPlugin implements Listener, CommandE
         ItemStack current = getProjectItem(project, page, targetSlot);
         ItemStack copied = clipboardItem(p.getUniqueId());
         Inventory inv = menu("clipboard", project, page, targetSlot, 0,
-            tr("§3✦ §bIxKits Studio §8• §0Portapapeles", "§3✦ §bIxKits Studio §8• §0Clipboard"));
+            tr("§3✦ §bIXKits Studio §8• §0Portapapeles", "§3✦ §bIXKits Studio §8• §0Clipboard"));
         border(inv);
         inv.setItem(4, item(Material.CHEST, tr("§b§lPortapapeles de objetos", "§b§lItem clipboard"),
-            tr("§7Copia, consulta, reemplaza y reutiliza objetos.", "§7Copy, inspect, replace and reuse items."),
-            tr("§8La copia se guarda en disco y sobrevive a los reinicios.", "§8The copy is saved to disk and survives restarts.")));
+            tr("§7Copia, consulta, reemplaza y reutiliza objetos.", "§7Copy, inspect, replace and reuse items."), "",
+            tr("§8La copia se guarda en disco y sobrevive a reinicios.", "§8The copy is saved to disk and survives restarts.")));
         inv.setItem(20, item(current == null || current.getType().isAir() ? Material.BARRIER : current.getType(),
             tr("§aCopiar objeto actual", "§aCopy current item"),
-            tr("§7Objeto: §f", "§7Item: §f") + itemDisplayName(current),
+            tr("§7Objeto: §f", "§7Item: §f") + itemDisplayName(current), "",
             tr("§eClic para guardar una copia", "§eClick to save a copy")));
         if (copied == null || copied.getType().isAir()) {
             inv.setItem(22, item(Material.BARRIER, tr("§cPortapapeles vacío", "§cClipboard is empty"),
-                tr("§7Copia un objeto del proyecto para comenzar.", "§7Copy a project item to get started."),
-                tr("§8Se conserva nombre, lore, encantamientos y metadatos.", "§8Name, lore, enchantments and metadata are preserved.")));
+                tr("§7Copia un objeto del proyecto para comenzar.", "§7Copy a project item to get started."), "",
+                tr("§8Conserva nombre, lore, encantamientos y metadatos.", "§8Preserves name, lore, enchantments and metadata.")));
             inv.setItem(24, item(Material.GRAY_DYE, tr("§7Reemplazar objeto actual", "§7Replace current item"),
                 tr("§cCopia un objeto antes de usar esta acción.", "§cCopy an item before using this action.")));
         } else {
-            ItemStack preview = copied.clone();
-            ItemMeta previewMeta = preview.getItemMeta();
-            List<String> statusLore = previewMeta.hasLore() ? new ArrayList<>(previewMeta.getLore()) : new ArrayList<>();
-            statusLore.add("");
-            statusLore.add(tr("§a✓ Copia disponible", "§a✓ Copy available"));
-            statusLore.add(tr("§7Cantidad: §f", "§7Amount: §f") + copied.getAmount());
-            previewMeta.setLore(statusLore);
-            preview.setItemMeta(previewMeta);
-            inv.setItem(22, preview);
+            inv.setItem(22, copied.clone());
             inv.setItem(24, item(Material.LIME_DYE, tr("§aReemplazar objeto actual", "§aReplace current item"),
-                tr("§7Sustituye el objeto seleccionado por la copia.", "§7Replace the selected item with the saved copy."),
+                tr("§7Sustituye el objeto seleccionado por la copia.", "§7Replace the selected item with the saved copy."), "",
                 tr("§eClic para reemplazar", "§eClick to replace")));
         }
         inv.setItem(29, item(Material.LAVA_BUCKET, tr("§cVaciar portapapeles", "§cClear clipboard"),
-            tr("§7Eliminar la copia guardada en memoria.", "§7Remove the saved copy from memory."),
+            tr("§7Eliminar la copia guardada en disco.", "§7Remove the saved copy from disk."), "",
             tr("§eClic para vaciar", "§eClick to clear")));
         inv.setItem(31, item(Material.CHEST, tr("§bPegar en otra ranura", "§bPaste into another slot"),
             tr("§7Vuelve al proyecto y haz clic izquierdo", "§7Return to the project and left-click"),
             tr("§7en una ranura vacía para duplicar la copia.", "§7an empty slot to duplicate the copy.")));
         inv.setItem(45, item(Material.ARROW, tr("§7Volver al editor", "§7Back to editor")));
         inv.setItem(49, item(Material.PAPER, tr("§fResumen", "§fSummary"),
-            tr("§7Objeto actual: §f", "§7Current item: §f") + itemDisplayName(current),
+            tr("§7Objeto actual: §f", "§7Current item: §f") + itemDisplayName(current), "",
             tr("§7Portapapeles: §f", "§7Clipboard: §f") + itemDisplayName(copied)));
         p.openInventory(inv);
     }
 
+
     private String itemDisplayName(ItemStack stack) {
         if (stack == null || stack.getType().isAir()) return tr("Vacío", "Empty");
         ItemMeta meta = stack.getItemMeta();
-        return meta != null && meta.hasDisplayName() ? ChatColor.stripColor(meta.getDisplayName()) : prettyKey(stack.getType().name());
+        if (meta != null && meta.hasDisplayName()) return ChatColor.stripColor(meta.getDisplayName());
+        return prettyKey(stack.getType().name());
+    }
+
+    private void sendHelp(Player player) {
+        String divider = "§8§m━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━";
+        player.sendMessage(divider);
+        player.sendMessage("§8┃ §b§l✦ IXKITS §f/ §bKIT CREATION STUDIO");
+        player.sendMessage("§8┃ " + configuredMessage("help.subtitle", "&7Crea objetos, kits y conjuntos desde una sola GUI.", "&7Create items, kits and sets from one GUI."));
+        player.sendMessage(divider);
+        player.sendMessage("§8┃ §b§l" + tr("ESTUDIO", "STUDIO"));
+        player.sendMessage("§8┃ §f/ixkits §8— §7" + tr("Abrir el taller", "Open the workshop"));
+        player.sendMessage("§8┃ §f/ixkits crear <nombre> §8— §7" + tr("Crear un proyecto", "Create a project"));
+        player.sendMessage("§8┃ §f/ixkits proyectos §8— §7" + tr("Buscar y organizar proyectos", "Search and organize projects"));
+        player.sendMessage("§8┃ §f/ixkits editar <proyecto> §8— §7" + tr("Editar un kit", "Edit a kit"));
+        player.sendMessage("§8┃ §f/ixkits plantillas §8— §7" + tr("Explorar plantillas de lore", "Browse lore templates"));
+        player.sendMessage("§8┃ §f/ixkits equipamiento <proyecto> §8— §7" + tr("Editar el equipamiento", "Edit equipment"));
+        player.sendMessage("");
+        player.sendMessage("§8┃ §d§l" + tr("PROYECTOS", "PROJECTS"));
+        player.sendMessage("§8┃ §f/ixkits claim <proyecto> §8— §7" + tr("Reclamar copia de los objetos", "Claim a copy of the items"));
+        player.sendMessage("§8┃ §f/ixkits exportar <proyecto> §8— §7" + tr("Exportar .ixkit.yml", "Export .ixkit.yml"));
+        player.sendMessage("§8┃ §f/ixkits importar <archivo.yml> [nombre] §8— §7" + tr("Importar desde imports", "Import from imports"));
+        player.sendMessage("§8┃ §f/ixkits importar-mano <proyecto> <página> <ranura>");
+        player.sendMessage("§8┃   §7" + tr("Copiar el objeto de tu mano al proyecto", "Copy the held item into the project"));
+        player.sendMessage("");
+        player.sendMessage("§8┃ §e§l" + tr("HERRAMIENTAS", "TOOLS"));
+        player.sendMessage("§8┃ §f/ixkits idioma <es|en|pt|fr|de|it|zh|ru> §8— §7" + tr("Cambiar idioma", "Change language"));
+        player.sendMessage("§8┃ §f/ixkits comunidad §8— §7" + tr("Abrir la comunidad", "Open Community"));
+        player.sendMessage("§8┃ §f/ixkits validar <proyecto> §8— §7" + tr("Revisar un proyecto", "Validate a project"));
+        player.sendMessage("§8┃ §f/ixkits recargar §8— §7" + tr("Recargar configuración y plantillas", "Reload configuration and templates"));
+        player.sendMessage(divider);
+        player.sendMessage("§8┃ §7" + tr("Documentación de CS Studios:", "CS Studios documentation:"));
+        player.sendMessage("§8┃ §bhttps://github.com/Angel08991/CS-Studios-");
+        player.sendMessage(divider);
     }
 
     private void claimProjectItems(Player player, String[] args) {
@@ -2415,8 +2554,11 @@ public final class IxKitsPlugin extends JavaPlugin implements Listener, CommandE
         inv.setItem(47, item(Material.SPECTRAL_ARROW, tr("§bAnterior", "§bPrevious"), tr("§7Página anterior", "§7Previous page")));
         inv.setItem(48, item(Material.LIME_DYE, tr("§aAñadir línea", "§aAdd line"),
             tr("§7Escribe el contenido de la nueva línea.", "§7Type the new line's content.")));
-        inv.setItem(49, item(Material.BARRIER, tr("§cBorrar todo el lore", "§cClear all lore"),
+        inv.setItem(49, item(Material.BARRIER, "§c§l" + tr("Borrar todo el lore", "Clear all lore"),
             tr("§7Pide confirmación por chat.", "§7Requires confirmation in chat.")));
+        inv.setItem(50, item(Material.WHITE_STAINED_GLASS_PANE, "§f§l" + tr("Añadir línea vacía", "Add blank line"),
+            tr("§7Inserta un separador sin texto.", "§7Insert an empty spacer with no text."), "",
+            tr("§eClic para insertar espacio", "§eClick to insert a spacer")));
         inv.setItem(51, item(Material.SPECTRAL_ARROW, tr("§bSiguiente", "§bNext"), tr("§7Página siguiente", "§7Next page")));
         inv.setItem(53, item(Material.PAPER, tr("§fLíneas: ", "§fLines: ") + lines.size(),
             tr("§7Cada línea es independiente.", "§7Each line is independent.")));
@@ -2429,6 +2571,7 @@ public final class IxKitsPlugin extends JavaPlugin implements Listener, CommandE
         ItemMeta meta = target.getItemMeta();
         meta.lore(lines.isEmpty() ? null : new ArrayList<>(lines));
         target.setItemMeta(meta);
+        clearLinkedLoreTemplate(project, page, targetSlot);
         saveProjectItem(project, page, targetSlot, target);
         openLoreEditor(p, project, page, targetSlot, viewPage);
     }
@@ -2774,8 +2917,14 @@ public final class IxKitsPlugin extends JavaPlugin implements Listener, CommandE
             } else if (slot == 40) openLanguages(p);
         } else if (h.kind.equals("language")) {
             if (slot == 45) openMain(p);
-            else if (slot == 21) setLanguage(p, "en");
-            else if (slot == 23) setLanguage(p, "es");
+            else if (slot == 10) setLanguage(p, "es");
+            else if (slot == 12) setLanguage(p, "en");
+            else if (slot == 14) setLanguage(p, "pt");
+            else if (slot == 16) setLanguage(p, "fr");
+            else if (slot == 28) setLanguage(p, "de");
+            else if (slot == 30) setLanguage(p, "it");
+            else if (slot == 32) setLanguage(p, "zh");
+            else if (slot == 34) setLanguage(p, "ru");
         } else if (h.kind.equals("projects")) {
             if (slot == 45) openMain(p);
             else if (slot == 47) openProjects(p, Math.max(0, h.page - 1), h.query);
@@ -3045,14 +3194,21 @@ public final class IxKitsPlugin extends JavaPlugin implements Listener, CommandE
             if (slot == 45) {
                 if (h.project == null) openTemplates(p);
                 else openItemEditor(p, h.project, h.page, h.targetSlot);
-            } else if (slot == 47) openPaletteTemplates(p, Math.max(0, listPage - 1), h.project, h.page, h.targetSlot);
-            else if (slot == 51) openPaletteTemplates(p, listPage + 1, h.project, h.page, h.targetSlot);
-            else if (h.entryBySlot.containsKey(slot)) {
+            } else if (slot == 47) openPaletteTemplates(p, Math.max(0, listPage - 1), h.project, h.page, h.targetSlot, h.query);
+            else if (slot == 51) openPaletteTemplates(p, listPage + 1, h.project, h.page, h.targetSlot, h.query);
+            else if (slot == 49) {
+                String nextScope = switch (normalizePaletteScope(h.query)) {
+                    case "both" -> "name";
+                    case "name" -> "lore";
+                    default -> "both";
+                };
+                openPaletteTemplates(p, listPage, h.project, h.page, h.targetSlot, nextScope);
+            } else if (h.entryBySlot.containsKey(slot)) {
                 if (e.isRightClick()) {
                     if (p.hasPermission("ixkits.admin") || p.hasPermission("ixkits.community.publish"))
                         publishLocalResource(p, "palette", h.entryBySlot.get(slot), null);
                     else p.sendMessage(prefix() + tr("Necesitas ixkits.community.publish para publicar recursos.", "You need ixkits.community.publish to publish resources."));
-                } else applyPalettePreset(p, h.entryBySlot.get(slot), h.project, h.page, h.targetSlot);
+                } else applyPalettePreset(p, h.entryBySlot.get(slot), h.project, h.page, h.targetSlot, h.query);
             }
         } else if (h.kind.equals("lore-templates")) {
             int listPage = h.project == null ? h.page : h.subPage;
@@ -3077,6 +3233,13 @@ public final class IxKitsPlugin extends JavaPlugin implements Listener, CommandE
                 "Escribe la nueva línea de lore (MiniMessage/RGB):", "Type the new lore line (MiniMessage/RGB):");
             else if (slot == 49) promptLoreInput(p, InputType.LORE_CLEAR_CONFIRM, h.project, h.page, h.targetSlot, -1,
                 "Escribe BORRAR para quitar todo el lore, o Cancelar para conservarlo:", "Type CLEAR to remove all lore, or Cancel to keep it:");
+            else if (slot == 50) {
+                ItemStack target = getProjectItem(h.project, h.page, h.targetSlot);
+                if (target == null || target.getType().isAir()) { openItemEditor(p, h.project, h.page, h.targetSlot); return; }
+                List<Component> lines = target.getItemMeta().lore() == null ? new ArrayList<>() : new ArrayList<>(target.getItemMeta().lore());
+                lines.add(Component.empty());
+                saveLoreLines(p, h.project, h.page, h.targetSlot, lines, h.subPage);
+            }
             else if (slot == 51) openLoreEditor(p, h.project, h.page, h.targetSlot, h.subPage + 1);
             else if (h.entryBySlot.containsKey(slot)) {
                 int lineIndex = Integer.parseInt(h.entryBySlot.get(slot));
@@ -3111,55 +3274,65 @@ public final class IxKitsPlugin extends JavaPlugin implements Listener, CommandE
             if (slot == 45) {
                 if (h.targetSlot < 0) openEquipment(p, h.project, h.page);
                 else openEditor(p, h.project, h.page);
-            }
-            else if (slot == 15) {
-                ItemStack source = getProjectItem(h.project, h.page, h.targetSlot);
-                if (source != null && !source.getType().isAir()) {
-                    setClipboard(p.getUniqueId(), source);
-                    p.sendMessage(prefix() + tr("Objeto copiado. Haz clic izquierdo en una ranura vacía del proyecto para pegarlo.", "Item copied. Left-click an empty project slot to paste it."));
+            } else if (slot == 10) promptInput(p, InputType.ITEM_NAME, h.project, h.page, h.targetSlot,
+                "Escribe el nombre con MiniMessage/RGB:", "Type the name with MiniMessage/RGB:");
+            else if (slot == 11) openLoreEditor(p, h.project, h.page, h.targetSlot, 0);
+            else if (slot == 12) openLoreTemplateCategories(p, h.project, h.page, h.targetSlot);
+            else if (slot == 13) openEnchantments(p, h.project, h.page, h.targetSlot, 0);
+            else if (slot == 14) openEnchantTemplates(p, 0, h.project, h.page, h.targetSlot);
+            else if (slot == 15) openAbilities(p, h.project, h.page, h.targetSlot);
+            else if (slot == 16) openSpecialProperties(p, h.project, h.page, h.targetSlot);
+            else if (slot == 19) openPaletteTemplates(p, 0, h.project, h.page, h.targetSlot);
+            else if (slot == 20) {
+                ItemStack target = getProjectItem(h.project, h.page, h.targetSlot);
+                if (target != null) {
+                    ItemMeta meta = target.getItemMeta();
+                    meta.setUnbreakable(!meta.isUnbreakable());
+                    target.setItemMeta(meta);
+                    saveProjectItem(h.project, h.page, h.targetSlot, target);
                 }
                 openItemEditor(p, h.project, h.page, h.targetSlot);
-            } else if (slot == 16) {
-                openClipboard(p, h.project, h.page, h.targetSlot);
-            } else if (slot == 14) openSpecialProperties(p, h.project, h.page, h.targetSlot);
-            else if (slot == 20) openEnchantments(p, h.project, h.page, h.targetSlot, 0);
-            else if (slot == 27) openEnchantTemplates(p, 0, h.project, h.page, h.targetSlot);
-            else if (slot == 32) openPaletteTemplates(p, 0, h.project, h.page, h.targetSlot);
-            else if (slot == 30) openAbilities(p, h.project, h.page, h.targetSlot);
-            else if (slot == 22) openLoreTemplateCategories(p, h.project, h.page, h.targetSlot);
-            else if (slot == 11) promptInput(p, InputType.ITEM_NAME, h.project, h.page, h.targetSlot, "Escribe el nombre MiniMessage del objeto:", "Type the item's MiniMessage name:");
-            else if (slot == 13) openLoreEditor(p, h.project, h.page, h.targetSlot, 0);
-            else if (slot == 29) {
+            } else if (slot == 21) {
                 ItemStack target = getProjectItem(h.project, h.page, h.targetSlot);
-                if (target != null) { ItemMeta meta = target.getItemMeta(); meta.setUnbreakable(!meta.isUnbreakable()); target.setItemMeta(meta); saveProjectItem(h.project, h.page, h.targetSlot, target); }
-                openItemEditor(p, h.project, h.page, h.targetSlot);
-            } else if (slot == 33) {
-                ItemStack target = getProjectItem(h.project, h.page, h.targetSlot);
-                if (target != null && target.getItemMeta() instanceof Damageable damageable) {
-                    ItemMeta meta = target.getItemMeta();
-                    Damageable edit = (Damageable) meta;
+                if (target != null && target.getItemMeta() instanceof Damageable) {
+                    Damageable edit = (Damageable) target.getItemMeta();
                     int maximum = Math.max(0, target.getType().getMaxDurability());
                     int value = e.isShiftClick() ? 0 : edit.getDamage() + (e.isRightClick() ? -10 : 10);
                     edit.setDamage(Math.max(0, Math.min(maximum, value)));
-                    target.setItemMeta(meta);
+                    target.setItemMeta((ItemMeta) edit);
                     saveProjectItem(h.project, h.page, h.targetSlot, target);
-                } else p.sendMessage(prefix() + tr("Este objeto no tiene durabilidad.", "This item has no durability."));
+                } else p.sendMessage(prefix() + tr("§eEste objeto no tiene durabilidad.", "§eThis item has no durability."));
                 openItemEditor(p, h.project, h.page, h.targetSlot);
-            } else if (slot == 35) promptInput(p, InputType.MODEL_DATA, h.project, h.page, h.targetSlot, "Escribe el custom model data numérico o - para borrarlo:", "Type the numeric custom model data or - to clear it:");
-            else if (slot == 37) openAttributes(p, h.project, h.page, h.targetSlot);
-            else if (slot == 39) openFlags(p, h.project, h.page, h.targetSlot); else if (slot == 41) {
+            } else if (slot == 22) promptInput(p, InputType.MODEL_DATA, h.project, h.page, h.targetSlot,
+                "Escribe el custom model data numérico o - para borrarlo:", "Type the numeric custom model data or - to clear it:");
+            else if (slot == 23) openAttributes(p, h.project, h.page, h.targetSlot);
+            else if (slot == 24) openFlags(p, h.project, h.page, h.targetSlot);
+            else if (slot == 25) {
                 ItemStack target = getProjectItem(h.project, h.page, h.targetSlot);
-                if (target != null && target.getItemMeta() instanceof LeatherArmorMeta) promptInput(p, InputType.LEATHER_COLOR, h.project, h.page, h.targetSlot, "Escribe el color como #RRGGBB o R,G,B:", "Type a color as #RRGGBB or R,G,B:");
-                else p.sendMessage(prefix() + tr("Solo disponible para armadura de cuero.", "Only available for leather armor."));
-            } else if (slot == 43) openPotionTypes(p, h.project, h.page, h.targetSlot, 0);
-            else if (slot == 24) {
-                YamlConfiguration y = YamlConfiguration.loadConfiguration(projectFile(h.project));
-                ItemStack target = y.getItemStack(storagePath(h.page, h.targetSlot));
+                if (target != null && target.getItemMeta() instanceof LeatherArmorMeta) {
+                    promptInput(p, InputType.LEATHER_COLOR, h.project, h.page, h.targetSlot,
+                        "Escribe el color como #RRGGBB o R,G,B:", "Type a color as #RRGGBB or R,G,B:");
+                } else p.sendMessage(prefix() + tr("§eSolo disponible para armadura de cuero.", "§eOnly available for leather armor."));
+            } else if (slot == 28) openPotionTypes(p, h.project, h.page, h.targetSlot, 0);
+            else if (slot == 29) {
+                ItemStack source = getProjectItem(h.project, h.page, h.targetSlot);
+                if (source != null && !source.getType().isAir()) {
+                    setClipboard(p.getUniqueId(), source);
+                    p.sendMessage(prefix() + configuredMessage("clipboard.saved", "&aObjeto copiado y guardado en disco.", "&aItem copied and saved to disk."));
+                }
+                openItemEditor(p, h.project, h.page, h.targetSlot);
+            } else if (slot == 30) openClipboard(p, h.project, h.page, h.targetSlot);
+            else if (slot == 32) fillCompleteSet(p, h.project, h.page, h.targetSlot);
+            else if (slot == 33) {
+                YamlConfiguration yaml = YamlConfiguration.loadConfiguration(projectFile(h.project));
+                ItemStack target = yaml.getItemStack(storagePath(h.page, h.targetSlot));
                 if (target != null) {
                     for (Enchantment enchantment : new ArrayList<>(target.getEnchantments().keySet())) target.removeEnchantment(enchantment);
-                    y.set(storagePath(h.page, h.targetSlot), target);
-                    saveYaml(y, projectFile(h.project));
-                    p.sendMessage(prefix() + tr("Se quitaron todos los encantamientos del objeto.", "All enchantments were removed from the item."));
+                    refreshLinkedLore(yaml, h.page, h.targetSlot, target);
+                    projectService.backupBeforeChange(projectFile(h.project));
+                    yaml.set(storagePath(h.page, h.targetSlot), target);
+                    saveYaml(yaml, projectFile(h.project));
+                    p.sendMessage(prefix() + tr("§aEncantamientos eliminados de este objeto.", "§aEnchantments removed from this item."));
                 }
                 openItemEditor(p, h.project, h.page, h.targetSlot);
             }
@@ -3253,6 +3426,7 @@ public final class IxKitsPlugin extends JavaPlugin implements Listener, CommandE
                 ItemStack target = y.getItemStack(storagePath(h.page, h.targetSlot));
                 if (target != null) {
                     for (Enchantment enchantment : new ArrayList<>(target.getEnchantments().keySet())) target.removeEnchantment(enchantment);
+                    refreshLinkedLore(y, h.page, h.targetSlot, target);
                     y.set(storagePath(h.page, h.targetSlot), target);
                     saveYaml(y, projectFile(h.project));
                     p.sendMessage(prefix() + tr("Se quitaron todos los encantamientos del objeto.", "All enchantments were removed from the item."));
@@ -3287,6 +3461,7 @@ public final class IxKitsPlugin extends JavaPlugin implements Listener, CommandE
                     int next = current <= 0 ? 1 : Math.min(32767, current + 1);
                     target.addUnsafeEnchantment(enchantment, next);
                 }
+                refreshLinkedLore(y, h.page, h.targetSlot, target);
                 y.set(itemPath, target);
                 saveYaml(y, projectFile(h.project));
                 openEnchantments(p, h.project, h.page, h.targetSlot, h.subPage);
@@ -3499,10 +3674,358 @@ public final class IxKitsPlugin extends JavaPlugin implements Listener, CommandE
         return YamlConfiguration.loadConfiguration(projectFile(project)).getItemStack(storagePath(page, slot));
     }
 
+    private void refreshLinkedLore(YamlConfiguration projectYaml, int page, int slot, ItemStack target) {
+        if (target == null || target.getType().isAir()) return;
+        String itemPath = storagePath(page, slot);
+        String templateKey = projectYaml.getString("lore-template." + itemPath);
+        if (templateKey == null || templateKey.isBlank()) return;
+        List<String> lines = yamlListForLoreTemplate(templateKey);
+        if (lines.isEmpty() || lines.stream().noneMatch(line ->
+            "{enchantments}".equalsIgnoreCase(line.trim()) || "{abilities}".equalsIgnoreCase(line.trim()))) return;
+        ItemMeta meta = target.getItemMeta();
+        if (meta == null) return;
+        meta.lore(loreComponents(resolveLorePlaceholders(lines, target)));
+        target.setItemMeta(meta);
+    }
+
+    private void clearLinkedLoreTemplate(String project, int page, int slot) {
+        File file = projectFile(project);
+        if (!file.isFile()) return;
+        YamlConfiguration yaml = YamlConfiguration.loadConfiguration(file);
+        yaml.set("lore-template." + storagePath(page, slot), null);
+        saveYaml(yaml, file);
+    }
+
+    private void fillCompleteSet(Player player, String project, int page, int targetSlot) {
+        if (!getConfig().getBoolean("set-fill.enabled", true)) {
+            player.sendMessage(prefix() + configuredMessage("set-fill.disabled", "&cLa generación de conjuntos está desactivada.", "&cSet generation is disabled."));
+            return;
+        }
+        File file = projectFile(project);
+        if (!file.isFile()) {
+            player.sendMessage(prefix() + configuredMessage("set-fill.project-missing", "&cNo se encontró el proyecto.", "&cProject not found."));
+            return;
+        }
+        YamlConfiguration yaml = YamlConfiguration.loadConfiguration(file);
+        ItemStack source = yaml.getItemStack(storagePath(page, targetSlot));
+        if (source == null || source.getType().isAir()) {
+            player.sendMessage(prefix() + configuredMessage("set-fill.source-required", "&eSelecciona primero una espada, herramienta o pieza de armadura.", "&eSelect a sword, tool or armor piece first."));
+            return;
+        }
+        String toolTier = tierForTools(source.getType().name());
+        String armorTier = tierForArmor(source.getType().name(), toolTier);
+        String startHex = setPaletteStart(toolTier);
+        String endHex = setPaletteEnd(toolTier);
+        int created = 0;
+        int skipped = 0;
+        projectService.backupBeforeChange(file);
+
+        // Tools are inserted only into free slots. Existing project items are never replaced.
+        for (String suffix : List.of("SWORD", "PICKAXE", "AXE", "SHOVEL", "HOE")) {
+            Material material = Material.matchMaterial(toolTier + "_" + suffix);
+            if (material == null || projectContainsMaterial(yaml, material)) { skipped++; continue; }
+            String templateKey = suggestSetLore(material);
+            ItemStack generated = createGeneratedSetItem(source, material, templateKey, startHex, endHex);
+            if (placeGeneratedItem(yaml, generated, templateKey)) created++; else skipped++;
+        }
+
+        // Armor goes into the appropriate equipment slot whenever possible.
+        for (String suffix : List.of("HELMET", "CHESTPLATE", "LEGGINGS", "BOOTS")) {
+            Material material = Material.matchMaterial(armorTier + "_" + suffix);
+            if (material == null || projectContainsMaterial(yaml, material)) { skipped++; continue; }
+            String equipmentKey = switch (suffix) {
+                case "HELMET" -> "helmet";
+                case "CHESTPLATE" -> "chestplate";
+                case "LEGGINGS" -> "leggings";
+                default -> "boots";
+            };
+            ItemStack current = yaml.getItemStack("equipment." + equipmentKey);
+            if (current != null && !current.getType().isAir()) { skipped++; continue; }
+            ItemStack generated = createGeneratedSetItem(source, material, "set_armor_sections", startHex, endHex);
+            yaml.set("equipment." + equipmentKey, generated);
+            yaml.set("lore-template.equipment." + equipmentKey, "set_armor_sections");
+            created++;
+        }
+
+        if (!projectContainsMaterial(yaml, Material.SHIELD)) {
+            ItemStack shield = createGeneratedSetItem(source, Material.SHIELD, "set_shield_sections", startHex, endHex);
+            ItemStack currentOffhand = yaml.getItemStack("equipment.offhand");
+            if (currentOffhand == null || currentOffhand.getType().isAir()) {
+                yaml.set("equipment.offhand", shield);
+                yaml.set("lore-template.equipment.offhand", "set_shield_sections");
+                created++;
+            } else if (placeGeneratedItem(yaml, shield, "set_shield_sections")) created++;
+            else skipped++;
+        } else skipped++;
+
+        for (Material material : List.of(Material.BOW, Material.CROSSBOW)) {
+            if (projectContainsMaterial(yaml, material)) { skipped++; continue; }
+            String templateKey = "set_ranged_sections";
+            ItemStack ranged = createGeneratedSetItem(source, material, templateKey, startHex, endHex);
+            if (placeGeneratedItem(yaml, ranged, templateKey)) created++; else skipped++;
+        }
+
+        if (created > 0) {
+            yaml.set("format-version", 2);
+            yaml.set("updated", System.currentTimeMillis());
+            saveYaml(yaml, file);
+            player.sendMessage(prefix() + configuredMessage("set-fill.success", "&a✓ Conjunto generado correctamente.", "&a✓ Set generated successfully."));
+            player.sendMessage(prefix() + configuredMessage("set-fill.added", "&7Objetos añadidos: &b{count}", "&7Items added: &b{count}", "{count}", String.valueOf(created)));
+            if (skipped > 0) player.sendMessage(prefix() + configuredMessage("set-fill.skipped", "&8Espacios ocupados o incompatibles omitidos: &7{count}", "&8Occupied or incompatible slots skipped: &7{count}", "{count}", String.valueOf(skipped)));
+        } else {
+            player.sendMessage(prefix() + configuredMessage("set-fill.no-room", "&eNo había espacios compatibles. No se sobrescribió ningún objeto.", "&eNo compatible empty slots were found. No items were overwritten."));
+        }
+        openItemEditor(player, project, page, targetSlot);
+    }
+
+    private String tierForTools(String materialName) {
+        for (String tier : List.of("NETHERITE", "DIAMOND", "GOLDEN", "IRON", "STONE", "WOODEN")) {
+            if (materialName.startsWith(tier + "_")) return tier;
+        }
+        String configured = getConfig().getString("set-fill.default-tool-tier", "DIAMOND").toUpperCase(Locale.ROOT);
+        return Set.of("NETHERITE", "DIAMOND", "GOLDEN", "IRON", "STONE", "WOODEN").contains(configured) ? configured : "DIAMOND";
+    }
+
+    private String tierForArmor(String materialName, String toolTier) {
+        for (String tier : List.of("NETHERITE", "DIAMOND", "GOLDEN", "IRON", "CHAINMAIL", "LEATHER")) {
+            if (materialName.startsWith(tier + "_")
+                && (materialName.endsWith("_HELMET") || materialName.endsWith("_CHESTPLATE")
+                || materialName.endsWith("_LEGGINGS") || materialName.endsWith("_BOOTS"))) return tier;
+        }
+        if (Set.of("NETHERITE", "DIAMOND", "GOLDEN", "IRON").contains(toolTier)) return toolTier;
+        if (toolTier.equals("STONE")) return "CHAINMAIL";
+        if (toolTier.equals("WOODEN")) return "LEATHER";
+        String configured = getConfig().getString("set-fill.default-armor-tier", "DIAMOND").toUpperCase(Locale.ROOT);
+        return Set.of("NETHERITE", "DIAMOND", "GOLDEN", "IRON", "CHAINMAIL", "LEATHER").contains(configured) ? configured : "DIAMOND";
+    }
+
+    private String setPaletteStart(String tier) {
+        return switch (tier) {
+            case "NETHERITE" -> "#A78BFA";
+            case "DIAMOND" -> "#22D3EE";
+            case "GOLDEN" -> "#FBBF24";
+            case "IRON", "CHAINMAIL" -> "#CBD5E1";
+            case "LEATHER", "WOODEN" -> "#86EFAC";
+            default -> "#94A3B8";
+        };
+    }
+
+    private String setPaletteEnd(String tier) {
+        return switch (tier) {
+            case "NETHERITE" -> "#6366F1";
+            case "DIAMOND" -> "#2563EB";
+            case "GOLDEN" -> "#F97316";
+            case "IRON", "CHAINMAIL" -> "#64748B";
+            case "LEATHER", "WOODEN" -> "#16A34A";
+            default -> "#475569";
+        };
+    }
+
+    private String suggestSetLore(Material material) {
+        String name = material.name();
+        if (name.endsWith("_SWORD") || name.endsWith("_AXE")) return "set_weapon_sections";
+        if (name.endsWith("_PICKAXE") || name.endsWith("_SHOVEL") || name.endsWith("_HOE")) return "set_tool_sections";
+        if (name.equals("BOW") || name.equals("CROSSBOW") || name.equals("TRIDENT")) return "set_ranged_sections";
+        if (name.equals("SHIELD")) return "set_shield_sections";
+        if (name.endsWith("_HELMET") || name.endsWith("_CHESTPLATE") || name.endsWith("_LEGGINGS") || name.endsWith("_BOOTS")) return "set_armor_sections";
+        return "set_tool_sections";
+    }
+
+    private boolean projectContainsMaterial(YamlConfiguration yaml, Material material) {
+        for (int page = 0; page < 2; page++) {
+            for (int slot : EDIT_SLOTS) {
+                ItemStack item = yaml.getItemStack("pages." + page + "." + slot);
+                if (item != null && item.getType() == material) return true;
+            }
+        }
+        for (String key : EQUIPMENT_KEYS) {
+            ItemStack item = yaml.getItemStack("equipment." + key);
+            if (item != null && item.getType() == material) return true;
+        }
+        return false;
+    }
+
+    private ItemStack createGeneratedSetItem(ItemStack source, Material material, String templateKey, String startHex, String endHex) {
+        ItemStack target = new ItemStack(material);
+        ItemMeta targetMeta = target.getItemMeta();
+        if (targetMeta == null) return target;
+        ItemMeta sourceMeta = source.getItemMeta();
+        if (sourceMeta != null) {
+            targetMeta.setUnbreakable(sourceMeta.isUnbreakable());
+            for (ItemFlag flag : sourceMeta.getItemFlags()) targetMeta.addItemFlags(flag);
+            if (targetMeta instanceof LeatherArmorMeta targetLeather && sourceMeta instanceof LeatherArmorMeta sourceLeather)
+                targetLeather.setColor(sourceLeather.getColor());
+        }
+        targetMeta.displayName(gradientComponent(setItemDisplayName(material), startHex, endHex));
+        target.setItemMeta(targetMeta);
+        copyCompatibleSetEnchantments(source, target);
+        copySetAbilities(source, target);
+        applyDefaultSetEnchantments(source, target);
+        applySetLore(target, templateKey);
+        return target;
+    }
+
+    private String setItemDisplayName(Material material) {
+        String name = material.name();
+        String shownTier = "";
+        String[] tiers = {"NETHERITE", "DIAMOND", "GOLDEN", "IRON", "STONE", "WOODEN", "CHAINMAIL", "LEATHER"};
+        String[] tierEs = {"Netherita", "Diamante", "Oro", "Hierro", "Piedra", "Madera", "Cota de malla", "Cuero"};
+        String[] tierEn = {"Netherite", "Diamond", "Golden", "Iron", "Stone", "Wooden", "Chainmail", "Leather"};
+        for (int i = 0; i < tiers.length; i++) {
+            if (name.startsWith(tiers[i] + "_")) {
+                shownTier = isEnglish() ? tierEn[i] : tierEs[i];
+                name = name.substring(tiers[i].length() + 1);
+                break;
+            }
+        }
+        String enName;
+        String esName;
+        switch (name) {
+            case "SWORD" -> { enName = "Sword"; esName = "Espada"; }
+            case "PICKAXE" -> { enName = "Pickaxe"; esName = "Pico"; }
+            case "AXE" -> { enName = "Axe"; esName = "Hacha"; }
+            case "SHOVEL" -> { enName = "Shovel"; esName = "Pala"; }
+            case "HOE" -> { enName = "Hoe"; esName = "Azada"; }
+            case "HELMET" -> { enName = "Helmet"; esName = "Casco"; }
+            case "CHESTPLATE" -> { enName = "Chestplate"; esName = "Peto"; }
+            case "LEGGINGS" -> { enName = "Leggings"; esName = "Pantalones"; }
+            case "BOOTS" -> { enName = "Boots"; esName = "Botas"; }
+            case "SHIELD" -> { enName = "Shield"; esName = "Escudo"; }
+            case "BOW" -> { enName = "Bow"; esName = "Arco"; }
+            case "CROSSBOW" -> { enName = "Crossbow"; esName = "Ballesta"; }
+            default -> { enName = prettyKey(name); esName = prettyKey(name); }
+        }
+        String itemName = isEnglish() ? enName : esName;
+        return shownTier.isBlank() ? itemName : (isEnglish() ? shownTier + " " + itemName : itemName + " de " + shownTier.toLowerCase(Locale.ROOT));
+    }
+
+    private boolean hasConflictingEnchant(ItemStack target, Enchantment candidate) {
+        for (Enchantment existing : target.getEnchantments().keySet()) {
+            if (existing.equals(candidate)) continue;
+            if (existing.conflictsWith(candidate) || candidate.conflictsWith(existing)) return true;
+        }
+        return false;
+    }
+
+    private void copyCompatibleSetEnchantments(ItemStack source, ItemStack target) {
+        List<Map.Entry<Enchantment, Integer>> entries = new ArrayList<>(source.getEnchantments().entrySet());
+        entries.sort(Comparator.comparing(entry -> entry.getKey().getKey().toString()));
+        for (Map.Entry<Enchantment, Integer> entry : entries) {
+            Enchantment enchantment = entry.getKey();
+            if (enchantment.canEnchantItem(target) && !hasConflictingEnchant(target, enchantment))
+                target.addUnsafeEnchantment(enchantment, entry.getValue());
+        }
+    }
+
+    private void copySetAbilities(ItemStack source, ItemStack target) {
+        String name = target.getType().name();
+        if (!(name.endsWith("_SWORD") || name.endsWith("_AXE"))) return;
+        ItemMeta sourceMeta = source.getItemMeta();
+        ItemMeta targetMeta = target.getItemMeta();
+        if (sourceMeta == null || targetMeta == null) return;
+        var from = sourceMeta.getPersistentDataContainer();
+        var to = targetMeta.getPersistentDataContainer();
+        for (NamespacedKey key : List.of(tntOnHitKey, lightningOnHitKey, lifeStealOnHitKey, poisonOnHitKey, frostOnHitKey, flameOnHitKey, knockbackOnHitKey)) {
+            if (key != null && from.has(key, PersistentDataType.BYTE)) to.set(key, PersistentDataType.BYTE, from.get(key, PersistentDataType.BYTE));
+        }
+        for (NamespacedKey key : List.of(tntCooldownKey, lightningCooldownKey, lifeStealCooldownKey, poisonCooldownKey, frostCooldownKey, flameCooldownKey, knockbackCooldownKey)) {
+            if (key != null && from.has(key, PersistentDataType.LONG)) to.set(key, PersistentDataType.LONG, from.get(key, PersistentDataType.LONG));
+        }
+        target.setItemMeta(targetMeta);
+    }
+
+    private boolean hasAnyEnchant(ItemStack stack, String... keys) {
+        for (String key : keys) {
+            Enchantment enchantment = Registry.ENCHANTMENT.get(NamespacedKey.minecraft(key));
+            if (enchantment != null && stack.getEnchantmentLevel(enchantment) > 0) return true;
+        }
+        return false;
+    }
+
+    private void addSetEnchantment(ItemStack target, String key, int level) {
+        Enchantment enchantment = Registry.ENCHANTMENT.get(NamespacedKey.minecraft(key));
+        if (enchantment != null && enchantment.canEnchantItem(target)
+            && target.getEnchantmentLevel(enchantment) == 0 && !hasConflictingEnchant(target, enchantment))
+            target.addUnsafeEnchantment(enchantment, Math.max(1, Math.min(32767, level)));
+    }
+
+    private int sourceEnchantLevel(ItemStack source, String key, int fallback) {
+        Enchantment enchantment = Registry.ENCHANTMENT.get(NamespacedKey.minecraft(key));
+        if (enchantment == null) return fallback;
+        int level = source.getEnchantmentLevel(enchantment);
+        return level > 0 ? level : fallback;
+    }
+
+    private void applyDefaultSetEnchantments(ItemStack source, ItemStack target) {
+        String name = target.getType().name();
+        boolean armor = name.endsWith("_HELMET") || name.endsWith("_CHESTPLATE") || name.endsWith("_LEGGINGS") || name.endsWith("_BOOTS");
+        boolean tool = name.endsWith("_PICKAXE") || name.endsWith("_SHOVEL") || name.endsWith("_HOE");
+        boolean melee = name.endsWith("_SWORD") || name.endsWith("_AXE");
+        if (armor) {
+            if (!hasAnyEnchant(target, "protection", "fire_protection", "blast_protection", "projectile_protection"))
+                addSetEnchantment(target, "protection", sourceEnchantLevel(source, "protection", 4));
+            addSetEnchantment(target, "unbreaking", sourceEnchantLevel(source, "unbreaking", 3));
+            addSetEnchantment(target, "mending", sourceEnchantLevel(source, "mending", 1));
+            if (name.endsWith("_BOOTS")) addSetEnchantment(target, "feather_falling", sourceEnchantLevel(source, "feather_falling", 4));
+            if (name.endsWith("_HELMET")) {
+                addSetEnchantment(target, "respiration", sourceEnchantLevel(source, "respiration", 3));
+                addSetEnchantment(target, "aqua_affinity", sourceEnchantLevel(source, "aqua_affinity", 1));
+            }
+        } else if (tool) {
+            addSetEnchantment(target, "efficiency", sourceEnchantLevel(source, "efficiency", 5));
+            addSetEnchantment(target, "unbreaking", sourceEnchantLevel(source, "unbreaking", 3));
+            addSetEnchantment(target, "mending", sourceEnchantLevel(source, "mending", 1));
+            if (!hasAnyEnchant(target, "fortune", "silk_touch"))
+                addSetEnchantment(target, "fortune", sourceEnchantLevel(source, "fortune", 3));
+        } else if (melee) {
+            if (!hasAnyEnchant(target, "sharpness", "smite", "bane_of_arthropods"))
+                addSetEnchantment(target, "sharpness", sourceEnchantLevel(source, "sharpness", 5));
+            addSetEnchantment(target, "unbreaking", sourceEnchantLevel(source, "unbreaking", 3));
+            addSetEnchantment(target, "mending", sourceEnchantLevel(source, "mending", 1));
+        } else if (name.equals("BOW")) {
+            addSetEnchantment(target, "power", sourceEnchantLevel(source, "power", 5));
+            addSetEnchantment(target, "unbreaking", sourceEnchantLevel(source, "unbreaking", 3));
+            addSetEnchantment(target, "flame", sourceEnchantLevel(source, "flame", 1));
+            addSetEnchantment(target, "infinity", sourceEnchantLevel(source, "infinity", 1));
+        } else if (name.equals("CROSSBOW")) {
+            addSetEnchantment(target, "quick_charge", sourceEnchantLevel(source, "quick_charge", 3));
+            addSetEnchantment(target, "unbreaking", sourceEnchantLevel(source, "unbreaking", 3));
+            if (hasAnyEnchant(source, "multishot")) addSetEnchantment(target, "multishot", sourceEnchantLevel(source, "multishot", 1));
+            else addSetEnchantment(target, "piercing", sourceEnchantLevel(source, "piercing", 4));
+        } else if (name.equals("SHIELD")) {
+            addSetEnchantment(target, "unbreaking", sourceEnchantLevel(source, "unbreaking", 3));
+            addSetEnchantment(target, "mending", sourceEnchantLevel(source, "mending", 1));
+        }
+    }
+
+    private void applySetLore(ItemStack target, String templateKey) {
+        List<String> lines = yamlListForLoreTemplate(templateKey);
+        ItemMeta meta = target.getItemMeta();
+        if (meta == null || lines.isEmpty()) return;
+        meta.lore(loreComponents(resolveLorePlaceholders(lines, target)));
+        target.setItemMeta(meta);
+    }
+
+    private boolean placeGeneratedItem(YamlConfiguration yaml, ItemStack item, String templateKey) {
+        for (int page = 0; page < 2; page++) {
+            for (int slot : EDIT_SLOTS) {
+                String itemPath = "pages." + page + "." + slot;
+                ItemStack current = yaml.getItemStack(itemPath);
+                if (current == null || current.getType().isAir()) {
+                    yaml.set(itemPath, item);
+                    yaml.set("lore-template." + itemPath, templateKey);
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
+
     private void saveProjectItem(String project, int page, int slot, ItemStack item) {
         File file = projectFile(project);
         projectService.backupBeforeChange(file);
         YamlConfiguration yaml = YamlConfiguration.loadConfiguration(file);
+        refreshLinkedLore(yaml, page, slot, item);
         yaml.set(storagePath(page, slot), item);
         yaml.set("format-version", 2);
         yaml.set("updated", System.currentTimeMillis());
@@ -4027,6 +4550,157 @@ public final class IxKitsPlugin extends JavaPlugin implements Listener, CommandE
                 "<#EF4444>◆ <#FECACA>Quality: <#EF4444>★★★★★", "",
                 "<#F87171>✔ Use it at /warp trades",
                 "<gradient:#450A0A:#EF4444>━━━━━━━━━━━━━━━━━━━━</gradient>"));
+        ensureLoreTemplate(lore, "sword_rpg_sections", "&#FBBF24⚔ &lEspada de leyenda", "&#FBBF24⚔ &lLegendary Sword",
+            List.of("<gradient:#78350F:#FBBF24>━━━━━━━━━━━━━━━━━━━━</gradient>",
+                "<gradient:#FDE68A:#F59E0B><bold>ESPADA DE LEYENDA</bold></gradient>",
+                "<#D6D3D1>Un arma hecha para decidir la batalla.", "",
+                "<#FBBF24>| <#FDE68A>Encantamientos",
+                "{enchantments}", "",
+                "<#C084FC>| <#E9D5FF>Habilidades",
+                "{abilities}", "",
+                "<gradient:#FDE68A:#F59E0B>✦ Que comience la leyenda.</gradient>"),
+            List.of("<gradient:#78350F:#FBBF24>━━━━━━━━━━━━━━━━━━━━</gradient>",
+                "<gradient:#FDE68A:#F59E0B><bold>LEGENDARY SWORD</bold></gradient>",
+                "<#D6D3D1>A weapon made to decide the battle.", "",
+                "<#FBBF24>| <#FDE68A>Enchantments",
+                "{enchantments}", "",
+                "<#C084FC>| <#E9D5FF>Abilities",
+                "{abilities}", "",
+                "<gradient:#FDE68A:#F59E0B>✦ Let the legend begin.</gradient>"));
+        ensureLoreTemplate(lore, "armor_vanguard_sections", "&#38BDF8✦ &lArmadura Vanguard", "&#38BDF8✦ &lVanguard Armor",
+            List.of("<gradient:#0C4A6E:#38BDF8>━━━━━━━━━━━━━━━━━━━━</gradient>",
+                "<gradient:#BAE6FD:#38BDF8><bold>SET VANGUARD</bold></gradient>",
+                "<#CBD5E1>Protección equilibrada para el combate.", "",
+                "<#38BDF8>| <#BAE6FD>Encantamientos",
+                "{enchantments}", "",
+                "<#A78BFA>| <#DDD6FE>Habilidades del set",
+                "{abilities}", "",
+                "<gradient:#0C4A6E:#38BDF8>━━━━━━━━━━━━━━━━━━━━</gradient>"),
+            List.of("<gradient:#0C4A6E:#38BDF8>━━━━━━━━━━━━━━━━━━━━</gradient>",
+                "<gradient:#BAE6FD:#38BDF8><bold>VANGUARD SET</bold></gradient>",
+                "<#CBD5E1>Balanced protection for combat.", "",
+                "<#38BDF8>| <#BAE6FD>Enchantments",
+                "{enchantments}", "",
+                "<#A78BFA>| <#DDD6FE>Set abilities",
+                "{abilities}", "",
+                "<gradient:#0C4A6E:#38BDF8>━━━━━━━━━━━━━━━━━━━━</gradient>"));
+        ensureLoreTemplate(lore, "armor_dragon_rgb", "&#F87171✦ &lArmadura Dracónica", "&#F87171✦ &lDragon Armor",
+            List.of("<gradient:#450A0A:#F87171>━━━━━━━━━━━━━━━━━━━━</gradient>",
+                "<gradient:#FCA5A5:#FB7185><bold>ARMADURA DRACÓNICA</bold></gradient>",
+                "<#FECACA>Forjada bajo el aliento de un dragón.", "",
+                "<#FB7185>| <#FECACA>Encantamientos",
+                "{enchantments}", "",
+                "<#FBBF24>✦ <#FDE68A>Resistencia ancestral",
+                "<gradient:#450A0A:#F87171>━━━━━━━━━━━━━━━━━━━━</gradient>"),
+            List.of("<gradient:#450A0A:#F87171>━━━━━━━━━━━━━━━━━━━━</gradient>",
+                "<gradient:#FCA5A5:#FB7185><bold>DRAGON ARMOR</bold></gradient>",
+                "<#FECACA>Forged beneath a dragon's breath.", "",
+                "<#FB7185>| <#FECACA>Enchantments",
+                "{enchantments}", "",
+                "<#FBBF24>✦ <#FDE68A>Ancient resilience",
+                "<gradient:#450A0A:#F87171>━━━━━━━━━━━━━━━━━━━━</gradient>"));
+        ensureLoreTemplate(lore, "tool_miner_sections", "&#22D3EE⛏ &lHerramienta de minero", "&#22D3EE⛏ &lMiner's Tool",
+            List.of("<gradient:#164E63:#22D3EE>━━━━━━━━━━━━━━━━━━━━</gradient>",
+                "<gradient:#CFFAFE:#22D3EE><bold>HERRAMIENTA DE MINERO</bold></gradient>",
+                "<#A5F3FC>Diseñada para extraer recursos con eficiencia.", "",
+                "<#22D3EE>| <#CFFAFE>Encantamientos",
+                "{enchantments}", "",
+                "<#67E8F9>◆ Recolección · Precisión · Durabilidad",
+                "<gradient:#164E63:#22D3EE>━━━━━━━━━━━━━━━━━━━━</gradient>"),
+            List.of("<gradient:#164E63:#22D3EE>━━━━━━━━━━━━━━━━━━━━</gradient>",
+                "<gradient:#CFFAFE:#22D3EE><bold>MINER'S TOOL</bold></gradient>",
+                "<#A5F3FC>Designed for efficient resource gathering.", "",
+                "<#22D3EE>| <#CFFAFE>Enchantments",
+                "{enchantments}", "",
+                "<#67E8F9>◆ Gathering · Precision · Durability",
+                "<gradient:#164E63:#22D3EE>━━━━━━━━━━━━━━━━━━━━</gradient>"));
+        ensureLoreTemplate(lore, "archer_bow_sections", "&#F472B6➶ &lArco de tirador", "&#F472B6➶ &lMarksman's Bow",
+            List.of("<gradient:#831843:#F472B6>━━━━━━━━━━━━━━━━━━━━</gradient>",
+                "<gradient:#FBCFE8:#F472B6><bold>ARCO DEL TIRADOR</bold></gradient>",
+                "<#FCE7F3>Cada flecha encuentra su destino.", "",
+                "<#F472B6>| <#FBCFE8>Encantamientos",
+                "{enchantments}", "",
+                "<#C084FC>✦ <#E9D5FF>Habilidad: precisión absoluta",
+                "<gradient:#831843:#F472B6>━━━━━━━━━━━━━━━━━━━━</gradient>"),
+            List.of("<gradient:#831843:#F472B6>━━━━━━━━━━━━━━━━━━━━</gradient>",
+                "<gradient:#FBCFE8:#F472B6><bold>MARKSMAN'S BOW</bold></gradient>",
+                "<#FCE7F3>Every arrow finds its mark.", "",
+                "<#F472B6>| <#FBCFE8>Enchantments",
+                "{enchantments}", "",
+                "<#C084FC>✦ <#E9D5FF>Ability: absolute precision",
+                "<gradient:#831843:#F472B6>━━━━━━━━━━━━━━━━━━━━</gradient>"));
+
+        // Plantillas enlazadas para que el lore generado cambie con los encantamientos/habilidades.
+        ensureLoreTemplate(lore, "set_weapon_sections", "&#FBBF24⚔ &lArma de conjunto", "&#FBBF24⚔ &lSet Weapon",
+            List.of("<gradient:#334155:#94A3B8>━━━━━━━━━━━━━━━━━━━━</gradient>",
+                "<gradient:#F8FAFC:#94A3B8><bold>{item}</bold></gradient>",
+                "<#94A3B8>Personalizado por IxKits · CS Studios.", "",
+                "<#FBBF24>| <#FDE68A>Encantamientos",
+                "{enchantments}", "",
+                "<#C084FC>| <#DDD6FE>Habilidades",
+                "{abilities}", "",
+                "<gradient:#334155:#94A3B8>━━━━━━━━━━━━━━━━━━━━</gradient>"),
+            List.of("<gradient:#334155:#94A3B8>━━━━━━━━━━━━━━━━━━━━</gradient>",
+                "<gradient:#F8FAFC:#94A3B8><bold>{item}</bold></gradient>",
+                "<#94A3B8>Customized with IxKits · CS Studios.", "",
+                "<#FBBF24>| <#FDE68A>Enchantments",
+                "{enchantments}", "",
+                "<#C084FC>| <#DDD6FE>Abilities",
+                "{abilities}", "",
+                "<gradient:#334155:#94A3B8>━━━━━━━━━━━━━━━━━━━━</gradient>"));
+        ensureLoreTemplate(lore, "set_tool_sections", "&#22D3EE⛏ &lHerramienta de conjunto", "&#22D3EE⛏ &lSet Tool",
+            List.of("<gradient:#164E63:#22D3EE>━━━━━━━━━━━━━━━━━━━━</gradient>",
+                "<gradient:#CFFAFE:#22D3EE><bold>{item}</bold></gradient>",
+                "<#A5F3FC>Herramienta preparada para recolectar recursos.", "",
+                "<#22D3EE>| <#CFFAFE>Encantamientos",
+                "{enchantments}", "",
+                "<gradient:#164E63:#22D3EE>✦ Eficiencia · Durabilidad · Precisión</gradient>"),
+            List.of("<gradient:#164E63:#22D3EE>━━━━━━━━━━━━━━━━━━━━</gradient>",
+                "<gradient:#CFFAFE:#22D3EE><bold>{item}</bold></gradient>",
+                "<#A5F3FC>Tool prepared for efficient resource gathering.", "",
+                "<#22D3EE>| <#CFFAFE>Enchantments",
+                "{enchantments}", "",
+                "<gradient:#164E63:#22D3EE>✦ Efficiency · Durability · Precision</gradient>"));
+        ensureLoreTemplate(lore, "set_armor_sections", "&#A78BFA◆ &lArmadura de conjunto", "&#A78BFA◆ &lSet Armor",
+            List.of("<gradient:#312E81:#A78BFA>━━━━━━━━━━━━━━━━━━━━</gradient>",
+                "<gradient:#EDE9FE:#A78BFA><bold>{item}</bold></gradient>",
+                "<#C4B5FD>Protección equilibrada para tu conjunto.", "",
+                "<#A78BFA>| <#DDD6FE>Encantamientos",
+                "{enchantments}", "",
+                "<gradient:#312E81:#A78BFA>✦ Defensa · Resistencia · Equilibrio</gradient>"),
+            List.of("<gradient:#312E81:#A78BFA>━━━━━━━━━━━━━━━━━━━━</gradient>",
+                "<gradient:#EDE9FE:#A78BFA><bold>{item}</bold></gradient>",
+                "<#C4B5FD>Balanced protection for your armor set.", "",
+                "<#A78BFA>| <#DDD6FE>Enchantments",
+                "{enchantments}", "",
+                "<gradient:#312E81:#A78BFA>✦ Defense · Resistance · Balance</gradient>"));
+        ensureLoreTemplate(lore, "set_ranged_sections", "&#F472B6➶ &lArma a distancia", "&#F472B6➶ &lRanged Weapon",
+            List.of("<gradient:#831843:#F472B6>━━━━━━━━━━━━━━━━━━━━</gradient>",
+                "<gradient:#FCE7F3:#F472B6><bold>{item}</bold></gradient>",
+                "<#FBCFE8>Preparado para ataques a distancia.", "",
+                "<#F472B6>| <#FBCFE8>Encantamientos",
+                "{enchantments}", "",
+                "<gradient:#831843:#F472B6>✦ Precisión · Control · Alcance</gradient>"),
+            List.of("<gradient:#831843:#F472B6>━━━━━━━━━━━━━━━━━━━━</gradient>",
+                "<gradient:#FCE7F3:#F472B6><bold>{item}</bold></gradient>",
+                "<#FBCFE8>Ready for ranged combat.", "",
+                "<#F472B6>| <#FBCFE8>Enchantments",
+                "{enchantments}", "",
+                "<gradient:#831843:#F472B6>✦ Precision · Control · Range</gradient>"));
+        ensureLoreTemplate(lore, "set_shield_sections", "&#38BDF8⛨ &lEscudo de conjunto", "&#38BDF8⛨ &lSet Shield",
+            List.of("<gradient:#0C4A6E:#38BDF8>━━━━━━━━━━━━━━━━━━━━</gradient>",
+                "<gradient:#BAE6FD:#38BDF8><bold>{item}</bold></gradient>",
+                "<#CBD5E1>Defensa adicional para completar el conjunto.", "",
+                "<#38BDF8>| <#BAE6FD>Propiedades",
+                "<#38BDF8>• <#E0F2FE>Bloqueo y resistencia",
+                "<gradient:#0C4A6E:#38BDF8>━━━━━━━━━━━━━━━━━━━━</gradient>"),
+            List.of("<gradient:#0C4A6E:#38BDF8>━━━━━━━━━━━━━━━━━━━━</gradient>",
+                "<gradient:#BAE6FD:#38BDF8><bold>{item}</bold></gradient>",
+                "<#CBD5E1>Extra defense to complete the set.", "",
+                "<#38BDF8>| <#BAE6FD>Properties",
+                "<#38BDF8>• <#E0F2FE>Blocking and resistance",
+                "<gradient:#0C4A6E:#38BDF8>━━━━━━━━━━━━━━━━━━━━</gradient>"));
+        normalizeBuiltInLoreSpacing(lore);
         saveYaml(lore, loreFile);
 
         File paletteFile = new File(templatesDir, "palettes.yml");
@@ -4091,10 +4765,43 @@ public final class IxKitsPlugin extends JavaPlugin implements Listener, CommandE
         String value = key == null ? "" : key.toLowerCase(Locale.ROOT);
         if (value.matches(".*(armor|armadura|helmet|chestplate|leggings|boots).*")) return "armor";
         if (value.matches(".*(soup|potion|elixir|consumable|food|ignifuga|drink).*")) return "consumables";
+        if (value.matches(".*(tool|pickaxe|shovel|hoe|miner_tool).*")) return "tools";
         if (value.matches(".*(mineral|miner|ore|gem|emerald).*")) return "minerals";
         if (value.matches(".*(blade|sword|weapon|soulreaper|fang|vanguard_pvp|ranger_marksman|pvp|katana).*")) return "weapons";
         if (value.matches(".*(token|relic|cosmic|astral|abyss|demonic|legendary|special|resource|item|gladiator_badge).*")) return "items";
         return "misc";
+    }
+
+    private void normalizeBuiltInLoreSpacing(YamlConfiguration lore) {
+        Set<String> builtIns = Set.of(
+            "clean_pvp", "legendary", "miner", "demonic", "cosmic", "frost", "emerald", "astral_rgb", "abyss_rgb",
+            "aeris_blade_rgb", "soup_ignifuga_rgb", "mineral_ancient_rgb", "token_koth_rgb",
+            "armor_onyx_rgb", "sword_rpg_sections", "armor_vanguard_sections", "armor_dragon_rgb",
+            "tool_miner_sections", "archer_bow_sections", "set_weapon_sections", "set_tool_sections",
+            "set_armor_sections", "set_ranged_sections", "set_shield_sections"
+        );
+        for (String key : builtIns) {
+            normalizeLoreSpacingAt(lore, key + ".lore");
+            normalizeLoreSpacingAt(lore, key + ".lore_en");
+        }
+    }
+
+    private void normalizeLoreSpacingAt(YamlConfiguration yaml, String path) {
+        List<String> original = yaml.getStringList(path);
+        if (original.isEmpty()) return;
+        List<String> normalized = new ArrayList<>();
+        for (String line : original) {
+            String value = line == null ? "" : line;
+            boolean section = value.matches("(?i).*\\b(encantamientos|habilidades|efectos especiales|atributos|enchantments|abilities|special effects|attributes|set abilities)\\b.*");
+            if (section && !normalized.isEmpty() && !normalized.get(normalized.size() - 1).isBlank()) normalized.add("");
+            if (value.isBlank()) {
+                if (!normalized.isEmpty() && !normalized.get(normalized.size() - 1).isBlank()) normalized.add("");
+            } else {
+                normalized.add(value);
+            }
+        }
+        while (!normalized.isEmpty() && normalized.get(normalized.size() - 1).isBlank()) normalized.remove(normalized.size() - 1);
+        if (!normalized.equals(original)) yaml.set(path, normalized);
     }
 
     private void ensureLoreTemplate(YamlConfiguration yaml, String key, String displayEs, String displayEn, List<String> loreEs, List<String> loreEn) {
@@ -4127,14 +4834,79 @@ public final class IxKitsPlugin extends JavaPlugin implements Listener, CommandE
 
     private List<String> generatedEnchantmentLore(ItemStack stack) {
         if (stack == null || stack.getType().isAir() || stack.getEnchantments().isEmpty()) return List.of();
-        String format = getConfig().getString("lore.enchantment-line-format", "<#FBBF24>⚔ <#D1D5DB>{name} <#FDE68A>{level}");
+        String format = getConfig().getString("lore.enchantment-line-format",
+            "<#FBBF24>• {icon} <#D1D5DB>{name} <#FDE68A>{level}");
         List<String> lines = new ArrayList<>();
         stack.getEnchantments().entrySet().stream()
             .sorted(Comparator.comparing(entry -> entry.getKey().getKey().toString()))
-            .forEach(entry -> lines.add(format.replace("{name}", enchantmentDisplayName(entry.getKey()))
-                .replace("{level}", romanLevel(entry.getValue()))
-                .replace("{key}", entry.getKey().getKey().toString())));
+            .forEach(entry -> {
+                String icon = enchantmentIcon(entry.getKey());
+                String lineFormat = format;
+                if (!lineFormat.contains("{icon}")) {
+                    if (lineFormat.contains("⚔")) lineFormat = lineFormat.replace("⚔", icon);
+                    else lineFormat = icon + " " + lineFormat;
+                }
+                lines.add(lineFormat.replace("{icon}", icon)
+                    .replace("{name}", enchantmentDisplayName(entry.getKey()))
+                    .replace("{level}", romanLevel(entry.getValue()))
+                    .replace("{key}", entry.getKey().getKey().toString()));
+            });
         return lines;
+    }
+
+    private String enchantmentIcon(Enchantment enchantment) {
+        String key = enchantment.getKey().getKey().toLowerCase(Locale.ROOT);
+        String configured = getConfig().getString("lore.enchantment-icons." + key);
+        if (configured != null && !configured.isBlank()) return configured;
+        return switch (key) {
+            case "fire_aspect", "flame", "fire_protection" -> "🔥";
+            case "sharpness", "sweeping_edge", "smite", "bane_of_arthropods" -> "⚔";
+            case "protection", "blast_protection", "projectile_protection" -> "🛡";
+            case "unbreaking", "mending" -> "✨";
+            case "efficiency" -> "⛏";
+            case "fortune", "looting" -> "💎";
+            case "silk_touch" -> "🪄";
+            case "power", "punch" -> "🏹";
+            case "infinity" -> "♾";
+            case "quick_charge", "channeling" -> "⚡";
+            case "multishot" -> "➶";
+            case "piercing" -> "➤";
+            case "loyalty", "riptide", "impaling" -> "🌊";
+            case "density", "breach", "wind_burst" -> "💥";
+            case "feather_falling", "soul_speed", "swift_sneak" -> "🪽";
+            case "depth_strider", "frost_walker" -> "❄";
+            case "respiration", "aqua_affinity" -> "🌊";
+            case "thorns" -> "🌵";
+            case "knockback" -> "💨";
+            case "binding_curse", "vanishing_curse" -> "☠";
+            case "luck_of_the_sea", "lure" -> "🎣";
+            default -> "✦";
+        };
+    }
+
+    private List<String> generatedAbilityLore(ItemStack stack) {
+        if (stack == null || stack.getType().isAir()) return List.of();
+        String format = getConfig().getString("lore.ability-line-format",
+            "<#F87171>• {icon} <#FECACA>{name} <#9CA3AF>({cooldown})");
+        List<String> lines = new ArrayList<>();
+        if (isAbilityEnabled(stack, tntOnHitKey)) lines.add(abilityLoreLine(format, "💥", tr("TNT al golpear", "TNT on hit"), getAbilityCooldown(stack, "tnt"), "tnt"));
+        if (isAbilityEnabled(stack, lightningOnHitKey)) lines.add(abilityLoreLine(format, "⚡", tr("Rayo al golpear", "Lightning on hit"), getAbilityCooldown(stack, "lightning"), "lightning"));
+        if (isAbilityEnabled(stack, lifeStealOnHitKey)) lines.add(abilityLoreLine(format, "🩸", tr("Robo de vida", "Lifesteal"), getAbilityCooldown(stack, "lifesteal"), "lifesteal"));
+        if (isAbilityEnabled(stack, poisonOnHitKey)) lines.add(abilityLoreLine(format, "☠", tr("Veneno", "Venom"), getAbilityCooldown(stack, "poison"), "poison"));
+        if (isAbilityEnabled(stack, frostOnHitKey)) lines.add(abilityLoreLine(format, "❄", tr("Escarcha", "Frost"), getAbilityCooldown(stack, "frost"), "frost"));
+        if (isAbilityEnabled(stack, flameOnHitKey)) lines.add(abilityLoreLine(format, "🔥", tr("Llama", "Flame"), getAbilityCooldown(stack, "flame"), "flame"));
+        if (isAbilityEnabled(stack, knockbackOnHitKey)) lines.add(abilityLoreLine(format, "💨", tr("Impacto reforzado", "Enhanced knockback"), getAbilityCooldown(stack, "knockback"), "knockback"));
+        return lines;
+    }
+
+    private String abilityLoreLine(String format, String icon, String name, long cooldown, String key) {
+        String lineFormat = format;
+        if (!lineFormat.contains("{icon}")) {
+            if (lineFormat.contains("✦")) lineFormat = lineFormat.replace("✦", icon);
+            else lineFormat = icon + " " + lineFormat;
+        }
+        return lineFormat.replace("{icon}", icon).replace("{name}", name)
+            .replace("{cooldown}", formatCooldown(cooldown)).replace("{key}", key);
     }
 
     private String enchantmentDisplayName(Enchantment enchantment) {
@@ -4178,20 +4950,6 @@ public final class IxKitsPlugin extends JavaPlugin implements Listener, CommandE
         };
     }
 
-    private List<String> generatedAbilityLore(ItemStack stack) {
-        if (stack == null || stack.getType().isAir()) return List.of();
-        String format = getConfig().getString("lore.ability-line-format", "<#F87171>✦ <#FECACA>{name} <#9CA3AF>({cooldown})");
-        List<String> lines = new ArrayList<>();
-        if (isAbilityEnabled(stack, tntOnHitKey)) lines.add(format.replace("{name}", tr("TNT al golpear", "TNT on hit")).replace("{cooldown}", formatCooldown(getAbilityCooldown(stack, "tnt"))).replace("{key}", "tnt"));
-        if (isAbilityEnabled(stack, lightningOnHitKey)) lines.add(format.replace("{name}", tr("Rayo al golpear", "Lightning on hit")).replace("{cooldown}", formatCooldown(getAbilityCooldown(stack, "lightning"))).replace("{key}", "lightning"));
-        if (isAbilityEnabled(stack, lifeStealOnHitKey)) lines.add(format.replace("{name}", tr("Robo de vida", "Lifesteal")).replace("{cooldown}", formatCooldown(getAbilityCooldown(stack, "lifesteal"))).replace("{key}", "lifesteal"));
-        if (isAbilityEnabled(stack, poisonOnHitKey)) lines.add(format.replace("{name}", tr("Veneno", "Venom")).replace("{cooldown}", formatCooldown(getAbilityCooldown(stack, "poison"))).replace("{key}", "poison"));
-        if (isAbilityEnabled(stack, frostOnHitKey)) lines.add(format.replace("{name}", tr("Escarcha", "Frost")).replace("{cooldown}", formatCooldown(getAbilityCooldown(stack, "frost"))).replace("{key}", "frost"));
-        if (isAbilityEnabled(stack, flameOnHitKey)) lines.add(format.replace("{name}", tr("Llama", "Flame")).replace("{cooldown}", formatCooldown(getAbilityCooldown(stack, "flame"))).replace("{key}", "flame"));
-        if (isAbilityEnabled(stack, knockbackOnHitKey)) lines.add(format.replace("{name}", tr("Impacto reforzado", "Enhanced knockback")).replace("{cooldown}", formatCooldown(getAbilityCooldown(stack, "knockback"))).replace("{key}", "knockback"));
-        return lines;
-    }
-
     private void applyLoreTemplateToProject(Player p, String key, String project, int projectPage, int targetSlot) {
         File file = projectFile(project);
         YamlConfiguration yaml = YamlConfiguration.loadConfiguration(file);
@@ -4215,6 +4973,8 @@ public final class IxKitsPlugin extends JavaPlugin implements Listener, CommandE
         lines = resolveLorePlaceholders(lines, target);
         meta.lore(loreComponents(lines));
         target.setItemMeta(meta);
+        projectService.backupBeforeChange(file);
+        yaml.set("lore-template." + itemPath, key);
         yaml.set(itemPath, target);
         saveYaml(yaml, file);
         YamlConfiguration loreFile = YamlConfiguration.loadConfiguration(new File(templatesDir, "lore.yml"));
@@ -4254,24 +5014,204 @@ public final class IxKitsPlugin extends JavaPlugin implements Listener, CommandE
     }
 
     private void setLanguage(Player p, String requested) {
-        String language = requested.toLowerCase(Locale.ROOT);
-        if (!language.equals("es") && !language.equals("en")) {
-            p.sendMessage(prefix() + tr("Idiomas disponibles: §bes§7 y §ben§7.", "Available languages: §bes§7 and §ben§7."));
+        String code = requested.toLowerCase(Locale.ROOT);
+        if (!Set.of("es", "en", "pt", "fr", "de", "it", "zh", "ru").contains(code)) {
+            p.sendMessage(prefix() + configuredMessage("language.invalid", "&eIdiomas disponibles: &bes, en, pt, fr, de, it, zh, ru.", "&eAvailable languages: &bes, en, pt, fr, de, it, zh, ru."));
             openLanguages(p);
             return;
         }
-        getConfig().set("language", language);
+        getConfig().set("language", code);
         saveConfig();
-        p.sendMessage(prefix() + tr("Idioma guardado: Español.", "Language saved: English."));
+        p.sendMessage(prefix() + configuredMessage("language.saved", "&aIdioma guardado: &f{language}&a.", "&aLanguage saved: &f{language}&a.", "{language}", languageDisplayName(code)));
         openMain(p);
     }
 
+    private String languageDisplayName(String code) {
+        return switch (code) {
+            case "en" -> "English";
+            case "pt" -> "Português";
+            case "fr" -> "Français";
+            case "de" -> "Deutsch";
+            case "it" -> "Italiano";
+            case "zh" -> "中文";
+            case "ru" -> "Русский";
+            default -> "Español";
+        };
+    }
+
+    private String language() {
+        String value = getConfig().getString("language", "es").toLowerCase(Locale.ROOT);
+        return Set.of("es", "en", "pt", "fr", "de", "it", "zh", "ru").contains(value) ? value : "es";
+    }
+
     private boolean isEnglish() {
-        return getConfig().getString("language", "es").equalsIgnoreCase("en");
+        return !language().equals("es");
     }
 
     private String tr(String spanish, String english) {
-        return isEnglish() ? english : spanish;
+        String locale = language();
+        if (locale.equals("es")) return spanish;
+        if (locale.equals("en")) return english;
+        String clean = english
+            .replaceAll("(?i)§x(?:§[0-9a-f]){6}", "")
+            .replaceAll("(?i)[§&][0-9a-fk-or]", "")
+            .trim();
+        String translated = translateUiPhrase(locale, clean);
+        if (translated == null) return english;
+        java.util.regex.Matcher colorPrefix = java.util.regex.Pattern
+            .compile("^(?:(?:§x(?:§[0-9a-f]){6})|[§&][0-9a-fk-or])*", java.util.regex.Pattern.CASE_INSENSITIVE)
+            .matcher(english);
+        return (colorPrefix.find() ? colorPrefix.group() : "") + translated;
+    }
+
+    private String translateUiPhrase(String locale, String text) {
+        return switch (locale) {
+            case "pt" -> switch (text) {
+                case "Back" -> "Voltar";
+                case "Previous" -> "Anterior";
+                case "Next" -> "Próximo";
+                case "My projects" -> "Meus projetos";
+                case "Create project" -> "Criar projeto";
+                case "Item workshop" -> "Oficina de itens";
+                case "✦ IxKits • Item workshop" -> "✦ IxKits • Oficina de itens";
+                case "Item name" -> "Nome do item";
+                case "Lore editor" -> "Editor de lore";
+                case "Lore templates" -> "Modelos de lore";
+                case "Enchantment presets" -> "Predefinições de encantamentos";
+                case "RGB palette" -> "Paleta RGB";
+                case "Special properties" -> "Propriedades especiais";
+                case "Special abilities" -> "Habilidades especiais";
+                case "Item details" -> "Detalhes do item";
+                case "Equipment" -> "Equipamento";
+                case "Tools" -> "Ferramentas";
+                case "Language" -> "Idioma";
+                case "Quick guide" -> "Guia rápido";
+                case "Fill complete set" -> "Completar conjunto";
+                case "Add blank line" -> "Adicionar linha vazia";
+                default -> null;
+            };
+            case "fr" -> switch (text) {
+                case "Back" -> "Retour";
+                case "Previous" -> "Précédent";
+                case "Next" -> "Suivant";
+                case "My projects" -> "Mes projets";
+                case "Create project" -> "Créer un projet";
+                case "Item workshop" -> "Atelier d'objet";
+                case "✦ IxKits • Item workshop" -> "✦ IxKits • Atelier d'objet";
+                case "Item name" -> "Nom de l'objet";
+                case "Lore editor" -> "Éditeur de lore";
+                case "Lore templates" -> "Modèles de lore";
+                case "Enchantment presets" -> "Préréglages d'enchantements";
+                case "RGB palette" -> "Palette RGB";
+                case "Special properties" -> "Propriétés spéciales";
+                case "Special abilities" -> "Compétences spéciales";
+                case "Item details" -> "Détails de l'objet";
+                case "Equipment" -> "Équipement";
+                case "Tools" -> "Outils";
+                case "Language" -> "Langue";
+                case "Quick guide" -> "Guide rapide";
+                case "Fill complete set" -> "Compléter l'ensemble";
+                case "Add blank line" -> "Ajouter une ligne vide";
+                default -> null;
+            };
+            case "de" -> switch (text) {
+                case "Back" -> "Zurück";
+                case "Previous" -> "Zurück";
+                case "Next" -> "Weiter";
+                case "My projects" -> "Meine Projekte";
+                case "Create project" -> "Projekt erstellen";
+                case "Item workshop" -> "Objekt-Werkstatt";
+                case "✦ IxKits • Item workshop" -> "✦ IxKits • Objekt-Werkstatt";
+                case "Item name" -> "Objektname";
+                case "Lore editor" -> "Lore-Editor";
+                case "Lore templates" -> "Lore-Vorlagen";
+                case "Enchantment presets" -> "Verzauberungs-Presets";
+                case "RGB palette" -> "RGB-Palette";
+                case "Special properties" -> "Spezielle Eigenschaften";
+                case "Special abilities" -> "Spezialfähigkeiten";
+                case "Item details" -> "Objektdetails";
+                case "Equipment" -> "Ausrüstung";
+                case "Tools" -> "Werkzeuge";
+                case "Language" -> "Sprache";
+                case "Quick guide" -> "Kurzanleitung";
+                case "Fill complete set" -> "Set vervollständigen";
+                case "Add blank line" -> "Leere Zeile hinzufügen";
+                default -> null;
+            };
+            case "it" -> switch (text) {
+                case "Back" -> "Indietro";
+                case "Previous" -> "Precedente";
+                case "Next" -> "Successivo";
+                case "My projects" -> "I miei progetti";
+                case "Create project" -> "Crea progetto";
+                case "Item workshop" -> "Officina oggetti";
+                case "✦ IxKits • Item workshop" -> "✦ IxKits • Officina oggetti";
+                case "Item name" -> "Nome oggetto";
+                case "Lore editor" -> "Editor lore";
+                case "Lore templates" -> "Modelli lore";
+                case "Enchantment presets" -> "Preset incantesimi";
+                case "RGB palette" -> "Palette RGB";
+                case "Special properties" -> "Proprietà speciali";
+                case "Special abilities" -> "Abilità speciali";
+                case "Item details" -> "Dettagli oggetto";
+                case "Equipment" -> "Equipaggiamento";
+                case "Tools" -> "Strumenti";
+                case "Language" -> "Lingua";
+                case "Quick guide" -> "Guida rapida";
+                case "Fill complete set" -> "Completa il set";
+                case "Add blank line" -> "Aggiungi riga vuota";
+                default -> null;
+            };
+            case "zh" -> switch (text) {
+                case "Back" -> "返回";
+                case "Previous" -> "上一页";
+                case "Next" -> "下一页";
+                case "My projects" -> "我的项目";
+                case "Create project" -> "创建项目";
+                case "Item workshop" -> "物品工作台";
+                case "✦ IxKits • Item workshop" -> "✦ IxKits • 物品工作台";
+                case "Item name" -> "物品名称";
+                case "Lore editor" -> "描述编辑器";
+                case "Lore templates" -> "描述模板";
+                case "Enchantment presets" -> "附魔预设";
+                case "RGB palette" -> "RGB 调色板";
+                case "Special properties" -> "特殊属性";
+                case "Special abilities" -> "特殊技能";
+                case "Item details" -> "物品详情";
+                case "Equipment" -> "装备";
+                case "Tools" -> "工具";
+                case "Language" -> "语言";
+                case "Quick guide" -> "快速指南";
+                case "Fill complete set" -> "补全套装";
+                case "Add blank line" -> "添加空白行";
+                default -> null;
+            };
+            case "ru" -> switch (text) {
+                case "Back" -> "Назад";
+                case "Previous" -> "Назад";
+                case "Next" -> "Далее";
+                case "My projects" -> "Мои проекты";
+                case "Create project" -> "Создать проект";
+                case "Item workshop" -> "Мастерская предметов";
+                case "✦ IxKits • Item workshop" -> "✦ IxKits • Мастерская предметов";
+                case "Item name" -> "Название предмета";
+                case "Lore editor" -> "Редактор описания";
+                case "Lore templates" -> "Шаблоны описания";
+                case "Enchantment presets" -> "Наборы зачарований";
+                case "RGB palette" -> "RGB-палитра";
+                case "Special properties" -> "Особые свойства";
+                case "Special abilities" -> "Особые способности";
+                case "Item details" -> "Детали предмета";
+                case "Equipment" -> "Снаряжение";
+                case "Tools" -> "Инструменты";
+                case "Language" -> "Язык";
+                case "Quick guide" -> "Краткое руководство";
+                case "Fill complete set" -> "Дополнить комплект";
+                case "Add blank line" -> "Добавить пустую строку";
+                default -> null;
+            };
+            default -> null;
+        };
     }
 
     private String prettyKey(String key) {
