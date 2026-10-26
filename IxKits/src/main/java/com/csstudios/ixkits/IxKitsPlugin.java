@@ -2256,7 +2256,108 @@ public final class IxKitsPlugin extends JavaPlugin implements Listener, CommandE
         else openPaletteTemplates(p, 0, null, 0, -1, scope);
     }
 
-        private void openItemEditor(Player p, String project, int page, int targetSlot) {
+        private void openNameTemplates(Player p, int requestedPage, String project, int projectPage, int targetSlot, String requestedCategory) {
+        YamlConfiguration names = YamlConfiguration.loadConfiguration(new File(templatesDir, "names.yml"));
+        String category = requestedCategory == null || requestedCategory.isBlank() ? "all" : requestedCategory.toLowerCase(Locale.ROOT);
+        List<String> keys = new ArrayList<>();
+        for (String key : names.getKeys(false)) {
+            if (names.getString(key + ".display") == null) continue;
+            if (!category.equals("all") && !category.equals(names.getString(key + ".category", "misc"))) continue;
+            keys.add(key);
+        }
+        Collections.sort(keys);
+        int pages = Math.max(1, (int) Math.ceil(keys.size() / (double) EDIT_SLOTS.length));
+        int page = Math.max(0, Math.min(requestedPage, pages - 1));
+        String title = tr("§3✦ §bIxKits §8• §0Nombres RGB", "§3✦ §bIxKits §8• §0RGB names")
+            + " §7[" + (page + 1) + "/" + pages + "]";
+        Inventory inv = project == null ? menu("name-templates", null, page, title)
+            : menu("name-templates", project, projectPage, targetSlot, page, title);
+        MenuHolder holder = (MenuHolder) inv.getHolder();
+        holder.query = category;
+        border(inv);
+        for (int i = page * EDIT_SLOTS.length; i < Math.min(keys.size(), (page + 1) * EDIT_SLOTS.length); i++) {
+            String key = keys.get(i);
+            int slot = EDIT_SLOTS[i - page * EDIT_SLOTS.length];
+            String display = names.getString(key + ".display", prettyKey(key));
+            String startHex = paletteHex(names.getString(key + ".start", "#22D3EE"));
+            String endHex = paletteHex(names.getString(key + ".end", "#A78BFA"));
+            ItemStack icon = new ItemStack(Material.NAME_TAG);
+            ItemMeta meta = icon.getItemMeta();
+            if (meta != null) {
+                meta.displayName(gradientComponent(display, startHex, endHex));
+                meta.lore(loreComponents(List.of(
+                    "§7" + tr("Categoría: ", "Category: ") + nameCategoryName(names.getString(key + ".category", "misc")),
+                    "",
+                    tr("§eClic para usar este nombre", "§eClick to use this name"),
+                    tr("§8No modifica el lore ni los encantamientos.", "§8Does not change lore or enchantments.")
+                )));
+                icon.setItemMeta(meta);
+            }
+            inv.setItem(slot, icon);
+            holder.entryBySlot.put(slot, key);
+        }
+        if (keys.isEmpty()) inv.setItem(22, item(Material.BARRIER, tr("§cNo hay nombres en esta categoría.", "§cNo names in this category.")));
+        inv.setItem(45, item(Material.ARROW, "§7← " + tr("Volver al taller", "Back to workshop")));
+        inv.setItem(47, item(Material.SPECTRAL_ARROW, tr("§bAnterior", "§bPrevious")));
+        inv.setItem(49, item(Material.HOPPER, tr("§bCategoría", "§bCategory"),
+            "§f" + nameCategoryName(category), "",
+            tr("§7Clic para cambiar de categoría", "§7Click to change category"),
+            tr("§8Espadas · Picos · Herramientas", "§8Swords · Pickaxes · Tools"),
+            tr("§8Fragmentos · Minerales · Armaduras", "§8Fragments · Minerals · Armor")));
+        inv.setItem(51, item(Material.SPECTRAL_ARROW, tr("§bSiguiente", "§bNext")));
+        p.openInventory(inv);
+    }
+
+    private String nameCategoryName(String category) {
+        return switch (category == null ? "all" : category.toLowerCase(Locale.ROOT)) {
+            case "swords" -> tr("Espadas", "Swords");
+            case "pickaxes" -> tr("Picos", "Pickaxes");
+            case "tools" -> tr("Herramientas", "Tools");
+            case "fragments" -> tr("Fragmentos", "Fragments");
+            case "minerals" -> tr("Minerales", "Minerals");
+            case "armor" -> tr("Armaduras", "Armor");
+            case "bows" -> tr("Arcos y ballestas", "Bows and crossbows");
+            case "misc" -> tr("Otros nombres", "Other names");
+            default -> tr("Todas las categorías", "All categories");
+        };
+    }
+
+    private String nextNameCategory(String category) {
+        List<String> categories = List.of("all", "swords", "pickaxes", "tools", "fragments", "minerals", "armor", "bows", "misc");
+        int current = categories.indexOf(category == null ? "all" : category.toLowerCase(Locale.ROOT));
+        return categories.get((current + 1 + categories.size()) % categories.size());
+    }
+
+    private void applyNameTemplate(Player p, String key, String project, int projectPage, int targetSlot) {
+        YamlConfiguration names = YamlConfiguration.loadConfiguration(new File(templatesDir, "names.yml"));
+        String display = names.getString(key + ".display");
+        if (display == null || display.isBlank()) {
+            p.sendMessage(prefix() + tr("§cNo se encontró ese nombre.", "§cName template not found."));
+            return;
+        }
+        String startHex = paletteHex(names.getString(key + ".start", "#22D3EE"));
+        String endHex = paletteHex(names.getString(key + ".end", "#A78BFA"));
+        ItemStack target = project == null ? p.getInventory().getItemInMainHand()
+            : getProjectItem(project, projectPage, targetSlot);
+        if (target == null || target.getType().isAir()) {
+            p.sendMessage(prefix() + tr("§eSelecciona primero un objeto.", "§eSelect an item first."));
+            return;
+        }
+        ItemMeta meta = target.getItemMeta();
+        if (meta == null) return;
+        meta.displayName(gradientComponent(display, startHex, endHex));
+        target.setItemMeta(meta);
+        if (project != null) {
+            saveProjectItem(project, projectPage, targetSlot, target);
+            p.sendMessage(prefix() + tr("§aNombre RGB aplicado: §b", "§aRGB name applied: §b") + display);
+            openItemEditor(p, project, projectPage, targetSlot);
+        } else {
+            p.sendMessage(prefix() + tr("§aNombre RGB aplicado: §b", "§aRGB name applied: §b") + display);
+            openNameTemplates(p, 0, null, 0, -1, "all");
+        }
+    }
+
+    private void openItemEditor(Player p, String project, int page, int targetSlot) {
         ItemStack target = getProjectItem(project, page, targetSlot);
         if (target == null || target.getType().isAir()) {
             p.sendMessage(prefix() + tr("§eEste espacio está vacío. Coloca un objeto antes de abrir el taller.", "§eThis slot is empty. Place an item before opening the workshop."));
@@ -2266,86 +2367,83 @@ public final class IxKitsPlugin extends JavaPlugin implements Listener, CommandE
         ItemMeta meta = target.getItemMeta();
         String displayName = itemDisplayName(target);
         Inventory inv = menu("item-editor", project, page, targetSlot, 0,
-            tr("§3✦ §bIXKITS §8» §0Taller de objeto", "§3✦ §bIXKITS §8» §0Item workshop"));
+            tr("§3✦ §bIXKITS STUDIO §8» §0Taller de objetos", "§3✦ §bIXKITS STUDIO §8» §0Item workshop"));
         border(inv);
         inv.setItem(4, target.clone());
 
-        inv.setItem(10, item(Material.NAME_TAG, "§b§l01  " + tr("Nombre del objeto", "Item name"),
-            tr("§8Actual: §f", "§8Current: §f") + displayName, "",
-            tr("§7MiniMessage · RGB · Gradientes", "§7MiniMessage · RGB · Gradients"), "",
-            tr("§eClic para editar el título", "§eClick to edit the title")));
-        inv.setItem(11, item(Material.WRITABLE_BOOK, "§b§l02  " + tr("Editor de lore", "Lore editor"),
-            tr("§7Diseña la descripción línea por línea.", "§7Build the description line by line."), "",
-            tr("§8• §7Editar, borrar y ordenar líneas", "§8• §7Edit, delete and reorder lines"),
-            tr("§8• §7Añadir separadores vacíos", "§8• §7Add blank spacer lines"),
-            tr("§8• §7Vista previa de RGB y gradientes", "§8• §7Preview RGB and gradients"), "",
-            tr("§eClic para editar el lore", "§eClick to edit lore")));
-        inv.setItem(12, item(Material.WRITABLE_BOOK, "§d§l03  " + tr("Plantillas de lore", "Lore templates"),
+        // Name, lore and combat controls.
+        inv.setItem(10, item(Material.NAME_TAG, "§b§l01  " + tr("Editar nombre", "Edit name"),
+            tr("§7Actual: §f", "§7Current: §f") + displayName, "",
+            tr("§7Nombre libre con MiniMessage y RGB.", "§7Custom name with MiniMessage and RGB."),
+            tr("§eClic para escribir", "§eClick to enter")));
+        inv.setItem(11, item(Material.NAME_TAG, "§d§l02  " + tr("Nombres RGB", "RGB name library"),
+            tr("§7RAGNAROK, LEGENDARIO, MÍTICO y más.", "§7RAGNAROK, LEGENDARY, MYTHIC and more."), "",
+            tr("§7Agrupados por tipo de objeto.", "§7Grouped by item type."),
+            tr("§eClic para elegir un nombre", "§eClick to choose a name")));
+        inv.setItem(12, item(Material.WRITABLE_BOOK, "§b§l03  " + tr("Editor de lore", "Lore editor"),
+            tr("§7Añade, edita, mueve y elimina líneas.", "§7Add, edit, move and remove lines."), "",
+            tr("§7Admite MiniMessage, RGB y gradientes.", "§7Supports MiniMessage, RGB and gradients."),
+            tr("§eClic para abrir", "§eClick to open")));
+        inv.setItem(13, item(Material.BOOKSHELF, "§d§l04  " + tr("Plantillas de lore", "Lore templates"),
             tr("§7Armas, armaduras, herramientas,", "§7Weapons, armor, tools,"),
-            tr("§7consumibles, minerales y tokens.", "§7consumables, minerals and tokens."), "",
-            tr("§a✓ §7Plantillas dinámicas disponibles", "§a✓ §7Dynamic templates available"),
-            tr("§7para encantamientos y habilidades.", "§7for enchantments and abilities."), "",
+            tr("§7fragmentos, minerales y objetos.", "§7fragments, minerals and items."), "",
             tr("§eClic para explorar categorías", "§eClick to browse categories")));
-        inv.setItem(13, item(Material.ENCHANTED_BOOK, "§b§l04  " + tr("Encantamientos", "Enchantments"),
-            tr("§7Clic: subir nivel", "§7Click: raise level"),
-            tr("§7Clic derecho: bajar nivel", "§7Right-click: lower level"),
-            tr("§7Mayús + clic: nivel exacto", "§7Shift-click: exact level"), "",
-            tr("§eClic para abrir el editor", "§eClick to open the editor")));
-        inv.setItem(14, item(Material.BOOKSHELF, "§d§l05  " + tr("Presets de encantamientos", "Enchantment presets"),
-            tr("§7Aplica combinaciones guardadas.", "§7Apply saved enchantment combinations."), "",
-            tr("§eClic para elegir preset", "§eClick to choose a preset")));
-        inv.setItem(15, item(Material.NETHER_STAR, "§c§l06  " + tr("Habilidades especiales", "Special abilities"),
-            tr("§7Poderes individuales por objeto.", "§7Per-item special powers."), "",
-            tr("§8• §7Fuego, escarcha, veneno y rayo", "§8• §7Flame, frost, poison and lightning"),
-            tr("§8• §7TNT, robo de vida e impacto", "§8• §7TNT, lifesteal and knockback"), "",
+        inv.setItem(14, item(Material.ENCHANTED_BOOK, "§b§l05  " + tr("Encantamientos", "Enchantments"),
+            tr("§7Edita niveles y combina encantamientos.", "§7Edit levels and combine enchantments."), "",
+            tr("§eClic para abrir el editor", "§eClick to open editor")));
+        inv.setItem(15, item(Material.BOOKSHELF, "§d§l06  " + tr("Presets de encantamientos", "Enchantment presets"),
+            tr("§7Perfiles para PvP, minería, arcos", "§7Profiles for PvP, mining, bows"),
+            tr("§7y armaduras; se filtran por compatibilidad.", "§7and armor; compatibility is checked."), "",
+            tr("§eClic para elegir", "§eClick to choose")));
+        inv.setItem(16, item(Material.NETHER_STAR, "§c§l07  " + tr("Habilidades", "Abilities"),
+            tr("§7Fuego, hielo, veneno, rayo,", "§7Fire, frost, venom, lightning,"),
+            tr("§7robo de vida, TNT e impacto.", "§7lifesteal, TNT and knockback."), "",
             tr("§eClic para configurar", "§eClick to configure")));
-        inv.setItem(16, item(Material.SHIELD, "§d§l07  " + tr("Propiedades especiales", "Special properties"),
-            tr("§7Escudos, estandartes, libros,", "§7Shields, banners, books,"),
-            tr("§7adornos, cabezas y fuegos artificiales.", "§7trims, player heads and fireworks."), "",
-            tr("§eClic para abrir herramientas", "§eClick to open tools")));
 
+        // Colors and item properties.
         inv.setItem(19, item(Material.CYAN_DYE, "§b§l08  " + tr("Paleta RGB", "RGB palette"),
-            tr("§7Aplica colores al nombre, al lore", "§7Apply colors to the name, the lore"),
-            tr("§7o a ambos de forma independiente.", "§7or both independently."), "",
+            tr("§7Aplica color solo cuando lo eliges.", "§7Applies color only when selected."),
+            tr("§7Nombre, lore o ambos.", "§7Name, lore or both."), "",
             tr("§eClic para elegir paleta y destino", "§eClick to choose palette and target")));
         inv.setItem(20, item(Material.IRON_BLOCK, "§b§l09  " + tr("Irrompible", "Unbreakable"),
             meta.isUnbreakable() ? tr("§a✓ Activado", "§a✓ Enabled") : tr("§8○ Desactivado", "§8○ Disabled"), "",
-            tr("§7Alterna la propiedad del objeto.", "§7Toggle the item's unbreakable property."), "",
-            tr("§eClic para cambiar", "§eClick to toggle")));
+            tr("§eClic para alternar", "§eClick to toggle")));
         String durabilityText = target.getType().getMaxDurability() > 0 && meta instanceof Damageable damageable
             ? Math.max(0, 100 - damageable.getDamage() * 100 / Math.max(1, target.getType().getMaxDurability())) + "%"
             : tr("No aplica", "Not applicable");
         inv.setItem(21, item(Material.ANVIL, "§b§l10  " + tr("Durabilidad", "Durability"),
-            tr("§7Estado actual: §f", "§7Current status: §f") + durabilityText, "",
+            tr("§7Estado: §f", "§7State: §f") + durabilityText, "",
             tr("§7Clic: daño +10 · Derecho: -10", "§7Click: +10 damage · Right-click: -10"),
-            tr("§7Mayús + clic: reparar", "§7Shift-click: repair")));
+            tr("§eMayús + clic: reparar", "§eShift-click: repair")));
         inv.setItem(22, item(Material.CARVED_PUMPKIN, "§b§l11  " + tr("Modelo personalizado", "Custom model data"),
-            tr("§7Define o borra el modelo numérico.", "§7Set or clear the numeric model value."), "",
-            tr("§eClic para escribir", "§eClick to enter a value")));
+            tr("§7Define o elimina el modelo numérico.", "§7Set or clear the numeric model."), "",
+            tr("§eClic para escribir", "§eClick to enter")));
         inv.setItem(23, item(Material.BRUSH, "§b§l12  " + tr("Atributos", "Attributes"),
-            tr("§7Salud, daño, velocidad, armadura", "§7Health, damage, speed, armor"),
-            tr("§7y otros modificadores.", "§7and other modifiers."), "",
-            tr("§eClic para abrir atributos", "§eClick to open attributes")));
-        inv.setItem(24, item(Material.GLASS, "§b§l13  " + tr("Flags del objeto", "Item flags"),
-            tr("§7Muestra u oculta atributos y", "§7Show or hide attributes and"),
-            tr("§7propiedades en la descripción.", "§7properties in the tooltip."), "",
-            tr("§eClic para administrar flags", "§eClick to manage flags")));
-        inv.setItem(25, item(Material.LEATHER_CHESTPLATE, "§b§l14  " + tr("Color de cuero", "Leather color"),
-            tr("§7Solo disponible para cuero.", "§7Only available for leather armor."), "",
-            tr("§eClic y escribe #RRGGBB o R,G,B", "§eClick and type #RRGGBB or R,G,B")));
-
-        inv.setItem(28, item(Material.POTION, "§b§l15  " + tr("Poción y efectos", "Potion and effects"),
-            tr("§7Cambia tipo base y efectos", "§7Change the base type and"),
-            tr("§7personalizados de la poción.", "§7custom potion effects."), "",
+            tr("§7Daño, salud, velocidad y armadura.", "§7Damage, health, speed and armor."), "",
             tr("§eClic para editar", "§eClick to edit")));
-        inv.setItem(29, item(Material.PAPER, "§b§l16  " + tr("Copiar objeto", "Copy item"),
-            tr("§7Guarda una copia exacta con", "§7Save an exact copy with"),
-            tr("§7nombre, lore y metadatos.", "§7name, lore and metadata."), "",
+        inv.setItem(24, item(Material.GLASS, "§b§l13  " + tr("Flags", "Item flags"),
+            tr("§7Controla qué propiedades muestra", "§7Control which item properties"),
+            tr("§7la descripción del objeto.", "§7appear in its tooltip."), "",
+            tr("§eClic para administrar", "§eClick to manage")));
+        inv.setItem(25, item(Material.SHIELD, "§d§l14  " + tr("Propiedades especiales", "Special properties"),
+            tr("§7Escudos, libros, adornos,", "§7Shields, books, armor trims,"),
+            tr("§7cabezas y fuegos artificiales.", "§7heads and fireworks."), "",
+            tr("§eClic para abrir herramientas", "§eClick to open tools")));
+
+        // Utility actions.
+        inv.setItem(28, item(Material.LEATHER_CHESTPLATE, "§b§l15  " + tr("Color de cuero", "Leather color"),
+            tr("§7Solo disponible para armadura de cuero.", "§7Only available for leather armor."), "",
+            tr("§eClic y escribe #RRGGBB o R,G,B", "§eClick and type #RRGGBB or R,G,B")));
+        inv.setItem(29, item(Material.POTION, "§b§l16  " + tr("Poción y efectos", "Potion and effects"),
+            tr("§7Cambia el tipo base y los efectos.", "§7Change base type and custom effects."), "",
+            tr("§eClic para editar", "§eClick to edit")));
+        inv.setItem(30, item(Material.CHEST, "§b§l17  " + tr("Copiar objeto", "Copy item"),
+            tr("§7Guarda una copia de todos sus metadatos.", "§7Save a copy of all its metadata."), "",
             tr("§eClic para copiar", "§eClick to copy")));
-        inv.setItem(30, item(Material.CHEST, "§b§l17  " + tr("Portapapeles", "Clipboard"),
-            clipboardItem(p.getUniqueId()) != null ? tr("§a● Hay una copia guardada", "§a● A copy is saved") : tr("§8○ Está vacío", "§8○ It is empty"), "",
-            tr("§7La copia persiste tras reiniciar.", "§7The copy survives restarts."), "",
-            tr("§eClic para ver, pegar o vaciar", "§eClick to inspect, paste or clear")));
+        inv.setItem(31, item(Material.ENDER_CHEST, "§b§l18  " + tr("Portapapeles", "Clipboard"),
+            clipboardItem(p.getUniqueId()) != null ? tr("§a● Hay una copia guardada", "§a● A copy is saved") : tr("§8○ Está vacío", "§8○ Empty"), "",
+            tr("§7Pega o reutiliza la copia guardada.", "§7Paste or reuse the saved copy."), "",
+            tr("§eClic para abrir", "§eClick to open")));
         List<String> details = new ArrayList<>();
         details.add("§8§m━━━━━━━━━━━━━━━━━━━━");
         details.add("§b§l" + tr("RESUMEN DEL OBJETO", "ITEM SUMMARY"));
@@ -2366,30 +2464,26 @@ public final class IxKitsPlugin extends JavaPlugin implements Listener, CommandE
         details.add("");
         details.add(meta.isUnbreakable() ? "§a✓ " + tr("Irrompible", "Unbreakable") : "§8○ " + tr("Durabilidad normal", "Normal durability"));
         details.add("§8§m━━━━━━━━━━━━━━━━━━━━");
-        inv.setItem(31, itemWithLore(Material.PAPER, "§f§l18  " + tr("Detalles del objeto", "Item details"), details));
-        inv.setItem(32, item(Material.CRAFTING_TABLE, "§a§l19  " + tr("Rellenar conjunto", "Fill complete set"),
-            tr("§7Genera herramientas y armaduras", "§7Generates tools and armor"),
-            tr("§7que falten en este proyecto.", "§7missing from this project."), "",
-            tr("§8• §7Solo completa espacios vacíos", "§8• §7Only fills empty slots"),
-            tr("§8• §7Adapta encantamientos por tipo", "§8• §7Chooses enchantments by item type"),
-            tr("§8• §7Nunca pone Filo en picos o palas", "§8• §7Never puts Sharpness on picks or shovels"), "",
-            tr("§eClic para generar el conjunto", "§eClick to generate the set")));
-        inv.setItem(33, item(Material.BARRIER, "§c§l20  " + tr("Quitar encantamientos", "Remove enchantments"),
-            tr("§7Quita los encantamientos de este", "§7Removes all enchantments from this"),
-            tr("§7objeto sin tocar los demás.", "§7item without affecting other items."), "",
+        inv.setItem(32, itemWithLore(Material.PAPER, "§f§l19  " + tr("Detalles del objeto", "Item details"), details));
+        inv.setItem(33, item(Material.CRAFTING_TABLE, "§a§l20  " + tr("Rellenar conjunto", "Fill complete set"),
+            tr("§7Completa las piezas que faltan.", "§7Creates the missing pieces."),
+            tr("§7Reutiliza plantilla y colores de origen.", "§7Reuses the source template and colors."), "",
+            tr("§8• §7No sobrescribe objetos existentes", "§8• §7Never overwrites existing items"),
+            tr("§8• §7Encantamientos según el tipo", "§8• §7Enchants selected by item type"), "",
+            tr("§eClic para generar", "§eClick to generate")));
+        inv.setItem(34, item(Material.BARRIER, "§c§l21  " + tr("Quitar encantamientos", "Remove enchantments"),
+            tr("§7Limpia solo el objeto seleccionado.", "§7Only clears the selected item."), "",
             tr("§eClic para limpiar", "§eClick to clear")));
-        inv.setItem(34, item(Material.REDSTONE, "§e§lGuardado automático",
-            "§7" + tr("Los cambios se guardan al aplicar.", "Changes save when applied."), "",
-            "§8✦ §7CS Studios"));
         inv.setItem(45, item(Material.ARROW, "§7← " + tr("Volver al proyecto", "Back to project")));
-        inv.setItem(49, item(Material.BOOK, "§f§l" + tr("Guía rápida", "Quick guide"),
-            tr("§7Elige una herramienta en las filas", "§7Choose a tool in the rows"),
-            tr("§7superiores para personalizar el objeto.", "§7above to customize your item."), "",
-            tr("§8No se modifican otros objetos del kit.", "§8Other items in the kit are untouched.")));
+        inv.setItem(49, item(Material.BOOK, "§f§l" + tr("Cómo usar el taller", "Workshop guide"),
+            tr("§7Fila 1: nombre, lore y combate.", "§7Row 1: name, lore and combat."),
+            tr("§7Fila 2: colores y propiedades.", "§7Row 2: colors and properties."),
+            tr("§7Fila 3: utilidades y conjuntos.", "§7Row 3: utilities and sets."), "",
+            tr("§8✦ §7CS Studios · IxKits", "§8✦ §7CS Studios · IxKits")));
         p.openInventory(inv);
     }
 
-    private void openClipboard(Player p, String project, int page, int targetSlot) {
+        private void openClipboard(Player p, String project, int page, int targetSlot) {
         ItemStack current = getProjectItem(project, page, targetSlot);
         ItemStack copied = clipboardItem(p.getUniqueId());
         Inventory inv = menu("clipboard", project, page, targetSlot, 0,
