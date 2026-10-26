@@ -2254,8 +2254,12 @@ public final class IxKitsPlugin extends JavaPlugin implements Listener, CommandE
             projectService.backupBeforeChange(file);
             YamlConfiguration projectYaml = YamlConfiguration.loadConfiguration(file);
             String itemPath = storagePath(projectPage, targetSlot);
-            projectYaml.set("palette-lore." + itemPath, null);
+            if (scope.equals("lore") || scope.equals("both")) projectYaml.set("palette-lore." + itemPath, key);
             projectYaml.set(itemPath, target);
+            if (scope.equals("lore") || scope.equals("both")) {
+                refreshLinkedLore(projectYaml, projectPage, targetSlot, target);
+                projectYaml.set(itemPath, target);
+            }
             projectYaml.set("format-version", 2);
             projectYaml.set("updated", System.currentTimeMillis());
             saveYaml(projectYaml, file);
@@ -3818,7 +3822,14 @@ public final class IxKitsPlugin extends JavaPlugin implements Listener, CommandE
         if (meta == null) return;
         meta.lore(loreComponents(resolveLorePlaceholders(lines, target)));
         target.setItemMeta(meta);
-        // Palette presets are one-shot actions. Dynamic lore refresh must not reapply prior palettes.
+
+        // Palette is scoped to the currently linked lore template. Applying a new lore template
+        // clears this key, so colors won't leak into unrelated future templates.
+        String paletteKey = projectYaml.getString("palette-lore." + itemPath);
+        if (paletteKey != null && !paletteKey.isBlank()) {
+            YamlConfiguration palettes = YamlConfiguration.loadConfiguration(new File(templatesDir, "palettes.yml"));
+            if (palettes.contains(paletteKey + ".color")) applyPaletteToItem(target, palettes, paletteKey, "lore");
+        }
     }
 
         private void clearLinkedLoreTemplate(String project, int page, int slot) {
