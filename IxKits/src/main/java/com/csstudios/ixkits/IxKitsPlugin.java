@@ -4854,15 +4854,26 @@ public final class IxKitsPlugin extends JavaPlugin implements Listener, CommandE
             List.of("<gradient:#0C4A6E:#38BDF8>━━━━━━━━━━━━━━━━━━━━</gradient>",
                 "<gradient:#BAE6FD:#38BDF8><bold>{item}</bold></gradient>",
                 "<#CBD5E1>Defensa adicional para completar el conjunto.", "",
-                "<#38BDF8>| <#BAE6FD>Propiedades",
+                "&l&a| &6PROPIEDADES",
                 "<#38BDF8>• <#E0F2FE>Bloqueo y resistencia",
                 "<gradient:#0C4A6E:#38BDF8>━━━━━━━━━━━━━━━━━━━━</gradient>"),
             List.of("<gradient:#0C4A6E:#38BDF8>━━━━━━━━━━━━━━━━━━━━</gradient>",
                 "<gradient:#BAE6FD:#38BDF8><bold>{item}</bold></gradient>",
                 "<#CBD5E1>Extra defense to complete the set.", "",
-                "<#38BDF8>| <#BAE6FD>Properties",
+                "&l&a| &6PROPERTIES",
                 "<#38BDF8>• <#E0F2FE>Blocking and resistance",
                 "<gradient:#0C4A6E:#38BDF8>━━━━━━━━━━━━━━━━━━━━</gradient>"));
+        ensureLoreTemplate(lore, "oni_perchera", "&#EF4444☠ &lPerchera ONI", "&#EF4444☠ &lONI Chestplate",
+            List.of("<gradient:#450A0A:#B91C1C><bold>☠ PERCHERA ONI ☠</bold></gradient>",
+                "<#FCA5A5>Forjada con poder ancestral.", "",
+                "&l&a| &6ENCANTAMIENTOS", "{enchantments}",
+                "&l&a| &6HABILIDADES", "{abilities}",
+                "<gradient:#F87171:#FCA5A5>✔ Forjada para resistir</gradient>"),
+            List.of("<gradient:#450A0A:#B91C1C><bold>☠ ONI CHESTPLATE ☠</bold></gradient>",
+                "<#FCA5A5>Forged with ancient power.", "",
+                "&l&a| &6ENCHANTMENTS", "{enchantments}",
+                "&l&a| &6ABILITIES", "{abilities}",
+                "<gradient:#F87171:#FCA5A5>✔ Built to endure</gradient>"));
         normalizeBuiltInLoreSpacing(lore);
         saveYaml(lore, loreFile);
 
@@ -4888,7 +4899,13 @@ public final class IxKitsPlugin extends JavaPlugin implements Listener, CommandE
         ensurePalette(palettes, "glacier_rgb", "Glaciar RGB", "#BAE6FD", "#2563EB");
         ensurePalette(palettes, "royal_flow_rgb", "Flujo Real RGB", "#FDE68A", "#A78BFA");
         ensurePalette(palettes, "rose_gold_rgb", "Oro Rosado RGB", "#F9A8D4", "#FBBF24");
-                saveYaml(palettes, paletteFile);
+        ensurePalette(palettes, "ragnarok_rgb", "Ragnarok RGB", "#F97316", "#7F1D1D");
+        ensurePalette(palettes, "oni_blood_rgb", "Sangre ONI RGB", "#FCA5A5", "#450A0A");
+        ensurePalette(palettes, "legendary_rgb", "Legendario RGB", "#FDE68A", "#F59E0B");
+        ensurePalette(palettes, "mythic_rgb", "Mítico RGB", "#C084FC", "#6D28D9");
+        ensurePalette(palettes, "matrix_rgb", "Matriz RGB", "#86EFAC", "#166534");
+        ensurePalette(palettes, "prism_rgb", "Prisma RGB", "#22D3EE", "#EC4899");
+        saveYaml(palettes, paletteFile);
 
         File enchantFile = new File(templatesDir, "enchantments.yml");
         YamlConfiguration enchants = YamlConfiguration.loadConfiguration(enchantFile);
@@ -4908,7 +4925,24 @@ public final class IxKitsPlugin extends JavaPlugin implements Listener, CommandE
         setPresetDefaults(enchants, "mace_burst", Map.of("density", 5, "breach", 4, "wind_burst", 2, "unbreaking", 4, "mending", 1));
         setPresetDefaults(enchants, "swift_boots", Map.of("feather_falling", 5, "depth_strider", 4, "soul_speed", 3, "unbreaking", 4, "mending", 1));
         setPresetDefaults(enchants, "fishing_rod", Map.of("luck_of_the_sea", 4, "lure", 4, "unbreaking", 4, "mending", 1));
+        setPresetDefaults(enchants, "berserker_sword", Map.of("sharpness", 7, "unbreaking", 5, "fire_aspect", 2, "looting", 5, "sweeping_edge", 4, "mending", 1));
+        setPresetDefaults(enchants, "oni_blade", Map.of("sharpness", 8, "fire_aspect", 2, "looting", 4, "unbreaking", 6, "mending", 1));
+        setPresetDefaults(enchants, "ragnarok_sword", Map.of("sharpness", 10, "unbreaking", 7, "fire_aspect", 2, "looting", 6, "sweeping_edge", 5, "mending", 1));
+        setPresetDefaults(enchants, "silk_miner_pickaxe", Map.of("efficiency", 6, "silk_touch", 1, "unbreaking", 5, "mending", 1));
+        setPresetDefaults(enchants, "excavator_pickaxe", Map.of("efficiency", 8, "fortune", 5, "unbreaking", 6, "mending", 1));
+        setPresetDefaults(enchants, "woodcutter_axe", Map.of("efficiency", 6, "sharpness", 4, "unbreaking", 5, "mending", 1));
+        setPresetDefaults(enchants, "hunter_bow", Map.of("power", 7, "punch", 2, "flame", 1, "infinity", 1, "unbreaking", 5));
+        setPresetDefaults(enchants, "rapid_crossbow", Map.of("quick_charge", 4, "piercing", 5, "unbreaking", 5, "mending", 1));
+        setPresetDefaults(enchants, "oni_armor", Map.of("protection", 6, "projectile_protection", 4, "unbreaking", 6, "thorns", 3, "mending", 1));
+        setPresetDefaults(enchants, "guardian_armor", Map.of("protection", 5, "blast_protection", 4, "unbreaking", 6, "mending", 1));
+        setPresetDefaults(enchants, "swift_leggings", Map.of("protection", 4, "swift_sneak", 3, "unbreaking", 5, "mending", 1));
+        setPresetDefaults(enchants, "titan_boots", Map.of("protection", 5, "feather_falling", 6, "depth_strider", 3, "soul_speed", 3, "unbreaking", 6, "mending", 1));
+        setPresetDefaults(enchants, "storm_trident", Map.of("loyalty", 3, "impaling", 6, "channeling", 1, "unbreaking", 5, "mending", 1));
+        setPresetDefaults(enchants, "impact_mace", Map.of("density", 6, "breach", 5, "wind_burst", 3, "unbreaking", 5, "mending", 1));
+        setPresetDefaults(enchants, "master_fisher", Map.of("luck_of_the_sea", 5, "lure", 5, "unbreaking", 5, "mending", 1));
+        setPresetDefaults(enchants, "farmer_hoe", Map.of("efficiency", 5, "unbreaking", 5, "fortune", 3, "mending", 1));
         saveYaml(enchants, enchantFile);
+        initializeNameTemplates();
     }
 
     private void ensurePalette(YamlConfiguration yaml, String key, String display, String color, String accent) {
