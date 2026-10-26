@@ -2100,18 +2100,28 @@ public final class IxKitsPlugin extends JavaPlugin implements Listener, CommandE
             p.sendMessage(prefix() + tr("Selecciona primero un objeto.", "Select an item first."));
             return;
         }
+        int applied = 0;
+        int skipped = 0;
         for (String rawKey : section.getKeys(false)) {
             NamespacedKey key = rawKey.contains(":") ? NamespacedKey.fromString(rawKey) : NamespacedKey.minecraft(rawKey.toLowerCase(Locale.ROOT));
             Enchantment enchantment = key == null ? null : Registry.ENCHANTMENT.get(key);
-            if (enchantment != null) target.addUnsafeEnchantment(enchantment, Math.max(1, Math.min(32767, section.getInt(rawKey, 1))));
+            if (enchantment == null || !enchantment.canEnchantItem(target) || hasConflictingEnchant(target, enchantment)) {
+                skipped++;
+                continue;
+            }
+            enchantment.getKey();
+            target.addUnsafeEnchantment(enchantment, Math.max(1, Math.min(32767, section.getInt(rawKey, 1))));
+            applied++;
         }
         if (project != null) saveProjectItem(project, projectPage, targetSlot, target);
-        p.sendMessage(prefix() + tr("Preset aplicado: §d", "Preset applied: §d") + prettyKey(presetName));
+        p.sendMessage(prefix() + tr("Preset aplicado: §d", "Preset applied: §d") + prettyKey(presetName)
+            + " §8· §7" + tr("aplicados: ", "applied: ") + applied
+            + (skipped > 0 ? " §8· §e" + tr("omitidos: ", "skipped: ") + skipped : ""));
         if (project != null) openItemEditor(p, project, projectPage, targetSlot);
         else openEnchantTemplates(p, 0, null, 0, -1);
     }
 
-    private void openPaletteTemplates(Player p, int requestedPage, String project, int projectPage, int targetSlot) {
+        private void openPaletteTemplates(Player p, int requestedPage, String project, int projectPage, int targetSlot) {
         openPaletteTemplates(p, requestedPage, project, projectPage, targetSlot, "both");
     }
 
@@ -3830,7 +3840,8 @@ public final class IxKitsPlugin extends JavaPlugin implements Listener, CommandE
             return;
         }
         YamlConfiguration yaml = YamlConfiguration.loadConfiguration(file);
-        ItemStack source = yaml.getItemStack(storagePath(page, targetSlot));
+        String sourcePath = storagePath(page, targetSlot);
+        ItemStack source = yaml.getItemStack(sourcePath);
         if (source == null || source.getType().isAir()) {
             player.sendMessage(prefix() + configuredMessage("set-fill.source-required", "&eSelecciona primero una espada, herramienta o pieza de armadura.", "&eSelect a sword, tool or armor piece first."));
             return;
@@ -3839,20 +3850,28 @@ public final class IxKitsPlugin extends JavaPlugin implements Listener, CommandE
         String armorTier = tierForArmor(source.getType().name(), toolTier);
         String startHex = setPaletteStart(toolTier);
         String endHex = setPaletteEnd(toolTier);
+        String sourceTemplate = yaml.getString("lore-template." + sourcePath);
+        if (sourceTemplate != null && (sourceTemplate.isBlank() || yamlListForLoreTemplate(sourceTemplate).isEmpty())) sourceTemplate = null;
+        if (sourceTemplate != null) {
+            String[] pair = paletteForLoreTemplate(sourceTemplate, startHex, endHex);
+            startHex = pair[0];
+            endHex = pair[1];
+        }
+
         int created = 0;
         int skipped = 0;
         projectService.backupBeforeChange(file);
 
-        // Tools are inserted only into free slots. Existing project items are never replaced.
+        // Every created item inherits the selected lore template and its color identity.
+        // Dynamic placeholders then render the enchantments and abilities of each individual piece.
         for (String suffix : List.of("SWORD", "PICKAXE", "AXE", "SHOVEL", "HOE")) {
             Material material = Material.matchMaterial(toolTier + "_" + suffix);
             if (material == null || projectContainsMaterial(yaml, material)) { skipped++; continue; }
-            String templateKey = suggestSetLore(material);
+            String templateKey = sourceTemplate != null ? sourceTemplate : suggestSetLore(material);
             ItemStack generated = createGeneratedSetItem(source, material, templateKey, startHex, endHex);
             if (placeGeneratedItem(yaml, generated, templateKey)) created++; else skipped++;
         }
 
-        // Armor goes into the appropriate equipment slot whenever possible.
         for (String suffix : List.of("HELMET", "CHESTPLATE", "LEGGINGS", "BOOTS")) {
             Material material = Material.matchMaterial(armorTier + "_" + suffix);
             if (material == null || projectContainsMaterial(yaml, material)) { skipped++; continue; }
@@ -3864,26 +3883,30 @@ public final class IxKitsPlugin extends JavaPlugin implements Listener, CommandE
             };
             ItemStack current = yaml.getItemStack("equipment." + equipmentKey);
             if (current != null && !current.getType().isAir()) { skipped++; continue; }
-            ItemStack generated = createGeneratedSetItem(source, material, "set_armor_sections", startHex, endHex);
+            String templateKey = sourceTemplate != null ? sourceTemplate : "set_armor_sections";
+            ItemStack generated = createGeneratedSetItem(source, material, templateKey, startHex, endHex);
             yaml.set("equipment." + equipmentKey, generated);
-            yaml.set("lore-template.equipment." + equipmentKey, "set_armor_sections");
+            yaml.set("lore-template.equipment." + equipmentKey, templateKey);
             created++;
         }
 
         if (!projectContainsMaterial(yaml, Material.SHIELD)) {
-            ItemStack shield = createGeneratedSetItem(source, Material.SHIELD, "set_shield_sections", startHex, endHex);
             ItemStack currentOffhand = yaml.getItemStack("equipment.offhand");
             if (currentOffhand == null || currentOffhand.getType().isAir()) {
+                String templateKey = sourceTemplate != null ? sourceTemplate : "set_shield_sections";
+                ItemStack shield = createGeneratedSetItem(source, Material.SHIELD, templateKey, startHex, endHex);
                 yaml.set("equipment.offhand", shield);
-                yaml.set("lore-template.equipment.offhand", "set_shield_sections");
+                yaml.set("lore-template.equipment.offhand", templateKey);
                 created++;
-            } else if (placeGeneratedItem(yaml, shield, "set_shield_sections")) created++;
-            else skipped++;
+            } else if (sourceTemplate == null) {
+                ItemStack shield = createGeneratedSetItem(source, Material.SHIELD, "set_shield_sections", startHex, endHex);
+                if (placeGeneratedItem(yaml, shield, "set_shield_sections")) created++; else skipped++;
+            } else skipped++;
         } else skipped++;
 
         for (Material material : List.of(Material.BOW, Material.CROSSBOW)) {
             if (projectContainsMaterial(yaml, material)) { skipped++; continue; }
-            String templateKey = "set_ranged_sections";
+            String templateKey = sourceTemplate != null ? sourceTemplate : "set_ranged_sections";
             ItemStack ranged = createGeneratedSetItem(source, material, templateKey, startHex, endHex);
             if (placeGeneratedItem(yaml, ranged, templateKey)) created++; else skipped++;
         }
@@ -3894,6 +3917,7 @@ public final class IxKitsPlugin extends JavaPlugin implements Listener, CommandE
             saveYaml(yaml, file);
             player.sendMessage(prefix() + configuredMessage("set-fill.success", "&a✓ Conjunto generado correctamente.", "&a✓ Set generated successfully."));
             player.sendMessage(prefix() + configuredMessage("set-fill.added", "&7Objetos añadidos: &b{count}", "&7Items added: &b{count}", "{count}", String.valueOf(created)));
+            if (sourceTemplate != null) player.sendMessage(prefix() + tr("§7Estilo heredado de la plantilla: §d", "§7Inherited style from template: §d") + prettyKey(sourceTemplate));
             if (skipped > 0) player.sendMessage(prefix() + configuredMessage("set-fill.skipped", "&8Espacios ocupados o incompatibles omitidos: &7{count}", "&8Occupied or incompatible slots skipped: &7{count}", "{count}", String.valueOf(skipped)));
         } else {
             player.sendMessage(prefix() + configuredMessage("set-fill.no-room", "&eNo había espacios compatibles. No se sobrescribió ningún objeto.", "&eNo compatible empty slots were found. No items were overwritten."));
@@ -3901,7 +3925,23 @@ public final class IxKitsPlugin extends JavaPlugin implements Listener, CommandE
         openItemEditor(player, project, page, targetSlot);
     }
 
-    private String tierForTools(String materialName) {
+    private String[] paletteForLoreTemplate(String templateKey, String fallbackStart, String fallbackEnd) {
+        YamlConfiguration lore = YamlConfiguration.loadConfiguration(new File(templatesDir, "lore.yml"));
+        List<String> lines = lore.getStringList(templateKey + (isEnglish() ? ".lore_en" : ".lore"));
+        if (lines.isEmpty()) lines = lore.getStringList(templateKey + ".lore");
+        java.util.regex.Matcher matcher = java.util.regex.Pattern.compile("(?i)(?:&#|#)([0-9a-f]{6})").matcher(String.join(" ", lines));
+        List<String> colors = new ArrayList<>();
+        while (matcher.find()) {
+            String color = "#" + matcher.group(1).toUpperCase(Locale.ROOT);
+            if (!colors.contains(color)) colors.add(color);
+        }
+        return new String[] {
+            colors.isEmpty() ? fallbackStart : colors.get(0),
+            colors.size() > 1 ? colors.get(1) : fallbackEnd
+        };
+    }
+
+        private String tierForTools(String materialName) {
         for (String tier : List.of("NETHERITE", "DIAMOND", "GOLDEN", "IRON", "STONE", "WOODEN")) {
             if (materialName.startsWith(tier + "_")) return tier;
         }
@@ -5119,6 +5159,7 @@ public final class IxKitsPlugin extends JavaPlugin implements Listener, CommandE
         target.setItemMeta(meta);
         projectService.backupBeforeChange(file);
         yaml.set("lore-template." + itemPath, key);
+        yaml.set("palette-lore." + itemPath, null);
         yaml.set(itemPath, target);
         refreshLinkedLore(yaml, projectPage, targetSlot, target);
         yaml.set(itemPath, target);
