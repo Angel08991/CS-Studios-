@@ -4951,6 +4951,53 @@ public final class IxKitsPlugin extends JavaPlugin implements Listener, CommandE
         if (!yaml.contains(key + ".accent")) yaml.set(key + ".accent", accent);
     }
 
+    private void initializeNameTemplates() {
+        File file = new File(templatesDir, "names.yml");
+        YamlConfiguration names = YamlConfiguration.loadConfiguration(file);
+        ensureNameTemplate(names, "ragnarok", "RAGNAROK", "swords", "#F97316", "#EF4444");
+        ensureNameTemplate(names, "legendary", "LEGENDARIO", "swords", "#FDE68A", "#F59E0B");
+        ensureNameTemplate(names, "mythic", "MÍTICO", "swords", "#C084FC", "#7C3AED");
+        ensureNameTemplate(names, "excalibur", "EXCALIBUR", "swords", "#FDE68A", "#FFFFFF");
+        ensureNameTemplate(names, "oni_blade", "FILO ONI", "swords", "#FCA5A5", "#B91C1C");
+        ensureNameTemplate(names, "soulreaper", "SOULREAPER", "swords", "#A78BFA", "#312E81");
+        ensureNameTemplate(names, "voidfang", "VOIDFANG", "swords", "#22D3EE", "#4C1D95");
+        ensureNameTemplate(names, "dragonslayer", "DRAGON SLAYER", "swords", "#FDBA74", "#991B1B");
+        ensureNameTemplate(names, "eclipse", "ECLIPSE", "swords", "#475569", "#C084FC");
+        ensureNameTemplate(names, "divine_miner", "MINERO DIVINO", "pickaxes", "#6EE7B7", "#0891B2");
+        ensureNameTemplate(names, "worldbreaker", "ROMPEMUNDOS", "pickaxes", "#FDE047", "#EA580C");
+        ensureNameTemplate(names, "deepcore", "DEEPCORE", "pickaxes", "#67E8F9", "#164E63");
+        ensureNameTemplate(names, "genesis_pick", "GÉNESIS", "pickaxes", "#C4B5FD", "#6D28D9");
+        ensureNameTemplate(names, "infinite_tool", "INFINITO", "tools", "#67E8F9", "#A78BFA");
+        ensureNameTemplate(names, "collector", "RECOLECTOR", "tools", "#86EFAC", "#15803D");
+        ensureNameTemplate(names, "titan", "TITÁN", "tools", "#D1D5DB", "#475569");
+        ensureNameTemplate(names, "forger", "FORJADOR", "tools", "#FB923C", "#7C2D12");
+        ensureNameTemplate(names, "ancient_soul", "ALMA ANTIGUA", "fragments", "#C4B5FD", "#6D28D9");
+        ensureNameTemplate(names, "astral_fragment", "FRAGMENTO ASTRAL", "fragments", "#67E8F9", "#C084FC");
+        ensureNameTemplate(names, "ragnarok_core", "NÚCLEO RAGNAROK", "fragments", "#FB7185", "#F59E0B");
+        ensureNameTemplate(names, "divine_diamond", "DIAMANTE DIVINO", "minerals", "#BAE6FD", "#2563EB");
+        ensureNameTemplate(names, "ancient_emerald", "ESMERALDA ANCESTRAL", "minerals", "#6EE7B7", "#047857");
+        ensureNameTemplate(names, "eternal_ruby", "RUBÍ ETERNO", "minerals", "#FDA4AF", "#9F1239");
+        ensureNameTemplate(names, "celestial_guard", "GUARDIÁN CELESTIAL", "armor", "#C4B5FD", "#2563EB");
+        ensureNameTemplate(names, "oni_chest", "PERCHERA ONI", "armor", "#FCA5A5", "#B91C1C");
+        ensureNameTemplate(names, "colossus", "COLOSO", "armor", "#FDE68A", "#78350F");
+        ensureNameTemplate(names, "phoenix_armor", "FÉNIX", "armor", "#FDBA74", "#DC2626");
+        ensureNameTemplate(names, "storm_bow", "TORMENTA", "bows", "#67E8F9", "#1D4ED8");
+        ensureNameTemplate(names, "nightpiercer", "NIGHTPIERCER", "bows", "#A5B4FC", "#1E1B4B");
+        ensureNameTemplate(names, "starfall", "STARFALL", "misc", "#FDE68A", "#C084FC");
+        ensureNameTemplate(names, "omega", "OMEGA", "misc", "#F472B6", "#7C3AED");
+        ensureNameTemplate(names, "celestial", "CELESTIAL", "misc", "#BAE6FD", "#A78BFA");
+        ensureNameTemplate(names, "artifact", "ARTEFACTO", "misc", "#FDE68A", "#D97706");
+        ensureNameTemplate(names, "primordial", "PRIMORDIAL", "misc", "#86EFAC", "#166534");
+        saveYaml(names, file);
+    }
+
+    private void ensureNameTemplate(YamlConfiguration yaml, String key, String display, String category, String start, String end) {
+        if (!yaml.contains(key + ".display")) yaml.set(key + ".display", display);
+        if (!yaml.contains(key + ".category")) yaml.set(key + ".category", category);
+        if (!yaml.contains(key + ".start")) yaml.set(key + ".start", start);
+        if (!yaml.contains(key + ".end")) yaml.set(key + ".end", end);
+    }
+
     private void setPresetDefaults(YamlConfiguration yaml, String preset, Map<String, Integer> values) {
         for (Map.Entry<String, Integer> entry : values.entrySet()) {
             String path = preset + "." + entry.getKey();
@@ -4975,11 +5022,13 @@ public final class IxKitsPlugin extends JavaPlugin implements Listener, CommandE
             "aeris_blade_rgb", "soup_ignifuga_rgb", "mineral_ancient_rgb", "token_koth_rgb",
             "armor_onyx_rgb", "sword_rpg_sections", "armor_vanguard_sections", "armor_dragon_rgb",
             "tool_miner_sections", "archer_bow_sections", "set_weapon_sections", "set_tool_sections",
-            "set_armor_sections", "set_ranged_sections", "set_shield_sections"
+            "set_armor_sections", "set_ranged_sections", "set_shield_sections", "oni_blade", "oni_armor", "oni_perchera"
         );
         for (String key : builtIns) {
             normalizeLoreSpacingAt(lore, key + ".lore");
             normalizeLoreSpacingAt(lore, key + ".lore_en");
+            normalizeLoreSectionsAt(lore, key + ".lore");
+            normalizeLoreSectionsAt(lore, key + ".lore_en");
         }
     }
 
@@ -4989,19 +5038,52 @@ public final class IxKitsPlugin extends JavaPlugin implements Listener, CommandE
         List<String> normalized = new ArrayList<>();
         for (String line : original) {
             String value = line == null ? "" : line;
-            boolean section = value.matches("(?i).*\\b(encantamientos|habilidades|efectos especiales|atributos|enchantments|abilities|special effects|attributes|set abilities)\\b.*");
-            if (section && !normalized.isEmpty() && !normalized.get(normalized.size() - 1).isBlank()) normalized.add("");
+            // Preserve authored spacing; only collapse duplicates so section headers don't appear doubled.
             if (value.isBlank()) {
                 if (!normalized.isEmpty() && !normalized.get(normalized.size() - 1).isBlank()) normalized.add("");
-            } else {
-                normalized.add(value);
-            }
+            } else normalized.add(value);
         }
         while (!normalized.isEmpty() && normalized.get(normalized.size() - 1).isBlank()) normalized.remove(normalized.size() - 1);
         if (!normalized.equals(original)) yaml.set(path, normalized);
     }
 
-    private void ensureLoreTemplate(YamlConfiguration yaml, String key, String displayEs, String displayEn, List<String> loreEs, List<String> loreEn) {
+    private void normalizeLoreSectionsAt(YamlConfiguration yaml, String path) {
+        List<String> lines = yaml.getStringList(path);
+        if (lines.isEmpty()) return;
+        boolean english = path.endsWith(".lore_en");
+        boolean changed = false;
+        List<String> normalized = new ArrayList<>(lines.size());
+        for (String line : lines) {
+            String value = line == null ? "" : line;
+            String plain = value.replaceAll("(?i)<[^>]*>", " ")
+                .replaceAll("(?i)&#[0-9a-f]{6}", " ")
+                .replaceAll("(?i)[&§][0-9a-fk-or]", " ")
+                .replaceAll("\\s+", " ").trim();
+            String lower = plain.toLowerCase(Locale.ROOT);
+            if (!value.trim().equalsIgnoreCase("{enchantments}")
+                && lower.contains(english ? "enchantments" : "encantamientos") && plain.length() <= 48) {
+                value = english ? "&l&a| &6ENCHANTMENTS" : "&l&a| &6ENCANTAMIENTOS";
+                changed = true;
+            } else if (!value.trim().equalsIgnoreCase("{abilities}")
+                && lower.contains(english ? "abilities" : "habilidades") && plain.length() <= 48) {
+                value = english ? "&l&a| &6ABILITIES" : "&l&a| &6HABILIDADES";
+                changed = true;
+            }
+            value = switch (value) {
+                case "Armadura marcada por una fuerza ancestral." -> "Forjada con poder ancestral.";
+                case "Armor marked by an ancestral force." -> "Forged with ancient power.";
+                case "Una reliquia sellada por el pacto de sangre." -> "Sellada por un pacto de sangre.";
+                case "A relic sealed by a blood pact." -> "Sealed by a blood pact.";
+                case "✔ Reclamada en el campo de batalla" -> "✔ Reclamada en batalla";
+                case "✔ Claimed on the battlefield" -> "✔ Claimed in battle";
+                default -> value;
+            };
+            normalized.add(value);
+        }
+        if (changed || !normalized.equals(lines)) yaml.set(path, normalized);
+    }
+
+        private void ensureLoreTemplate(YamlConfiguration yaml, String key, String displayEs, String displayEn, List<String> loreEs, List<String> loreEn) {
         if (!yaml.contains(key + ".lore")) yaml.set(key + ".lore", loreEs);
         if (!yaml.contains(key + ".lore_en")) yaml.set(key + ".lore_en", loreEn);
         if (!yaml.contains(key + ".display")) yaml.set(key + ".display", displayEs);
