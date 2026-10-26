@@ -3388,12 +3388,12 @@ public final class IxKitsPlugin extends JavaPlugin implements Listener, CommandE
                 else openEditor(p, h.project, h.page);
             } else if (slot == 10) promptInput(p, InputType.ITEM_NAME, h.project, h.page, h.targetSlot,
                 "Escribe el nombre con MiniMessage/RGB:", "Type the name with MiniMessage/RGB:");
-            else if (slot == 11) openLoreEditor(p, h.project, h.page, h.targetSlot, 0);
-            else if (slot == 12) openLoreTemplateCategories(p, h.project, h.page, h.targetSlot);
-            else if (slot == 13) openEnchantments(p, h.project, h.page, h.targetSlot, 0);
-            else if (slot == 14) openEnchantTemplates(p, 0, h.project, h.page, h.targetSlot);
-            else if (slot == 15) openAbilities(p, h.project, h.page, h.targetSlot);
-            else if (slot == 16) openSpecialProperties(p, h.project, h.page, h.targetSlot);
+            else if (slot == 11) openNameTemplates(p, 0, h.project, h.page, h.targetSlot, "all");
+            else if (slot == 12) openLoreEditor(p, h.project, h.page, h.targetSlot, 0);
+            else if (slot == 13) openLoreTemplateCategories(p, h.project, h.page, h.targetSlot);
+            else if (slot == 14) openEnchantments(p, h.project, h.page, h.targetSlot, 0);
+            else if (slot == 15) openEnchantTemplates(p, 0, h.project, h.page, h.targetSlot);
+            else if (slot == 16) openAbilities(p, h.project, h.page, h.targetSlot);
             else if (slot == 19) openPaletteTemplates(p, 0, h.project, h.page, h.targetSlot);
             else if (slot == 20) {
                 ItemStack target = getProjectItem(h.project, h.page, h.targetSlot);
@@ -3419,23 +3419,24 @@ public final class IxKitsPlugin extends JavaPlugin implements Listener, CommandE
                 "Escribe el custom model data numérico o - para borrarlo:", "Type the numeric custom model data or - to clear it:");
             else if (slot == 23) openAttributes(p, h.project, h.page, h.targetSlot);
             else if (slot == 24) openFlags(p, h.project, h.page, h.targetSlot);
-            else if (slot == 25) {
+            else if (slot == 25) openSpecialProperties(p, h.project, h.page, h.targetSlot);
+            else if (slot == 28) {
                 ItemStack target = getProjectItem(h.project, h.page, h.targetSlot);
                 if (target != null && target.getItemMeta() instanceof LeatherArmorMeta) {
                     promptInput(p, InputType.LEATHER_COLOR, h.project, h.page, h.targetSlot,
                         "Escribe el color como #RRGGBB o R,G,B:", "Type a color as #RRGGBB or R,G,B:");
                 } else p.sendMessage(prefix() + tr("§eSolo disponible para armadura de cuero.", "§eOnly available for leather armor."));
-            } else if (slot == 28) openPotionTypes(p, h.project, h.page, h.targetSlot, 0);
-            else if (slot == 29) {
+            } else if (slot == 29) openPotionTypes(p, h.project, h.page, h.targetSlot, 0);
+            else if (slot == 30) {
                 ItemStack source = getProjectItem(h.project, h.page, h.targetSlot);
                 if (source != null && !source.getType().isAir()) {
                     setClipboard(p.getUniqueId(), source);
                     p.sendMessage(prefix() + configuredMessage("clipboard.saved", "&aObjeto copiado y guardado en disco.", "&aItem copied and saved to disk."));
                 }
                 openItemEditor(p, h.project, h.page, h.targetSlot);
-            } else if (slot == 30) openClipboard(p, h.project, h.page, h.targetSlot);
-            else if (slot == 32) fillCompleteSet(p, h.project, h.page, h.targetSlot);
-            else if (slot == 33) {
+            } else if (slot == 31) openClipboard(p, h.project, h.page, h.targetSlot);
+            else if (slot == 33) fillCompleteSet(p, h.project, h.page, h.targetSlot);
+            else if (slot == 34) {
                 YamlConfiguration yaml = YamlConfiguration.loadConfiguration(projectFile(h.project));
                 ItemStack target = yaml.getItemStack(storagePath(h.page, h.targetSlot));
                 if (target != null) {
@@ -3448,6 +3449,15 @@ public final class IxKitsPlugin extends JavaPlugin implements Listener, CommandE
                 }
                 openItemEditor(p, h.project, h.page, h.targetSlot);
             }
+        } else if (h.kind.equals("name-templates")) {
+            int listPage = h.project == null ? h.page : h.subPage;
+            if (slot == 45) {
+                if (h.project == null) openTemplates(p);
+                else openItemEditor(p, h.project, h.page, h.targetSlot);
+            } else if (slot == 47) openNameTemplates(p, Math.max(0, listPage - 1), h.project, h.page, h.targetSlot, h.query);
+            else if (slot == 51) openNameTemplates(p, listPage + 1, h.project, h.page, h.targetSlot, h.query);
+            else if (slot == 49) openNameTemplates(p, 0, h.project, h.page, h.targetSlot, nextNameCategory(h.query));
+            else if (h.entryBySlot.containsKey(slot)) applyNameTemplate(p, h.entryBySlot.get(slot), h.project, h.page, h.targetSlot);
         } else if (h.kind.equals("potion-types")) {
             if (slot == 45) openItemEditor(p, h.project, h.page, h.targetSlot);
             else if (slot == 47) openPotionTypes(p, h.project, h.page, h.targetSlot, Math.max(0, h.subPage - 1));
