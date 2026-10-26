@@ -2244,12 +2244,8 @@ public final class IxKitsPlugin extends JavaPlugin implements Listener, CommandE
             projectService.backupBeforeChange(file);
             YamlConfiguration projectYaml = YamlConfiguration.loadConfiguration(file);
             String itemPath = storagePath(projectPage, targetSlot);
-            if (scope.equals("lore") || scope.equals("both")) projectYaml.set("palette-lore." + itemPath, key);
+            projectYaml.set("palette-lore." + itemPath, null);
             projectYaml.set(itemPath, target);
-            if (scope.equals("lore") || scope.equals("both")) {
-                refreshLinkedLore(projectYaml, projectPage, targetSlot, target);
-                projectYaml.set(itemPath, target);
-            }
             projectYaml.set("format-version", 2);
             projectYaml.set("updated", System.currentTimeMillis());
             saveYaml(projectYaml, file);
@@ -2260,7 +2256,7 @@ public final class IxKitsPlugin extends JavaPlugin implements Listener, CommandE
         else openPaletteTemplates(p, 0, null, 0, -1, scope);
     }
 
-    private void openItemEditor(Player p, String project, int page, int targetSlot) {
+        private void openItemEditor(Player p, String project, int page, int targetSlot) {
         ItemStack target = getProjectItem(project, page, targetSlot);
         if (target == null || target.getType().isAir()) {
             p.sendMessage(prefix() + tr("§eEste espacio está vacío. Coloca un objeto antes de abrir el taller.", "§eThis slot is empty. Place an item before opening the workshop."));
@@ -3708,14 +3704,10 @@ public final class IxKitsPlugin extends JavaPlugin implements Listener, CommandE
         if (meta == null) return;
         meta.lore(loreComponents(resolveLorePlaceholders(lines, target)));
         target.setItemMeta(meta);
-        String paletteKey = projectYaml.getString("palette-lore." + itemPath);
-        if (paletteKey != null && !paletteKey.isBlank()) {
-            YamlConfiguration palettes = YamlConfiguration.loadConfiguration(new File(templatesDir, "palettes.yml"));
-            if (palettes.contains(paletteKey + ".color")) applyPaletteToItem(target, palettes, paletteKey, "lore");
-        }
+        // Palette presets are one-shot actions. Dynamic lore refresh must not reapply prior palettes.
     }
 
-    private void clearLinkedLoreTemplate(String project, int page, int slot) {
+        private void clearLinkedLoreTemplate(String project, int page, int slot) {
         File file = projectFile(project);
         if (!file.isFile()) return;
         YamlConfiguration yaml = YamlConfiguration.loadConfiguration(file);
